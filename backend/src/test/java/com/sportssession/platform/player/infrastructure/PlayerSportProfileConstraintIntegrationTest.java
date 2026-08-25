@@ -3,7 +3,7 @@ package com.sportssession.platform.player.infrastructure;
 import com.sportssession.platform.player.domain.Player;
 import com.sportssession.platform.player.domain.PlayerSportProfile;
 import com.sportssession.platform.player.domain.SkillLevel;
-import com.sportssession.platform.player.domain.SportCode;
+import com.sportssession.platform.shared.domain.SportCode;
 import com.sportssession.platform.support.PostgreSqlIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,4 +45,3 @@ class PlayerSportProfileConstraintIntegrationTest extends PostgreSqlIntegrationT
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }
-

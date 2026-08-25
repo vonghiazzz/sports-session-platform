@@ -161,8 +161,7 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
     private String validPlayerJson(String displayName) throws Exception {
         return objectMapper.writeValueAsString(new CreatePlayerRequest(
                 displayName,
-                com.sportssession.platform.player.domain.SportCode.BADMINTON,
+                com.sportssession.platform.shared.domain.SportCode.BADMINTON,
                 com.sportssession.platform.player.domain.SkillLevel.INTERMEDIATE));
     }
 }
-

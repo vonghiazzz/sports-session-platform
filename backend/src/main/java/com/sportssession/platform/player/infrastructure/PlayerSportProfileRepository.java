@@ -1,6 +1,6 @@
 package com.sportssession.platform.player.infrastructure;
 
-import com.sportssession.platform.player.domain.SportCode;
+import com.sportssession.platform.shared.domain.SportCode;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
@@ -17,4 +17,3 @@ public interface PlayerSportProfileRepository
 
     boolean existsByPlayerIdAndSportCode(UUID playerId, SportCode sportCode);
 }
-

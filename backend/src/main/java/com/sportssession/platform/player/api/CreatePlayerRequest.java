@@ -1,7 +1,7 @@
 package com.sportssession.platform.player.api;
 
 import com.sportssession.platform.player.domain.SkillLevel;
-import com.sportssession.platform.player.domain.SportCode;
+import com.sportssession.platform.shared.domain.SportCode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -18,4 +18,3 @@ public record CreatePlayerRequest(
         SkillLevel skillLevel
 ) {
 }
-

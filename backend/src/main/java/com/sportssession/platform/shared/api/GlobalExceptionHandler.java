@@ -2,6 +2,10 @@ package com.sportssession.platform.shared.api;
 
 import com.sportssession.platform.player.domain.DuplicatePlayerSportProfileException;
 import com.sportssession.platform.player.domain.PlayerNotFoundException;
+import com.sportssession.platform.venue.domain.CourtNotFoundException;
+import com.sportssession.platform.venue.domain.DuplicateCourtNameException;
+import com.sportssession.platform.venue.domain.InactiveVenueException;
+import com.sportssession.platform.venue.domain.VenueNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -26,6 +30,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PlayerNotFoundException.class)
     ResponseEntity<ApiError> handlePlayerNotFound(
             PlayerNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler({VenueNotFoundException.class, CourtNotFoundException.class})
+    ResponseEntity<ApiError> handleVenueResourceNotFound(
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
@@ -74,6 +86,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicatePlayerSportProfileException.class)
     ResponseEntity<ApiError> handleDuplicateProfile(
             DuplicatePlayerSportProfileException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler({DuplicateCourtNameException.class, InactiveVenueException.class})
+    ResponseEntity<ApiError> handleVenueConflict(
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());

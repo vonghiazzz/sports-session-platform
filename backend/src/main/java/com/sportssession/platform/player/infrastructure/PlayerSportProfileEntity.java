@@ -2,7 +2,7 @@ package com.sportssession.platform.player.infrastructure;
 
 import com.sportssession.platform.player.domain.PlayerSportProfile;
 import com.sportssession.platform.player.domain.SkillLevel;
-import com.sportssession.platform.player.domain.SportCode;
+import com.sportssession.platform.shared.domain.SportCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -95,4 +95,3 @@ public class PlayerSportProfileEntity {
         return updatedAt;
     }
 }
-

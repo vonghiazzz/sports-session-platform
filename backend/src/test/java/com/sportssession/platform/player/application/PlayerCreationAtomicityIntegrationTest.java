@@ -1,7 +1,7 @@
 package com.sportssession.platform.player.application;
 
 import com.sportssession.platform.player.domain.SkillLevel;
-import com.sportssession.platform.player.domain.SportCode;
+import com.sportssession.platform.shared.domain.SportCode;
 import com.sportssession.platform.player.infrastructure.PlayerRepository;
 import com.sportssession.platform.player.infrastructure.PlayerSportProfileEntity;
 import com.sportssession.platform.player.infrastructure.PlayerSportProfileRepository;
@@ -46,4 +46,3 @@ class PlayerCreationAtomicityIntegrationTest extends PostgreSqlIntegrationTest {
         assertThat(playerRepository.count()).isZero();
     }
 }
-

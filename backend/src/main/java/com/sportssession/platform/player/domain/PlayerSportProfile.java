@@ -1,5 +1,7 @@
 package com.sportssession.platform.player.domain;
 
+import com.sportssession.platform.shared.domain.SportCode;
+
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -31,4 +33,3 @@ public record PlayerSportProfile(
                 UUID.randomUUID(), playerId, sportCode, skillLevel, now, now);
     }
 }
-
