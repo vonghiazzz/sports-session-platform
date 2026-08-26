@@ -55,6 +55,24 @@ public record SessionCourt(
         return copy(SessionCourtStatus.AVAILABLE, now);
     }
 
+    public SessionCourt startMatch(Instant now) {
+        if (status != SessionCourtStatus.AVAILABLE) {
+            throw new InvalidSessionCourtStateException(
+                    "Session Court cannot start a Match from status " + status);
+        }
+        return copy(SessionCourtStatus.PLAYING, now);
+    }
+
+    public SessionCourt releaseFromMatch(Instant releasedAt) {
+        if (status != SessionCourtStatus.PLAYING) {
+            throw new InvalidSessionCourtStateException(
+                    "Session Court cannot release from a Match from status "
+                            + status
+            );
+        }
+        return copy(SessionCourtStatus.AVAILABLE, releasedAt);
+    }
+
     private SessionCourt copy(SessionCourtStatus newStatus, Instant now) {
         return new SessionCourt(
                 id, sessionId, courtId, newStatus, addedAt, version, createdAt, now);

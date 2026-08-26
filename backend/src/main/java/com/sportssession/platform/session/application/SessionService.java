@@ -45,6 +45,7 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final SessionParticipantRepository participantRepository;
     private final SessionCourtRepository sessionCourtRepository;
+    private final SessionActiveMatchLookup activeMatchLookup;
 
     private final PlayerLookup playerLookup;
     private final VenueLookup venueLookup;
@@ -56,6 +57,7 @@ public class SessionService {
             SessionRepository sessionRepository,
             SessionParticipantRepository participantRepository,
             SessionCourtRepository sessionCourtRepository,
+            SessionActiveMatchLookup activeMatchLookup,
             PlayerLookup playerLookup,
             VenueLookup venueLookup,
             CourtLookup courtLookup,
@@ -64,6 +66,7 @@ public class SessionService {
         this.sessionRepository = sessionRepository;
         this.participantRepository = participantRepository;
         this.sessionCourtRepository = sessionCourtRepository;
+        this.activeMatchLookup = activeMatchLookup;
         this.playerLookup = playerLookup;
         this.venueLookup = venueLookup;
         this.courtLookup = courtLookup;
@@ -121,11 +124,24 @@ public class SessionService {
 
     @Transactional
     public Session completeSession(UUID sessionId) {
-        SessionEntity entity = findSessionEntity(sessionId);
+        SessionEntity entity = findSessionEntityForUpdate(sessionId);
+        Session session = entity.toDomain();
+
+        if (session.status() != SessionStatus.IN_PROGRESS) {
+            throw new InvalidSessionStateException(
+                    "Session cannot complete from status " + session.status()
+            );
+        }
+
+        if (activeMatchLookup.hasPlayingMatch(sessionId)) {
+            throw new SessionResourceConflictException(
+                    "Session cannot complete while a Match is PLAYING"
+            );
+        }
 
         Instant now = clock.instant();
 
-        Session updated = entity.toDomain().complete(now);
+        Session updated = session.complete(now);
 
         entity.applyRuntimeState(updated);
 
@@ -474,6 +490,14 @@ public class SessionService {
     private SessionEntity findSessionEntity(UUID sessionId) {
         return sessionRepository
                 .findById(sessionId)
+                .orElseThrow(
+                        () -> new SessionNotFoundException(sessionId)
+                );
+    }
+
+    private SessionEntity findSessionEntityForUpdate(UUID sessionId) {
+        return sessionRepository
+                .findByIdForUpdate(sessionId)
                 .orElseThrow(
                         () -> new SessionNotFoundException(sessionId)
                 );

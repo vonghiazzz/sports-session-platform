@@ -66,6 +66,18 @@ public record SessionParticipant(
                 totalPausedSeconds, null, now);
     }
 
+    public SessionParticipant startMatch(Instant now) {
+        requireStatus(ParticipantStatus.WAITING, "start a Match");
+        return copy(ParticipantStatus.PLAYING, checkedInAt, null, null,
+                totalPausedSeconds, null, now);
+    }
+
+    public SessionParticipant releaseFromMatch(Instant releasedAt) {
+        requireStatus(ParticipantStatus.PLAYING, "release from a Match");
+        return copy(ParticipantStatus.WAITING, checkedInAt, releasedAt, null,
+                totalPausedSeconds, null, releasedAt);
+    }
+
     public SessionParticipant resume(Instant now) {
         requireStatus(ParticipantStatus.PAUSED, "resume");
 

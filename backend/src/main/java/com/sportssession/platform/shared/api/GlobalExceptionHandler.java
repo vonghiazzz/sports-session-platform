@@ -2,6 +2,11 @@ package com.sportssession.platform.shared.api;
 
 import com.sportssession.platform.player.domain.DuplicatePlayerSportProfileException;
 import com.sportssession.platform.player.domain.PlayerNotFoundException;
+import com.sportssession.platform.match.domain.InvalidManualMatchRequestException;
+import com.sportssession.platform.match.domain.InvalidMatchResultException;
+import com.sportssession.platform.match.domain.InvalidMatchStateException;
+import com.sportssession.platform.match.domain.MatchNotFoundException;
+import com.sportssession.platform.match.domain.MatchResourceConflictException;
 import com.sportssession.platform.session.domain.DuplicateSessionCourtException;
 import com.sportssession.platform.session.domain.DuplicateSessionParticipantException;
 import com.sportssession.platform.session.domain.InvalidParticipantStateException;
@@ -18,6 +23,7 @@ import com.sportssession.platform.venue.domain.InactiveVenueException;
 import com.sportssession.platform.venue.domain.VenueNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -66,9 +72,33 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(MatchNotFoundException.class)
+    ResponseEntity<ApiError> handleMatchNotFound(
+            MatchNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(InvalidSessionTimeRangeException.class)
     ResponseEntity<ApiError> handleInvalidSessionTimeRange(
             InvalidSessionTimeRangeException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidManualMatchRequestException.class)
+    ResponseEntity<ApiError> handleInvalidManualMatchRequest(
+            InvalidManualMatchRequestException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidMatchResultException.class)
+    ResponseEntity<ApiError> handleInvalidMatchResult(
+            InvalidMatchResultException exception,
             HttpServletRequest request
     ) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
@@ -140,6 +170,18 @@ public class GlobalExceptionHandler {
             ObjectOptimisticLockingFailureException.class
     })
     ResponseEntity<ApiError> handleSessionConflict(
+            RuntimeException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler({
+            MatchResourceConflictException.class,
+            InvalidMatchStateException.class,
+            PessimisticLockingFailureException.class
+    })
+    ResponseEntity<ApiError> handleMatchResourceConflict(
             RuntimeException exception,
             HttpServletRequest request
     ) {
