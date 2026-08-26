@@ -14,7 +14,7 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesOnlyThePhaseOneFoundationTables() {
+    void flywayCreatesFoundationAndSessionRuntimeTablesOnly() {
         String serverVersion = jdbcTemplate.queryForObject(
                 "SHOW server_version", String.class);
         assertThat(serverVersion).startsWith("18.4");
@@ -31,13 +31,16 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 "players",
                 "player_sport_profiles",
                 "venues",
-                "courts");
-        assertThat(tables).doesNotContain(
+                "courts",
                 "sessions",
                 "session_participants",
-                "session_courts",
+                "session_courts");
+        assertThat(tables).doesNotContain(
                 "matches",
+                "match_participants",
+                "match_results",
                 "ratings",
+                "rating_events",
                 "recommendations",
                 "payments",
                 "bookings",
@@ -49,5 +52,12 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 WHERE version = '1' AND success = true
                 """, Integer.class);
         assertThat(migrationCount).isEqualTo(1);
+
+        Integer sessionMigrationCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE version = '2' AND success = true
+                """, Integer.class);
+        assertThat(sessionMigrationCount).isEqualTo(1);
     }
 }
