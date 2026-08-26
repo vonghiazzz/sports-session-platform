@@ -1,5 +1,6 @@
 package com.sportssession.platform.session.domain;
 
+import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.shared.domain.SportCode;
 import org.junit.jupiter.api.Test;
 

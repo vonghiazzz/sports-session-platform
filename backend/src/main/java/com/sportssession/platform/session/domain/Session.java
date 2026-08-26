@@ -1,6 +1,7 @@
 package com.sportssession.platform.session.domain;
 
 import com.sportssession.platform.shared.domain.SportCode;
+import com.sportssession.platform.shared.domain.MatchFormat;
 
 import java.time.Instant;
 import java.util.Objects;

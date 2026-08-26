@@ -6,7 +6,7 @@ import com.sportssession.platform.player.domain.Player;
 import com.sportssession.platform.player.infrastructure.PlayerEntity;
 import com.sportssession.platform.player.infrastructure.PlayerRepository;
 import com.sportssession.platform.player.infrastructure.PlayerSportProfileRepository;
-import com.sportssession.platform.session.domain.MatchFormat;
+import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.session.infrastructure.SessionCourtRepository;
 import com.sportssession.platform.session.infrastructure.SessionParticipantRepository;
 import com.sportssession.platform.session.infrastructure.SessionRepository;

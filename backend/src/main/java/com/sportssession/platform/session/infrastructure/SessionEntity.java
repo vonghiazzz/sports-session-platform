@@ -1,6 +1,6 @@
 package com.sportssession.platform.session.infrastructure;
 
-import com.sportssession.platform.session.domain.MatchFormat;
+import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.session.domain.Session;
 import com.sportssession.platform.session.domain.SessionStatus;
 import com.sportssession.platform.shared.domain.SportCode;

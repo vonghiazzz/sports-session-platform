@@ -1,6 +1,6 @@
 package com.sportssession.platform.session.api;
 
-import com.sportssession.platform.session.domain.MatchFormat;
+import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.shared.domain.SportCode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
