@@ -15,5 +15,9 @@ public interface PlayerSportProfileRepository
     List<PlayerSportProfileEntity> findAllByPlayerIdInOrderByCreatedAtAsc(
             Collection<UUID> playerIds);
 
+    List<PlayerSportProfileEntity> findAllByPlayerIdInAndSportCode(
+            Collection<UUID> playerIds,
+            SportCode sportCode);
+
     boolean existsByPlayerIdAndSportCode(UUID playerId, SportCode sportCode);
 }
