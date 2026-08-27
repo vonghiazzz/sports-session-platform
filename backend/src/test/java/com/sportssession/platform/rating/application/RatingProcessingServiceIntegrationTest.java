@@ -57,6 +57,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -69,6 +71,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static com.sportssession.platform.rating.domain.WengLinPlackettLuceRatingEngine.ALGORITHM_VERSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,6 +95,18 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
 
     @Autowired
     private RatingProcessingService ratingProcessingService;
+
+    @Autowired
+    private RatingReconciliationService ratingReconciliationService;
+
+    @Autowired
+    private RatingContextLock ratingContextLock;
+
+    @Autowired
+    private PendingCompletedMatchRatingLookup pendingMatchLookup;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @Autowired
     private PlayerRatingRepository playerRatingRepository;
@@ -538,6 +557,333 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
         }
     }
 
+    @Test
+    void reconciliationReturnsIdleWithoutRatingWrites() {
+        assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.IDLE);
+        assertThat(playerRatingRepository.count()).isZero();
+        assertThat(ratingEventRepository.count()).isZero();
+    }
+
+    @Test
+    void reconciliationRecoversCompletedOperationalMatchAfterRatingCrashWindow()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        UUID matchId = createManualMatchThroughApi(fixture);
+        startAndCompleteThroughApi(matchId, TeamSide.A, 21, 18);
+
+        assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.APPLIED);
+
+        assertThat(playerRatingRepository.count()).isEqualTo(4);
+        assertThat(events(matchId)).hasSize(4);
+        assertOperationalStateReleased(fixture, matchId);
+    }
+
+    @Test
+    void reconciliationProcessesAtMostOnePendingMatchInCanonicalOrder() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T12:00:00Z");
+        UUID first = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID second = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+
+        assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.APPLIED);
+        assertThat(events(first)).hasSize(4);
+        assertThat(events(second)).isEmpty();
+        assertThat(playerRatingRepository.findAll())
+                .allSatisfy(rating -> assertThat(rating.getRatedMatches())
+                        .isEqualTo(1));
+
+        assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.APPLIED);
+        assertThat(events(second)).hasSize(4);
+        assertThat(playerRatingRepository.findAll())
+                .allSatisfy(rating -> assertThat(rating.getRatedMatches())
+                        .isEqualTo(2));
+    }
+
+    @Test
+    void reconciliationUsesPostgreSqlUuidOrderForEqualCompletionTimes() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant completedAt = Instant.parse("2026-08-27T13:00:00Z");
+        UUID firstCreated = createCompletedMatch(
+                fixture, completedAt, TeamSide.A, null, null);
+        UUID secondCreated = createCompletedMatch(
+                fixture, completedAt, TeamSide.B, null, null);
+        List<UUID> databaseOrder = jdbcTemplate.query(
+                "SELECT id FROM matches WHERE id IN (?, ?) ORDER BY id ASC",
+                (resultSet, rowNumber) -> resultSet.getObject("id", UUID.class),
+                firstCreated,
+                secondCreated
+        );
+
+        assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.APPLIED);
+
+        assertThat(events(databaseOrder.getFirst())).hasSize(4);
+        assertThat(events(databaseOrder.getLast())).isEmpty();
+    }
+
+    @Test
+    void reconciliationSkipsFullyProcessedMatchAndAppliesNextPendingMatch() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T14:00:00Z");
+        UUID processed = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID pending = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        assertThat(ratingProcessingService.processRating(processed))
+                .isEqualTo(RatingProcessingResult.APPLIED);
+
+        assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.APPLIED);
+
+        assertThat(events(processed)).hasSize(4);
+        assertThat(events(pending)).hasSize(4);
+        assertThat(playerRatingRepository.findAll())
+                .allSatisfy(rating -> assertThat(rating.getRatedMatches())
+                        .isEqualTo(2));
+    }
+
+    @Test
+    void reconciliationKeepsPartialEventPoisonAheadOfLaterMatch() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T15:00:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        ratingProcessingService.processRating(poison);
+        UUID retainedEvent = events(poison).getFirst().getId();
+        jdbcTemplate.update(
+                "DELETE FROM rating_events WHERE match_id = ? AND id <> ?",
+                poison,
+                retainedEvent
+        );
+        Map<UUID, RatingSnapshot> before = ratingSnapshots();
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(RatingProcessingIntegrityException.class);
+
+        assertThat(events(poison)).hasSize(1);
+        assertThat(events(later)).isEmpty();
+        assertThat(ratingSnapshots()).isEqualTo(before);
+    }
+
+    @Test
+    void reconciliationKeepsWrongFourEventIdentityPoisonAheadOfLaterMatch() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T16:00:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        ratingProcessingService.processRating(poison);
+        UUID externalRating = createExternalRating();
+        jdbcTemplate.update(
+                "UPDATE rating_events SET player_rating_id = ? WHERE id = ?",
+                externalRating,
+                events(poison).getFirst().getId()
+        );
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(RatingProcessingIntegrityException.class);
+
+        assertThat(events(poison)).hasSize(4);
+        assertThat(events(later)).isEmpty();
+    }
+
+    @Test
+    void reconciliationKeepsAlgorithmMismatchPoisonAheadOfLaterMatch() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T17:00:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        ratingProcessingService.processRating(poison);
+        jdbcTemplate.update(
+                "UPDATE rating_events SET algorithm_version = 'legacy-test-v0' "
+                        + "WHERE id = ?",
+                events(poison).getFirst().getId()
+        );
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(RatingProcessingIntegrityException.class);
+
+        assertThat(events(poison)).hasSize(4);
+        assertThat(events(later)).isEmpty();
+    }
+
+    @Test
+    void reconciliationKeepsPlayerRatingAlgorithmMismatchAsPoison() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T17:10:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        ratingProcessingService.processRating(poison);
+        jdbcTemplate.update(
+                "UPDATE player_ratings SET algorithm_version = 'legacy-test-v0' "
+                        + "WHERE id = ?",
+                events(poison).getFirst().getPlayerRatingId()
+        );
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(RatingProcessingIntegrityException.class);
+
+        assertThat(events(poison)).hasSize(4);
+        assertThat(events(later)).isEmpty();
+    }
+
+    @Test
+    void reconciliationKeepsMoreThanFourEventsAsPoison() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T17:20:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        ratingProcessingService.processRating(poison);
+        UUID externalRating = createExternalRating();
+        ratingEventRepository.saveAndFlush(RatingEventEntity.create(
+                externalRating,
+                poison,
+                1,
+                RatingOutcome.WIN,
+                new RatingState(25.0, 8.0),
+                new RatingState(26.0, 7.9),
+                ALGORITHM_VERSION,
+                Instant.now()
+        ));
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(RatingProcessingIntegrityException.class);
+
+        assertThat(events(poison)).hasSize(5);
+        assertThat(events(later)).isEmpty();
+    }
+
+    @Test
+    void reconciliationSelectsUnsupportedResultVersionPoisonBeforeLaterMatch() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T18:00:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        jdbcTemplate.update(
+                "UPDATE matches SET result_version = 2 WHERE id = ?",
+                poison
+        );
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(UnsupportedRatingResultVersionException.class);
+
+        assertThat(playerRatingRepository.count()).isZero();
+        assertThat(ratingEventRepository.count()).isZero();
+        assertThat(events(later)).isEmpty();
+    }
+
+    @Test
+    void missingProfilePoisonRollsBackReleasesLockAndRemainsEarliest() {
+        RuntimeFixture poisonFixture = createFixture(GOLDEN_SKILLS, Set.of(3));
+        RuntimeFixture laterFixture = createFixture(GOLDEN_SKILLS, Set.of());
+        UUID poison = createCompletedMatch(
+                poisonFixture,
+                Instant.parse("2026-08-27T19:00:00Z"),
+                TeamSide.A,
+                null,
+                null
+        );
+        UUID later = createCompletedMatch(
+                laterFixture,
+                Instant.parse("2026-08-27T19:00:01Z"),
+                TeamSide.A,
+                null,
+                null
+        );
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(MissingPlayerRatingPriorException.class);
+        assertThat(playerRatingRepository.count()).isZero();
+        assertThat(ratingEventRepository.count()).isZero();
+
+        Boolean reacquired = new TransactionTemplate(transactionManager).execute(
+                status -> ratingContextLock.tryAcquire(
+                        SportCode.BADMINTON,
+                        MatchFormat.DOUBLES
+                )
+        );
+        assertThat(reacquired).isTrue();
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(MissingPlayerRatingPriorException.class);
+        assertThat(events(poison)).isEmpty();
+        assertThat(events(later)).isEmpty();
+    }
+
+    @Test
+    void overlappingReconciliationReturnsAppliedAndBusyWithoutDoubleRating()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        UUID matchId = createCompletedMatch(
+                fixture,
+                Instant.parse("2026-08-27T20:00:00Z"),
+                TeamSide.A,
+                null,
+                null
+        );
+        CountDownLatch lockHeld = new CountDownLatch(1);
+        CountDownLatch releaseOwner = new CountDownLatch(1);
+        RatingContextLock holdingLock = new HoldingRatingContextLock(
+                ratingContextLock,
+                lockHeld,
+                releaseOwner
+        );
+        RatingReconciliationService holdingService =
+                new RatingReconciliationService(
+                        holdingLock,
+                        pendingMatchLookup,
+                        ratingProcessingService
+                );
+        TransactionTemplate transactionTemplate =
+                new TransactionTemplate(transactionManager);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        try {
+            Future<RatingReconciliationResult> owner = executor.submit(
+                    () -> transactionTemplate.execute(
+                            status -> holdingService.reconcileOne(
+                                    SportCode.BADMINTON,
+                                    MatchFormat.DOUBLES
+                            )
+                    )
+            );
+            assertThat(lockHeld.await(10, TimeUnit.SECONDS)).isTrue();
+
+            assertThat(reconcileOne()).isEqualTo(RatingReconciliationResult.BUSY);
+
+            releaseOwner.countDown();
+            assertThat(owner.get(20, TimeUnit.SECONDS))
+                    .isEqualTo(RatingReconciliationResult.APPLIED);
+        } finally {
+            releaseOwner.countDown();
+            executor.shutdownNow();
+        }
+
+        assertThat(events(matchId)).hasSize(4);
+        assertThat(playerRatingRepository.count()).isEqualTo(4);
+        assertThat(playerRatingRepository.findAll())
+                .allSatisfy(rating -> assertThat(rating.getRatedMatches())
+                        .isEqualTo(1));
+    }
+
+    private RatingReconciliationResult reconcileOne() {
+        return ratingReconciliationService.reconcileOne(
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        );
+    }
+
     private RuntimeFixture createFixture(
             List<SkillLevel> skillLevels,
             Set<Integer> missingProfileIndexes
@@ -846,6 +1192,39 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
         private RuntimeFixture {
             playerIds = List.copyOf(playerIds);
             participantIds = List.copyOf(participantIds);
+        }
+    }
+
+    private record HoldingRatingContextLock(
+            RatingContextLock delegate,
+            CountDownLatch lockHeld,
+            CountDownLatch releaseOwner
+    ) implements RatingContextLock {
+
+        @Override
+        public boolean tryAcquire(
+                SportCode sportCode,
+                MatchFormat matchFormat
+        ) {
+            boolean acquired = delegate.tryAcquire(sportCode, matchFormat);
+            if (!acquired) {
+                return false;
+            }
+            lockHeld.countDown();
+            try {
+                if (!releaseOwner.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException(
+                            "Timed out waiting to release Rating context lock"
+                    );
+                }
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(
+                        "Interrupted while holding Rating context lock",
+                        exception
+                );
+            }
+            return true;
         }
     }
 
