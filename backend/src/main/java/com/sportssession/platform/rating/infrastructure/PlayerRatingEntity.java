@@ -1,6 +1,8 @@
 package com.sportssession.platform.rating.infrastructure;
 
 import com.sportssession.platform.player.domain.SkillLevel;
+import com.sportssession.platform.rating.domain.RatingNumericNormalizer;
+import com.sportssession.platform.rating.domain.RatingState;
 import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.shared.domain.SportCode;
 import jakarta.persistence.Column;
@@ -88,6 +90,45 @@ public class PlayerRatingEntity {
         this.version = version;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    public static PlayerRatingEntity initialize(
+            UUID playerId,
+            SportCode sportCode,
+            MatchFormat matchFormat,
+            SkillLevel initialSkillLevel,
+            RatingState initialState,
+            String algorithmVersion,
+            Instant now
+    ) {
+        return new PlayerRatingEntity(
+                UUID.randomUUID(),
+                playerId,
+                sportCode,
+                matchFormat,
+                RatingNumericNormalizer.normalizeToDecimal(initialState.mu()),
+                RatingNumericNormalizer.normalizeToDecimal(initialState.sigma()),
+                0,
+                initialSkillLevel,
+                algorithmVersion,
+                0,
+                now,
+                now
+        );
+    }
+
+    public RatingState toRatingState() {
+        return new RatingState(
+                ratingValue.doubleValue(),
+                uncertainty.doubleValue()
+        );
+    }
+
+    public void applyRating(RatingState state, Instant now) {
+        this.ratingValue = RatingNumericNormalizer.normalizeToDecimal(state.mu());
+        this.uncertainty = RatingNumericNormalizer.normalizeToDecimal(state.sigma());
+        this.ratedMatches = Math.addExact(ratedMatches, 1);
+        this.updatedAt = now;
     }
 
     public UUID getId() {

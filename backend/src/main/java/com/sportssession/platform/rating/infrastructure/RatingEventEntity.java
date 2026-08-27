@@ -1,6 +1,8 @@
 package com.sportssession.platform.rating.infrastructure;
 
 import com.sportssession.platform.rating.domain.RatingOutcome;
+import com.sportssession.platform.rating.domain.RatingNumericNormalizer;
+import com.sportssession.platform.rating.domain.RatingState;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -77,6 +79,31 @@ public class RatingEventEntity {
         this.afterUncertainty = afterUncertainty;
         this.algorithmVersion = algorithmVersion;
         this.createdAt = createdAt;
+    }
+
+    public static RatingEventEntity create(
+            UUID playerRatingId,
+            UUID matchId,
+            int resultVersion,
+            RatingOutcome outcome,
+            RatingState before,
+            RatingState after,
+            String algorithmVersion,
+            Instant now
+    ) {
+        return new RatingEventEntity(
+                UUID.randomUUID(),
+                playerRatingId,
+                matchId,
+                resultVersion,
+                outcome,
+                RatingNumericNormalizer.normalizeToDecimal(before.mu()),
+                RatingNumericNormalizer.normalizeToDecimal(after.mu()),
+                RatingNumericNormalizer.normalizeToDecimal(before.sigma()),
+                RatingNumericNormalizer.normalizeToDecimal(after.sigma()),
+                algorithmVersion,
+                now
+        );
     }
 
     public UUID getId() {
