@@ -40,12 +40,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import static com.sportssession.platform.rating.domain.WengLinPlackettLuceRatingEngine.ALGORITHM_VERSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RatingRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
-
-    private static final String ALGORITHM_VERSION = "weng-lin-pl-v1";
 
     @Autowired
     private PlayerRatingRepository playerRatingRepository;
