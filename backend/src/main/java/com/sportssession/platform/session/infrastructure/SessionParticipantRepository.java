@@ -29,4 +29,8 @@ public interface SessionParticipantRepository
     );
 
     List<SessionParticipantEntity> findAllBySessionIdOrderByJoinedAtAscIdAsc(UUID sessionId);
+
+    List<SessionParticipantEntity> findAllBySessionIdOrderByPlayerIdAscIdAsc(
+            UUID sessionId
+    );
 }

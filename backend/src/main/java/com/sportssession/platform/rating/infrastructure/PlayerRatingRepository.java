@@ -29,4 +29,18 @@ public interface PlayerRatingRepository
             @Param("sportCode") SportCode sportCode,
             @Param("matchFormat") MatchFormat matchFormat
     );
+
+    @Query("""
+            SELECT rating
+            FROM PlayerRatingEntity rating
+            WHERE rating.playerId IN :playerIds
+              AND rating.sportCode = :sportCode
+              AND rating.matchFormat = :matchFormat
+            ORDER BY rating.playerId
+            """)
+    List<PlayerRatingEntity> findContextRatings(
+            @Param("playerIds") Collection<UUID> playerIds,
+            @Param("sportCode") SportCode sportCode,
+            @Param("matchFormat") MatchFormat matchFormat
+    );
 }
