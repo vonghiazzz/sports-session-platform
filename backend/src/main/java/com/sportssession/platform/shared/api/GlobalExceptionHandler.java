@@ -7,6 +7,11 @@ import com.sportssession.platform.match.domain.InvalidMatchResultException;
 import com.sportssession.platform.match.domain.InvalidMatchStateException;
 import com.sportssession.platform.match.domain.MatchNotFoundException;
 import com.sportssession.platform.match.domain.MatchResourceConflictException;
+import com.sportssession.platform.matchmaking.application.MatchmakingRatingResolutionException;
+import com.sportssession.platform.matchmaking.application.MatchmakingRecommendationException;
+import com.sportssession.platform.matchmaking.application.MatchmakingRecommendationFailureReason;
+import com.sportssession.platform.matchmaking.application.MatchmakingSessionSnapshotException;
+import com.sportssession.platform.matchmaking.domain.InvalidMatchmakingInputException;
 import com.sportssession.platform.session.domain.DuplicateSessionCourtException;
 import com.sportssession.platform.session.domain.DuplicateSessionParticipantException;
 import com.sportssession.platform.session.domain.InvalidParticipantStateException;
@@ -198,6 +203,56 @@ public class GlobalExceptionHandler {
                 "The request conflicts with a database constraint",
                 request,
                 Map.of());
+    }
+
+    @ExceptionHandler(MatchmakingSessionSnapshotException.class)
+    ResponseEntity<ApiError> handleMatchmakingResourceNotFound(
+            MatchmakingSessionSnapshotException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(MatchmakingRecommendationException.class)
+    ResponseEntity<ApiError> handleMatchmakingRecommendation(
+            MatchmakingRecommendationException exception,
+            HttpServletRequest request
+    ) {
+        if (exception.reason()
+                == MatchmakingRecommendationFailureReason.SESSION_NOT_IN_PROGRESS
+                || exception.reason()
+                == MatchmakingRecommendationFailureReason
+                .SESSION_COURT_NOT_AVAILABLE) {
+            return error(
+                    HttpStatus.CONFLICT,
+                    exception.getMessage(),
+                    request,
+                    Map.of()
+            );
+        }
+        return matchmakingInternalError(request);
+    }
+
+    @ExceptionHandler({
+            MatchmakingRatingResolutionException.class,
+            InvalidMatchmakingInputException.class
+    })
+    ResponseEntity<ApiError> handleMatchmakingInternalFailure(
+            RuntimeException exception,
+            HttpServletRequest request
+    ) {
+        return matchmakingInternalError(request);
+    }
+
+    private ResponseEntity<ApiError> matchmakingInternalError(
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Matchmaking internal error",
+                request,
+                Map.of()
+        );
     }
 
     private ResponseEntity<ApiError> error(
