@@ -33,7 +33,7 @@ public record MatchResponse(
         return from(created.match(), created.participants());
     }
 
-    static MatchResponse from(
+    public static MatchResponse from(
             Match match,
             List<MatchParticipant> participants
     ) {

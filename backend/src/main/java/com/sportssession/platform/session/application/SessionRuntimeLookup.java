@@ -25,6 +25,11 @@ public interface SessionRuntimeLookup {
             UUID sessionCourtId
     );
 
+    SessionCourt requireScopedSessionCourtForUpdate(
+            UUID requestedSessionId,
+            UUID sessionCourtId
+    );
+
     List<SessionParticipant> requireSessionParticipantsForUpdate(
             UUID requestedSessionId,
             List<UUID> sessionParticipantIds

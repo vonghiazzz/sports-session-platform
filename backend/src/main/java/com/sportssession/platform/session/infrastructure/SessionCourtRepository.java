@@ -20,5 +20,17 @@ public interface SessionCourtRepository extends JpaRepository<SessionCourtEntity
     @Query("select court from SessionCourtEntity court where court.id = :courtId")
     Optional<SessionCourtEntity> findByIdForUpdate(@Param("courtId") UUID courtId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select court
+            from SessionCourtEntity court
+            where court.id = :courtId
+              and court.sessionId = :sessionId
+            """)
+    Optional<SessionCourtEntity> findByIdAndSessionIdForUpdate(
+            @Param("courtId") UUID courtId,
+            @Param("sessionId") UUID sessionId
+    );
+
     List<SessionCourtEntity> findAllBySessionIdOrderByAddedAtAscIdAsc(UUID sessionId);
 }

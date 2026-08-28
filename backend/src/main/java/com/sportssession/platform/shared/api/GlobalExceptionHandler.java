@@ -8,6 +8,8 @@ import com.sportssession.platform.match.domain.InvalidMatchStateException;
 import com.sportssession.platform.match.domain.MatchNotFoundException;
 import com.sportssession.platform.match.domain.MatchResourceConflictException;
 import com.sportssession.platform.matchmaking.application.MatchmakingRatingResolutionException;
+import com.sportssession.platform.matchmaking.application.InvalidRecommendationAcceptanceRequestException;
+import com.sportssession.platform.matchmaking.application.MatchmakingRecommendationAcceptanceException;
 import com.sportssession.platform.matchmaking.application.MatchmakingRecommendationException;
 import com.sportssession.platform.matchmaking.application.MatchmakingRecommendationFailureReason;
 import com.sportssession.platform.matchmaking.application.MatchmakingSessionSnapshotException;
@@ -211,6 +213,22 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidRecommendationAcceptanceRequestException.class)
+    ResponseEntity<ApiError> handleInvalidRecommendationAcceptanceRequest(
+            InvalidRecommendationAcceptanceRequestException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(MatchmakingRecommendationAcceptanceException.class)
+    ResponseEntity<ApiError> handleRecommendationAcceptanceConflict(
+            MatchmakingRecommendationAcceptanceException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(MatchmakingRecommendationException.class)

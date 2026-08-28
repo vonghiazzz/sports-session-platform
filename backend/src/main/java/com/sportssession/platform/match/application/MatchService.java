@@ -60,8 +60,12 @@ public class MatchService {
 
     @Transactional
     public CreatedManualMatch createManualMatch(CreateManualMatchCommand command) {
-        List<ManualMatchParticipantAssignment> assignments =
-                validateStructure(command.participants());
+        List<ValidatedAssignment> assignments = validateStructure(
+                command.participants().stream()
+                        .map(this::validatedAssignment)
+                        .toList(),
+                "A Manual Match requires exactly 4 participant assignments"
+        );
 
         Session session = sessionRuntimeLookup.requireSession(command.sessionId());
         if (session.status() != SessionStatus.IN_PROGRESS) {
@@ -85,7 +89,7 @@ public class MatchService {
             );
         }
 
-        for (ManualMatchParticipantAssignment assignment : assignments) {
+        for (ValidatedAssignment assignment : assignments) {
             SessionParticipant participant =
                     sessionRuntimeLookup.requireSessionParticipant(
                             command.sessionId(),
@@ -135,6 +139,114 @@ public class MatchService {
                         .toList();
 
         return new CreatedManualMatch(
+                persistedMatch.toDomain(),
+                persistedParticipants
+        );
+    }
+
+    @Transactional
+    public StartedMatch createAndStartRecommendedMatch(
+            CreateAndStartRecommendedMatchCommand command
+    ) {
+        List<ValidatedAssignment> assignments = validateStructure(
+                command.participants().stream()
+                        .map(this::validatedAssignment)
+                        .toList(),
+                "A Recommended Match requires exactly 4 participant assignments"
+        );
+
+        Session session = sessionRuntimeLookup.requireSessionForUpdate(
+                command.sessionId()
+        );
+        if (session.status() != SessionStatus.IN_PROGRESS) {
+            throw new MatchResourceConflictException(
+                    "Recommended Match can Start only while Session is IN_PROGRESS"
+            );
+        }
+
+        SessionCourt sessionCourt = sessionRuntimeLookup
+                .requireScopedSessionCourtForUpdate(
+                        command.sessionId(),
+                        command.sessionCourtId()
+                );
+        if (sessionCourt.status() != SessionCourtStatus.AVAILABLE) {
+            throw new MatchResourceConflictException(
+                    "Session Court must be AVAILABLE to Start Recommended Match"
+            );
+        }
+
+        List<UUID> participantIds = assignments.stream()
+                .map(ValidatedAssignment::sessionParticipantId)
+                .sorted()
+                .toList();
+        List<SessionParticipant> participants = sessionRuntimeLookup
+                .requireSessionParticipantsForUpdate(
+                        command.sessionId(),
+                        participantIds
+                );
+        Set<UUID> selectedParticipantIds = new HashSet<>(participantIds);
+        Set<UUID> lockedParticipantIds = new HashSet<>();
+        participants.forEach(participant ->
+                lockedParticipantIds.add(participant.id()));
+        if (participants.size() != 4
+                || !lockedParticipantIds.equals(selectedParticipantIds)) {
+            throw new MatchResourceConflictException(
+                    "Recommended Match Participants could not be locked exactly"
+            );
+        }
+        for (SessionParticipant participant : participants) {
+            if (!participant.sessionId().equals(command.sessionId())) {
+                throw new MatchResourceConflictException(
+                        "Session Participant belongs to a different Session: "
+                                + participant.id()
+                );
+            }
+            if (participant.status() != ParticipantStatus.WAITING) {
+                throw new MatchResourceConflictException(
+                        "Session Participant must be WAITING to Start Recommended Match: "
+                                + participant.id()
+                );
+            }
+        }
+
+        Instant startTime = clock.instant();
+        Match startedMatch = Match.create(
+                command.sessionId(),
+                command.sessionCourtId(),
+                MatchSource.RECOMMENDATION,
+                startTime
+        ).start(startTime);
+        SessionCourt playingCourt = sessionCourt.startMatch(startTime);
+        List<SessionParticipant> playingParticipants = participants.stream()
+                .map(participant -> participant.startMatch(startTime))
+                .toList();
+
+        MatchEntity persistedMatch = matchRepository.saveAndFlush(
+                MatchEntity.from(startedMatch)
+        );
+        List<MatchParticipantEntity> participantEntities = assignments.stream()
+                .map(assignment -> MatchParticipant.assign(
+                        startedMatch.id(),
+                        assignment.sessionParticipantId(),
+                        assignment.teamSide(),
+                        assignment.teamSlot()
+                ))
+                .map(MatchParticipantEntity::from)
+                .toList();
+        List<MatchParticipant> persistedParticipants =
+                matchParticipantRepository
+                        .saveAllAndFlush(participantEntities)
+                        .stream()
+                        .map(MatchParticipantEntity::toDomain)
+                        .toList();
+
+        sessionRuntimeLookup.applyMatchRuntimeState(
+                playingCourt,
+                playingParticipants
+        );
+        matchRepository.flush();
+
+        return new StartedMatch(
                 persistedMatch.toDomain(),
                 persistedParticipants
         );
@@ -389,12 +501,13 @@ public class MatchService {
                 .toList();
     }
 
-    private List<ManualMatchParticipantAssignment> validateStructure(
-            List<ManualMatchParticipantAssignment> assignments
+    private List<ValidatedAssignment> validateStructure(
+            List<ValidatedAssignment> assignments,
+            String countFailureMessage
     ) {
         if (assignments.size() != 4) {
             throw new InvalidManualMatchRequestException(
-                    "A Manual Match requires exactly 4 participant assignments"
+                    countFailureMessage
             );
         }
 
@@ -404,7 +517,7 @@ public class MatchService {
         int teamBCount = 0;
         boolean duplicateTeamSlot = false;
 
-        for (ManualMatchParticipantAssignment assignment : assignments) {
+        for (ValidatedAssignment assignment : assignments) {
             if (assignment == null
                     || assignment.sessionParticipantId() == null
                     || assignment.teamSide() == null) {
@@ -453,11 +566,35 @@ public class MatchService {
 
         return assignments.stream()
                 .sorted(Comparator
-                        .comparing(ManualMatchParticipantAssignment::teamSide)
+                        .comparing(ValidatedAssignment::teamSide)
                         .thenComparingInt(
-                                ManualMatchParticipantAssignment::teamSlot
+                                ValidatedAssignment::teamSlot
                         ))
                 .toList();
+    }
+
+    private ValidatedAssignment validatedAssignment(
+            ManualMatchParticipantAssignment assignment
+    ) {
+        return assignment == null
+                ? null
+                : new ValidatedAssignment(
+                assignment.sessionParticipantId(),
+                assignment.teamSide(),
+                assignment.teamSlot()
+        );
+    }
+
+    private ValidatedAssignment validatedAssignment(
+            RecommendedMatchParticipantAssignment assignment
+    ) {
+        return assignment == null
+                ? null
+                : new ValidatedAssignment(
+                assignment.sessionParticipantId(),
+                assignment.teamSide(),
+                assignment.teamSlot()
+        );
     }
 
     private List<MatchParticipant> validatePersistedComposition(
@@ -518,6 +655,13 @@ public class MatchService {
     }
 
     private record TeamSlot(TeamSide teamSide, int teamSlot) {
+    }
+
+    private record ValidatedAssignment(
+            UUID sessionParticipantId,
+            TeamSide teamSide,
+            int teamSlot
+    ) {
     }
 
     private record LockedPlayingResources(

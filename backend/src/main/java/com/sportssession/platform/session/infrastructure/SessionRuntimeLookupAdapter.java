@@ -86,6 +86,22 @@ public class SessionRuntimeLookupAdapter implements SessionRuntimeLookup {
     }
 
     @Override
+    public SessionCourt requireScopedSessionCourtForUpdate(
+            UUID requestedSessionId,
+            UUID sessionCourtId
+    ) {
+        return sessionCourtRepository.findByIdAndSessionIdForUpdate(
+                        sessionCourtId,
+                        requestedSessionId
+                )
+                .orElseThrow(() -> new SessionCourtNotFoundException(
+                        requestedSessionId,
+                        sessionCourtId
+                ))
+                .toDomain();
+    }
+
+    @Override
     public List<SessionParticipant> requireSessionParticipantsForUpdate(
             UUID requestedSessionId,
             List<UUID> sessionParticipantIds
