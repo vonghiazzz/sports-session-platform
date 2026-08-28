@@ -784,6 +784,50 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
     }
 
     @Test
+    void reconciliationKeepsVersionTwoWithFourCorrectEventsAsPoison() {
+        RuntimeFixture fixture = createFixture(GOLDEN_SKILLS, Set.of());
+        Instant firstTime = Instant.parse("2026-08-27T18:30:00Z");
+        UUID poison = createCompletedMatch(
+                fixture, firstTime, TeamSide.A, null, null);
+        UUID later = createCompletedMatch(
+                fixture, firstTime.plusSeconds(1), TeamSide.B, null, null);
+        jdbcTemplate.update(
+                "UPDATE matches SET result_version = 2 WHERE id = ?",
+                poison
+        );
+        createVersionTwoRatingEvidence(fixture, poison, TeamSide.A);
+        Map<UUID, RatingSnapshot> before = ratingSnapshots();
+
+        assertThat(events(poison, 2)).hasSize(4);
+        assertThat(pendingMatchLookup.findEarliestUnresolved(
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).contains(poison);
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(UnsupportedRatingResultVersionException.class);
+
+        assertThat(pendingMatchLookup.findEarliestUnresolved(
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).contains(poison);
+        assertThat(events(poison, 2)).hasSize(4);
+        assertThat(events(later)).isEmpty();
+        assertThat(ratingSnapshots()).isEqualTo(before);
+
+        assertThatThrownBy(this::reconcileOne)
+                .isInstanceOf(UnsupportedRatingResultVersionException.class);
+
+        assertThat(pendingMatchLookup.findEarliestUnresolved(
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).contains(poison);
+        assertThat(events(poison, 2)).hasSize(4);
+        assertThat(events(later)).isEmpty();
+        assertThat(ratingSnapshots()).isEqualTo(before);
+    }
+
+    @Test
     void missingProfilePoisonRollsBackReleasesLockAndRemainsEarliest() {
         RuntimeFixture poisonFixture = createFixture(GOLDEN_SKILLS, Set.of(3));
         RuntimeFixture laterFixture = createFixture(GOLDEN_SKILLS, Set.of());
@@ -1078,6 +1122,58 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
         return playerRatingRepository.saveAndFlush(rating).getId();
     }
 
+    private void createVersionTwoRatingEvidence(
+            RuntimeFixture fixture,
+            UUID matchId,
+            TeamSide winnerTeam
+    ) {
+        Instant now = Instant.parse("2026-08-27T18:30:02Z");
+        List<PlayerRatingEntity> initializedRatings = new ArrayList<>(4);
+        for (int index = 0; index < fixture.playerIds().size(); index++) {
+            SkillLevel skillLevel = GOLDEN_SKILLS.get(index);
+            initializedRatings.add(PlayerRatingEntity.initialize(
+                    fixture.playerIds().get(index),
+                    SportCode.BADMINTON,
+                    MatchFormat.DOUBLES,
+                    skillLevel,
+                    RatingInitializer.initialize(skillLevel),
+                    ALGORITHM_VERSION,
+                    now
+            ));
+        }
+        List<PlayerRatingEntity> ratings = playerRatingRepository
+                .saveAllAndFlush(initializedRatings);
+        WengLinPlackettLuceRatingEngine engine =
+                new WengLinPlackettLuceRatingEngine();
+        List<RatingUpdate> updates = engine.rate(
+                ratings.subList(0, 2).stream()
+                        .map(PlayerRatingEntity::toRatingState)
+                        .toList(),
+                ratings.subList(2, 4).stream()
+                        .map(PlayerRatingEntity::toRatingState)
+                        .toList(),
+                winnerTeam == TeamSide.A ? WinningTeam.A : WinningTeam.B
+        );
+        List<RatingEventEntity> events = new ArrayList<>(4);
+        for (int index = 0; index < ratings.size(); index++) {
+            PlayerRatingEntity rating = ratings.get(index);
+            RatingUpdate update = updates.get(index);
+            boolean won = (index < 2) == (winnerTeam == TeamSide.A);
+            rating.applyRating(update.after(), now);
+            events.add(RatingEventEntity.create(
+                    rating.getId(),
+                    matchId,
+                    2,
+                    won ? RatingOutcome.WIN : RatingOutcome.LOSS,
+                    update.before(),
+                    update.after(),
+                    ALGORITHM_VERSION,
+                    now
+            ));
+        }
+        ratingEventRepository.saveAllAndFlush(events);
+    }
+
     private Map<UUID, PlayerRatingEntity> ratingsByPlayer() {
         Map<UUID, PlayerRatingEntity> result = new HashMap<>();
         playerRatingRepository.findAll().forEach(
@@ -1121,8 +1217,15 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
     }
 
     private List<RatingEventEntity> events(UUID matchId) {
+        return events(matchId, 1);
+    }
+
+    private List<RatingEventEntity> events(UUID matchId, int resultVersion) {
         return ratingEventRepository
-                .findAllByMatchIdAndResultVersionOrderByPlayerRatingId(matchId, 1);
+                .findAllByMatchIdAndResultVersionOrderByPlayerRatingId(
+                        matchId,
+                        resultVersion
+                );
     }
 
     private UUID playerIdForRating(

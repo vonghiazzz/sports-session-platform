@@ -25,6 +25,8 @@ public class PostgreSqlPendingCompletedMatchRatingLookup
                AND session_record.sport_code = ?
                AND session_record.match_format = ?
                AND NOT (
+                   match_record.result_version = 1
+                   AND
                    (SELECT COUNT(*)
                       FROM match_participants assignment
                      WHERE assignment.match_id = match_record.id) = 4

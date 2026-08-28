@@ -17,3 +17,8 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+
+rating:
+  reconciliation:
+    enabled: true
+    fixed-delay-ms: 5000
