@@ -58,6 +58,20 @@ public class MatchService {
         this.clock = clock;
     }
 
+    @Transactional(readOnly = true)
+    public List<MatchDetails> getSessionMatches(UUID sessionId) {
+        sessionRuntimeLookup.requireSession(sessionId);
+
+        return matchRepository
+                .findAllBySessionIdOrderByCreatedAtAscIdAsc(sessionId)
+                .stream()
+                .map(matchEntity -> new MatchDetails(
+                        matchEntity.toDomain(),
+                        loadComposition(matchEntity.getId())
+                ))
+                .toList();
+    }
+
     @Transactional
     public CreatedManualMatch createManualMatch(CreateManualMatchCommand command) {
         List<ValidatedAssignment> assignments = validateStructure(
