@@ -1,20 +1,23 @@
-.app-shell {
-  width: min(100%, 72rem);
+.route-message {
+  width: min(100% - 2rem, 56rem);
   margin: 0 auto;
-  padding: 3rem 1.5rem;
+  padding: 5rem 0;
 }
 
-.app-shell h1 {
-  margin: 0.5rem 0;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  line-height: 1.1;
+.route-message h1 {
+  margin: 0.35rem 0 0.75rem;
+  font-size: clamp(2rem, 6vw, 3.5rem);
 }
 
-.app-shell p {
+.route-message p {
+  max-width: 42rem;
   margin: 0;
+  color: var(--muted-text);
 }
 
-.app-name {
-  color: #475569;
-  font-weight: 600;
+.route-message a {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: var(--accent-strong);
+  font-weight: 700;
 }
