@@ -220,6 +220,52 @@
   font-weight: 650;
 }
 
+.session-lifecycle-controls {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.35fr) minmax(0, 1fr);
+  gap: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.25rem;
+}
+
+.session-lifecycle-controls h2 {
+  margin: 0.15rem 0 0;
+  font-size: 1.1rem;
+}
+
+.session-lifecycle-operation {
+  min-width: 0;
+}
+
+.session-lifecycle-actions {
+  justify-content: flex-end;
+}
+
+.session-lifecycle-note {
+  margin: 0.6rem 0 0;
+  color: var(--danger-text);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.session-lifecycle-confirmation {
+  margin-top: 0.75rem;
+  border-left: 3px solid #a94858;
+  border-radius: 0.45rem;
+  padding: 0.7rem 0.8rem;
+  background: #fff5f6;
+}
+
+.session-lifecycle-confirmation p {
+  margin: 0 0 0.6rem;
+  color: var(--danger-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .consistency-warning {
   margin-top: 1rem;
   border-left: 4px solid var(--warning-border);
@@ -614,6 +660,24 @@
   .session-facts {
     grid-column: 1;
     grid-template-columns: 1fr;
+  }
+
+  .session-lifecycle-controls {
+    grid-column: 1;
+    grid-template-columns: 1fr;
+  }
+
+  .session-lifecycle-actions {
+    justify-content: stretch;
+  }
+
+  .session-lifecycle-actions > button,
+  .session-lifecycle-confirmation .action-area > button {
+    width: 100%;
+  }
+
+  .session-lifecycle-note {
+    text-align: left;
   }
 
   .court-grid {

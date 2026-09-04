@@ -63,6 +63,14 @@ export function getSessionMatches(
   return getJson(`/api/sessions/${segment(sessionId)}/matches`, signal)
 }
 
+export function completeSession(sessionId: string): Promise<SessionResponse> {
+  return postJson(`/api/sessions/${segment(sessionId)}/complete`)
+}
+
+export function cancelSession(sessionId: string): Promise<SessionResponse> {
+  return postJson(`/api/sessions/${segment(sessionId)}/cancel`)
+}
+
 export function createManualMatch(
   sessionId: string,
   request: CreateManualMatchRequest,

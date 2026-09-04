@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createLiveSessionInput } from '../test/liveSessionFixtures'
 import {
+  cancelSession,
   cancelMatch,
   checkInParticipant,
+  completeSession,
   completeMatch,
   createManualMatch,
   disableSessionCourt,
@@ -19,6 +21,18 @@ const participantId = input.participants[0].id
 const sessionCourtId = input.sessionCourts[0].id
 
 const actionCases = [
+  {
+    name: 'Complete Session',
+    execute: () => completeSession(sessionId),
+    path: `/api/sessions/${sessionId}/complete`,
+    response: { ...input.session, status: 'COMPLETED' as const },
+  },
+  {
+    name: 'Cancel Session',
+    execute: () => cancelSession(sessionId),
+    path: `/api/sessions/${sessionId}/cancel`,
+    response: { ...input.session, status: 'CANCELLED' as const },
+  },
   {
     name: 'Check-In',
     execute: () => checkInParticipant(sessionId, participantId),

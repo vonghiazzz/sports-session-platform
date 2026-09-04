@@ -22,6 +22,10 @@ import {
   useCreateManualMatch,
   useMatchLifecycleActions,
 } from './useManualMatchActions'
+import {
+  useSessionLifecycleActions,
+  type SessionLifecycleAction,
+} from './useSessionLifecycleActions'
 
 const SESSION_STATUS_LABELS: Readonly<
   Record<LiveSessionModel['header']['status'], string>
@@ -843,10 +847,14 @@ function CreatedMatchCard({
 
 function SessionHeader({
   model,
+  sessionId,
+  hasPlayingMatch,
   onRefresh,
   isRefreshing,
 }: {
   readonly model: LiveSessionModel
+  readonly sessionId: string
+  readonly hasPlayingMatch: boolean
   readonly onRefresh: () => Promise<void>
   readonly isRefreshing: boolean
 }) {
@@ -896,7 +904,135 @@ function SessionHeader({
           <dd>{model.header.startedAtLabel ?? 'Not started'}</dd>
         </div>
       </dl>
+      <SessionLifecycleControls
+        sessionId={sessionId}
+        sessionStatus={model.header.status}
+        hasPlayingMatch={hasPlayingMatch}
+      />
     </header>
+  )
+}
+
+function SessionLifecycleControls({
+  sessionId,
+  sessionStatus,
+  hasPlayingMatch,
+}: {
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly hasPlayingMatch: boolean
+}) {
+  const actionState = useSessionLifecycleActions(sessionId)
+  const [confirmation, setConfirmation] =
+    useState<SessionLifecycleAction | null>(null)
+
+  if (sessionStatus === 'COMPLETED' || sessionStatus === 'CANCELLED') {
+    return null
+  }
+
+  const completeIsAvailable = sessionStatus === 'IN_PROGRESS'
+  const activeConfirmation =
+    confirmation === 'COMPLETE' &&
+    (!completeIsAvailable || hasPlayingMatch)
+      ? null
+      : confirmation
+  const controlsLocked = actionState.isPending || activeConfirmation !== null
+  const confirmationMessage =
+    activeConfirmation === 'COMPLETE'
+      ? 'Complete this Session? This terminal action cannot be undone.'
+      : hasPlayingMatch
+        ? 'Cancel this Session? Playing Matches will not be resolved automatically. Complete or cancel them afterward to release Courts and players.'
+        : 'Cancel this Session? This terminal action cannot be undone.'
+
+  function executeConfirmedAction() {
+    if (activeConfirmation === null) {
+      return
+    }
+    const action = activeConfirmation
+    setConfirmation(null)
+    actionState.execute(action)
+  }
+
+  return (
+    <section
+      className="session-lifecycle-controls"
+      aria-labelledby="session-lifecycle-heading"
+    >
+      <div>
+        <p className="eyebrow">Session operations</p>
+        <h2 id="session-lifecycle-heading">End Session</h2>
+      </div>
+      <div className="session-lifecycle-operation">
+        <div className="action-area session-lifecycle-actions">
+          {completeIsAvailable && (
+            <button
+              className="primary-action-button"
+              type="button"
+              disabled={controlsLocked || hasPlayingMatch}
+              onClick={() => setConfirmation('COMPLETE')}
+            >
+              {actionState.pendingAction === 'COMPLETE'
+                ? 'Completing…'
+                : 'Complete Session'}
+            </button>
+          )}
+          <button
+            className="danger-action-button"
+            type="button"
+            disabled={controlsLocked}
+            onClick={() => setConfirmation('CANCEL')}
+          >
+            {actionState.pendingAction === 'CANCEL'
+              ? 'Cancelling…'
+              : 'Cancel Session'}
+          </button>
+        </div>
+        {completeIsAvailable && hasPlayingMatch && (
+          <p className="session-lifecycle-note" role="status">
+            Complete Session is unavailable while a Match is PLAYING. Complete
+            or cancel the playing Match first.
+          </p>
+        )}
+        {activeConfirmation !== null && (
+          <div className="session-lifecycle-confirmation">
+            <p>{confirmationMessage}</p>
+            <div className="action-area">
+              <button
+                className={
+                  activeConfirmation === 'CANCEL'
+                    ? 'danger-action-button'
+                    : 'primary-action-button'
+                }
+                type="button"
+                disabled={actionState.isPending}
+                onClick={executeConfirmedAction}
+              >
+                {actionState.pendingAction === 'COMPLETE'
+                  ? 'Completing…'
+                  : actionState.pendingAction === 'CANCEL'
+                    ? 'Cancelling…'
+                    : activeConfirmation === 'COMPLETE'
+                      ? 'Confirm Complete'
+                      : 'Confirm Cancel'}
+              </button>
+              <button
+                className="secondary-action-button"
+                type="button"
+                disabled={actionState.isPending}
+                onClick={() => setConfirmation(null)}
+              >
+                Keep Session
+              </button>
+            </div>
+          </div>
+        )}
+        {actionState.errorMessage && (
+          <p className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </p>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -957,6 +1093,10 @@ export function LiveSessionScreen({
     <main className="control-room">
       <SessionHeader
         model={model}
+        sessionId={state.data.session.id}
+        hasPlayingMatch={state.data.matches.some(
+          (match) => match.status === 'PLAYING',
+        )}
         onRefresh={state.refresh}
         isRefreshing={state.isRefreshing}
       />
