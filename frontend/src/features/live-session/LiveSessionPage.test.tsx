@@ -241,4 +241,95 @@ describe('LiveSessionScreen', () => {
       }),
     ).toBeEnabled()
   })
+
+  it('shows Create and Start controls only while the Session is in progress', () => {
+    renderScreen(readyState())
+
+    expect(screen.getByRole('button', { name: 'Create Match' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Start Match' })).toBeEnabled()
+    expect(
+      screen.getByText(/does not reserve its Court or players/i),
+    ).toBeVisible()
+  })
+
+  it.each(['PLANNED', 'COMPLETED', 'CANCELLED'] as const)(
+    'keeps Manual Match controls inactive for a %s Session',
+    (sessionStatus) => {
+      const currentState = readyState()
+      if (currentState.status !== 'ready') {
+        throw new Error('Expected ready fixture data')
+      }
+
+      renderScreen({
+        ...currentState,
+        data: {
+          ...currentState.data,
+          session: {
+            ...currentState.data.session,
+            status: sessionStatus,
+          },
+        },
+      })
+
+      expect(screen.queryByRole('button', { name: 'Create Match' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Start Match' })).not.toBeInTheDocument()
+      expect(
+        screen.getByText(
+          'Manual Matches can only be created while the Session is in progress.',
+        ),
+      ).toBeVisible()
+      expect(
+        screen.getByText(
+          'This Match can only start while the Session is in progress.',
+        ),
+      ).toBeVisible()
+    },
+  )
+
+  it.each(['PLAYING', 'COMPLETED', 'CANCELLED'] as const)(
+    'does not offer Start for a %s Match',
+    (matchStatus) => {
+      const currentState = readyState()
+      if (currentState.status !== 'ready') {
+        throw new Error('Expected ready fixture data')
+      }
+      const createdMatch = currentState.data.matches.find(
+        (match) => match.status === 'CREATED',
+      )
+      if (createdMatch === undefined) {
+        throw new Error('Expected a CREATED Match fixture')
+      }
+
+      renderScreen({
+        ...currentState,
+        data: {
+          ...currentState.data,
+          matches: [{ ...createdMatch, status: matchStatus }],
+        },
+      })
+
+      expect(screen.queryByRole('button', { name: 'Start Match' })).not.toBeInTheDocument()
+    },
+  )
+
+  it('does not restrict Start by Match source', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        matches: currentState.data.matches.map((match) =>
+          match.status === 'CREATED'
+            ? { ...match, source: 'RECOMMENDATION' }
+            : match,
+        ),
+      },
+    })
+
+    expect(screen.getByRole('button', { name: 'Start Match' })).toBeEnabled()
+  })
 })

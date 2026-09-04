@@ -107,6 +107,17 @@ export interface MatchParticipantResponse {
   readonly teamSlot: number
 }
 
+export interface MatchParticipantRequest {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface CreateManualMatchRequest {
+  readonly sessionCourtId: UUID
+  readonly participants: readonly MatchParticipantRequest[]
+}
+
 export interface MatchResponse {
   readonly id: UUID
   readonly sessionId: UUID

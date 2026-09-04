@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   composeLiveSessionModel,
@@ -18,6 +18,10 @@ import {
   type ParticipantAction,
   type SessionCourtAction,
 } from './useLiveSessionActions'
+import {
+  useCreateManualMatch,
+  useStartMatch,
+} from './useManualMatchActions'
 
 const SESSION_STATUS_LABELS: Readonly<
   Record<LiveSessionModel['header']['status'], string>
@@ -310,7 +314,271 @@ function ParticipantList({
   )
 }
 
-function CreatedMatchCard({ match }: { readonly match: MatchView }) {
+function participantOptionLabel(participant: ParticipantView): string {
+  return [
+    participant.displayName,
+    participant.skillLabel ?? 'Skill unavailable',
+    participant.waitingDuration === null
+      ? 'waiting time unavailable'
+      : `waiting ${participant.waitingDuration}`,
+  ].join(' · ')
+}
+
+type MatchSlot = 'A1' | 'A2' | 'B1' | 'B2'
+
+const MATCH_SLOTS: readonly {
+  readonly id: MatchSlot
+  readonly label: string
+  readonly teamSide: 'A' | 'B'
+  readonly teamSlot: 1 | 2
+}[] = [
+  { id: 'A1', label: 'Team A — Slot 1', teamSide: 'A', teamSlot: 1 },
+  { id: 'A2', label: 'Team A — Slot 2', teamSide: 'A', teamSlot: 2 },
+  { id: 'B1', label: 'Team B — Slot 1', teamSide: 'B', teamSlot: 1 },
+  { id: 'B2', label: 'Team B — Slot 2', teamSide: 'B', teamSlot: 2 },
+]
+
+const EMPTY_MATCH_SLOTS: Readonly<Record<MatchSlot, string>> = {
+  A1: '',
+  A2: '',
+  B1: '',
+  B2: '',
+}
+
+function CreateManualMatchForm({
+  sessionId,
+  model,
+}: {
+  readonly sessionId: string
+  readonly model: LiveSessionModel
+}) {
+  const actionState = useCreateManualMatch(sessionId)
+  const [sessionCourtId, setSessionCourtId] = useState('')
+  const [participantsBySlot, setParticipantsBySlot] = useState(
+    EMPTY_MATCH_SLOTS,
+  )
+  const availableCourts = model.courts.filter(
+    (court) => court.status === 'AVAILABLE',
+  )
+  const waitingParticipants = model.waitingParticipants
+  const availableCourtIds = new Set(
+    availableCourts.map((court) => court.sessionCourtId),
+  )
+  const waitingParticipantIds = new Set(
+    waitingParticipants.map((participant) => participant.sessionParticipantId),
+  )
+
+  if (model.header.status !== 'IN_PROGRESS') {
+    return (
+      <section className="panel manual-match-creator" aria-labelledby="create-match-heading">
+        <div className="section-title section-title-large">
+          <div>
+            <p className="eyebrow">Match operations</p>
+            <h2 id="create-match-heading">Create Manual Match</h2>
+          </div>
+        </div>
+        <p className="empty-panel">
+          Manual Matches can only be created while the Session is in progress.
+        </p>
+      </section>
+    )
+  }
+
+  const selectedParticipants = Object.values(participantsBySlot).filter(
+    (participantId) => participantId !== '',
+  )
+  const selectionIsUnique =
+    new Set(selectedParticipants).size === selectedParticipants.length
+  const hasStaleSelection =
+    (sessionCourtId !== '' && !availableCourtIds.has(sessionCourtId)) ||
+    selectedParticipants.some(
+      (participantId) => !waitingParticipantIds.has(participantId),
+    )
+  const formIsValid =
+    availableCourtIds.has(sessionCourtId) &&
+    selectedParticipants.length === MATCH_SLOTS.length &&
+    selectionIsUnique &&
+    selectedParticipants.every((participantId) =>
+      waitingParticipantIds.has(participantId),
+    )
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!formIsValid || actionState.isPending) {
+      return
+    }
+
+    const succeeded = await actionState.execute({
+      sessionCourtId,
+      participants: MATCH_SLOTS.map((slot) => ({
+        sessionParticipantId: participantsBySlot[slot.id],
+        teamSide: slot.teamSide,
+        teamSlot: slot.teamSlot,
+      })),
+    })
+    if (succeeded) {
+      setSessionCourtId('')
+      setParticipantsBySlot(EMPTY_MATCH_SLOTS)
+    }
+  }
+
+  return (
+    <section className="panel manual-match-creator" aria-labelledby="create-match-heading">
+      <div className="section-title section-title-large">
+        <div>
+          <p className="eyebrow">Match operations</p>
+          <h2 id="create-match-heading">Create Manual Match</h2>
+        </div>
+      </div>
+      <form onSubmit={(event) => void handleSubmit(event)}>
+        <div className="manual-match-fields">
+          <label className="match-field court-field">
+            <span>Session Court</span>
+            <select
+              value={
+                availableCourtIds.has(sessionCourtId) ? sessionCourtId : ''
+              }
+              disabled={actionState.isPending || availableCourts.length === 0}
+              onChange={(event) => setSessionCourtId(event.target.value)}
+            >
+              <option value="">Choose an available Court</option>
+              {availableCourts.map((court) => (
+                <option key={court.sessionCourtId} value={court.sessionCourtId}>
+                  {court.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="team-fields" aria-label="Team A assignments">
+            {MATCH_SLOTS.filter((slot) => slot.teamSide === 'A').map((slot) => (
+              <label className="match-field" key={slot.id}>
+                <span>{slot.label}</span>
+                <select
+                  value={
+                    waitingParticipantIds.has(participantsBySlot[slot.id])
+                      ? participantsBySlot[slot.id]
+                      : ''
+                  }
+                  disabled={actionState.isPending || waitingParticipants.length < 4}
+                  onChange={(event) =>
+                    setParticipantsBySlot((current) => ({
+                      ...current,
+                      [slot.id]: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Choose a waiting player</option>
+                  {waitingParticipants.map((participant) => {
+                    const selectedElsewhere = MATCH_SLOTS.some(
+                      (candidateSlot) =>
+                        candidateSlot.id !== slot.id &&
+                        participantsBySlot[candidateSlot.id] ===
+                          participant.sessionParticipantId,
+                    )
+                    return (
+                      <option
+                        key={participant.sessionParticipantId}
+                        value={participant.sessionParticipantId}
+                        disabled={selectedElsewhere}
+                      >
+                        {participantOptionLabel(participant)}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
+            ))}
+          </div>
+          <div className="team-fields" aria-label="Team B assignments">
+            {MATCH_SLOTS.filter((slot) => slot.teamSide === 'B').map((slot) => (
+              <label className="match-field" key={slot.id}>
+                <span>{slot.label}</span>
+                <select
+                  value={
+                    waitingParticipantIds.has(participantsBySlot[slot.id])
+                      ? participantsBySlot[slot.id]
+                      : ''
+                  }
+                  disabled={actionState.isPending || waitingParticipants.length < 4}
+                  onChange={(event) =>
+                    setParticipantsBySlot((current) => ({
+                      ...current,
+                      [slot.id]: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Choose a waiting player</option>
+                  {waitingParticipants.map((participant) => {
+                    const selectedElsewhere = MATCH_SLOTS.some(
+                      (candidateSlot) =>
+                        candidateSlot.id !== slot.id &&
+                        participantsBySlot[candidateSlot.id] ===
+                          participant.sessionParticipantId,
+                    )
+                    return (
+                      <option
+                        key={participant.sessionParticipantId}
+                        value={participant.sessionParticipantId}
+                        disabled={selectedElsewhere}
+                      >
+                        {participantOptionLabel(participant)}
+                      </option>
+                    )
+                  })}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+        {availableCourts.length === 0 && (
+          <p className="form-note">No AVAILABLE Court can be selected.</p>
+        )}
+        {waitingParticipants.length < 4 && (
+          <p className="form-note">
+            At least four WAITING players are needed to create a Match.
+          </p>
+        )}
+        {hasStaleSelection && (
+          <p className="form-note" role="status">
+            A previous selection is no longer eligible. Choose from the current
+            options before creating.
+          </p>
+        )}
+        <p className="form-note">
+          Creating a Match does not reserve its Court or players. Availability
+          is checked again when the Match starts.
+        </p>
+        <div className="create-match-actions">
+          <button
+            className="primary-action-button"
+            type="submit"
+            disabled={!formIsValid || actionState.isPending}
+          >
+            {actionState.isPending ? 'Creating…' : 'Create Match'}
+          </button>
+        </div>
+        {actionState.errorMessage && (
+          <p className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </p>
+        )}
+      </form>
+    </section>
+  )
+}
+
+function CreatedMatchCard({
+  match,
+  sessionId,
+  sessionStatus,
+}: {
+  readonly match: MatchView
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+}) {
+  const actionState = useStartMatch(sessionId, match.id)
+  const canStart = sessionStatus === 'IN_PROGRESS'
+
   return (
     <article className="created-match-card">
       <header>
@@ -322,6 +590,27 @@ function CreatedMatchCard({ match }: { readonly match: MatchView }) {
       </header>
       <MatchTeams match={match} />
       <p className="created-time">Created {match.createdAtLabel}</p>
+      {canStart ? (
+        <div className="action-area created-match-actions">
+          <button
+            className="primary-action-button"
+            type="button"
+            disabled={actionState.isPending}
+            onClick={() => void actionState.execute()}
+          >
+            {actionState.isPending ? 'Starting…' : 'Start Match'}
+          </button>
+        </div>
+      ) : (
+        <p className="action-note">
+          This Match can only start while the Session is in progress.
+        </p>
+      )}
+      {actionState.errorMessage && (
+        <p className="action-feedback" role="alert">
+          {actionState.errorMessage}
+        </p>
+      )}
     </article>
   )
 }
@@ -481,6 +770,11 @@ export function LiveSessionScreen({
         )}
       </section>
 
+      <CreateManualMatchForm
+        sessionId={state.data.session.id}
+        model={model}
+      />
+
       <div className="operational-grid">
         <section className="panel participant-panel" aria-labelledby="participants-heading">
           <div className="section-title section-title-large">
@@ -532,7 +826,12 @@ export function LiveSessionScreen({
           ) : (
             <div className="created-match-list">
               {model.createdMatches.map((match) => (
-                <CreatedMatchCard key={match.id} match={match} />
+                <CreatedMatchCard
+                  key={match.id}
+                  match={match}
+                  sessionId={state.data.session.id}
+                  sessionStatus={model.header.status}
+                />
               ))}
             </div>
           )}

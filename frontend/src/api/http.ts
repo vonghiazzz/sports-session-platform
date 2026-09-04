@@ -48,13 +48,17 @@ async function requestJson<T>(
   path: string,
   method: 'GET' | 'POST',
   signal?: AbortSignal,
+  body?: unknown,
 ): Promise<T> {
+  const hasBody = body !== undefined
   const response = await fetch(path, {
     method,
     headers: {
       Accept: 'application/json',
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
     },
     signal,
+    ...(hasBody ? { body: JSON.stringify(body) } : {}),
   })
 
   if (!response.ok) {
@@ -81,4 +85,12 @@ export function postJson<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   return requestJson(path, 'POST', signal)
+}
+
+export function postJsonWithBody<TResponse, TBody>(
+  path: string,
+  body: TBody,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  return requestJson(path, 'POST', signal, body)
 }

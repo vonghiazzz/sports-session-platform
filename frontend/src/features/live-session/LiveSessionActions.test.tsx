@@ -27,6 +27,7 @@ import { useLiveSessionData } from './useLiveSessionData'
 
 vi.mock('../../api/liveSessionApi', () => ({
   checkInParticipant: vi.fn(),
+  createManualMatch: vi.fn(),
   disableSessionCourt: vi.fn(),
   enableSessionCourt: vi.fn(),
   getPlayers: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock('../../api/liveSessionApi', () => ({
   leaveParticipant: vi.fn(),
   pauseParticipant: vi.fn(),
   resumeParticipant: vi.fn(),
+  startMatch: vi.fn(),
 }))
 
 const SESSION_ID = 'session-1'

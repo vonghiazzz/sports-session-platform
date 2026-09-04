@@ -1,5 +1,6 @@
 import type {
   CourtResponse,
+  CreateManualMatchRequest,
   MatchResponse,
   PlayerResponse,
   SessionCourtResponse,
@@ -7,7 +8,7 @@ import type {
   SessionResponse,
   VenueResponse,
 } from './contracts'
-import { getJson, postJson } from './http'
+import { getJson, postJson, postJsonWithBody } from './http'
 
 function segment(value: string): string {
   return encodeURIComponent(value)
@@ -59,6 +60,20 @@ export function getSessionMatches(
   signal?: AbortSignal,
 ): Promise<readonly MatchResponse[]> {
   return getJson(`/api/sessions/${segment(sessionId)}/matches`, signal)
+}
+
+export function createManualMatch(
+  sessionId: string,
+  request: CreateManualMatchRequest,
+): Promise<MatchResponse> {
+  return postJsonWithBody(
+    `/api/sessions/${segment(sessionId)}/matches`,
+    request,
+  )
+}
+
+export function startMatch(matchId: string): Promise<MatchResponse> {
+  return postJson(`/api/matches/${segment(matchId)}/start`)
 }
 
 function participantActionPath(

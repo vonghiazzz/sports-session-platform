@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createLiveSessionInput } from '../test/liveSessionFixtures'
 import {
   checkInParticipant,
+  createManualMatch,
   disableSessionCourt,
   enableSessionCourt,
   leaveParticipant,
   pauseParticipant,
   resumeParticipant,
+  startMatch,
 } from './liveSessionApi'
 
 const input = createLiveSessionInput()
@@ -78,5 +80,54 @@ describe('live Session action API', () => {
     const request = fetchMock.mock.calls[0]?.[1]
     expect(request).not.toHaveProperty('body')
     expect(request?.headers).not.toHaveProperty('Content-Type')
+  })
+
+  it('creates a Manual Match with the exact A1, A2, B1, B2 request', async () => {
+    const request = {
+      sessionCourtId,
+      participants: [
+        { sessionParticipantId: 'participant-1', teamSide: 'A' as const, teamSlot: 1 },
+        { sessionParticipantId: 'participant-2', teamSide: 'A' as const, teamSlot: 2 },
+        { sessionParticipantId: 'participant-3', teamSide: 'B' as const, teamSlot: 1 },
+        { sessionParticipantId: 'participant-4', teamSide: 'B' as const, teamSlot: 2 },
+      ],
+    }
+    const response = input.matches[1]
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createManualMatch(sessionId, request)).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledWith(`/api/sessions/${sessionId}/matches`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      signal: undefined,
+      body: JSON.stringify(request),
+    })
+  })
+
+  it('starts a Match with a bodyless POST', async () => {
+    const response = input.matches[0]
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(startMatch('match-created')).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledWith('/api/matches/match-created/start', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      signal: undefined,
+    })
   })
 })
