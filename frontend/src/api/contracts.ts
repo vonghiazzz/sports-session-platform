@@ -118,6 +118,12 @@ export interface CreateManualMatchRequest {
   readonly participants: readonly MatchParticipantRequest[]
 }
 
+export interface CompleteMatchRequest {
+  readonly winnerTeam: TeamSide
+  readonly teamAScore: number | null
+  readonly teamBScore: number | null
+}
+
 export interface MatchResponse {
   readonly id: UUID
   readonly sessionId: UUID

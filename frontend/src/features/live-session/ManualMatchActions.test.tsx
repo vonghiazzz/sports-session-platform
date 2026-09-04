@@ -25,7 +25,9 @@ import { LiveSessionScreen } from './LiveSessionPage'
 import { useLiveSessionData } from './useLiveSessionData'
 
 vi.mock('../../api/liveSessionApi', () => ({
+  cancelMatch: vi.fn(),
   checkInParticipant: vi.fn(),
+  completeMatch: vi.fn(),
   createManualMatch: vi.fn(),
   disableSessionCourt: vi.fn(),
   enableSessionCourt: vi.fn(),

@@ -40,7 +40,8 @@
   font-weight: 750;
 }
 
-.match-field select {
+.match-field select,
+.match-field input {
   width: 100%;
   min-width: 0;
   border: 1px solid #aebdb8;
@@ -50,12 +51,14 @@
   background: #ffffff;
 }
 
-.match-field select:focus-visible {
+.match-field select:focus-visible,
+.match-field input:focus-visible {
   outline: 3px solid #8dd7c7;
   outline-offset: 2px;
 }
 
-.match-field select:disabled {
+.match-field select:disabled,
+.match-field input:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
@@ -89,6 +92,60 @@
 .primary-action-button:focus-visible {
   outline: 3px solid #8dd7c7;
   outline-offset: 2px;
+}
+
+.complete-match-form {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.85rem;
+}
+
+.result-fields {
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) repeat(2, minmax(6rem, 0.8fr));
+  gap: 0.6rem;
+}
+
+.match-lifecycle-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.danger-action-button {
+  border: 1px solid #a94858;
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  color: #8a2438;
+  background: #fff5f6;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.danger-action-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.danger-action-button:focus-visible {
+  outline: 3px solid #f0a7b3;
+  outline-offset: 2px;
+}
+
+.cancel-confirmation {
+  flex: 1 1 15rem;
+  border-left: 3px solid #a94858;
+  border-radius: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  background: #fff5f6;
+}
+
+.cancel-confirmation p {
+  margin: 0 0 0.55rem;
+  color: var(--danger-text);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .session-header {
@@ -573,6 +630,19 @@
 
   .inline-details {
     grid-template-columns: 1fr;
+  }
+
+  .result-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .match-lifecycle-actions {
+    flex-direction: column;
+  }
+
+  .match-lifecycle-actions > button,
+  .match-lifecycle-actions > .cancel-confirmation {
+    width: 100%;
   }
 
   .participant-list li {

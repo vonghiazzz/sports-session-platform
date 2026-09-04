@@ -229,7 +229,11 @@ describe('LiveSessionScreen', () => {
     expect(availableCard).not.toBeNull()
     expect(unavailableCard).not.toBeNull()
 
-    expect(within(playingCard as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
+    expect(
+      within(playingCard as HTMLElement).queryByRole('button', {
+        name: /Enable Court|Disable Court/,
+      }),
+    ).not.toBeInTheDocument()
     expect(
       within(availableCard as HTMLElement).getByRole('button', {
         name: 'Disable Court',
@@ -273,6 +277,15 @@ describe('LiveSessionScreen', () => {
 
       expect(screen.queryByRole('button', { name: 'Create Match' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Start Match' })).not.toBeInTheDocument()
+      const createdMatches = screen
+        .getByRole('heading', { name: 'Created Matches' })
+        .closest('section')
+      expect(createdMatches).not.toBeNull()
+      expect(
+        within(createdMatches as HTMLElement).getByRole('button', {
+          name: 'Cancel Match',
+        }),
+      ).toBeEnabled()
       expect(
         screen.getByText(
           'Manual Matches can only be created while the Session is in progress.',
@@ -309,6 +322,13 @@ describe('LiveSessionScreen', () => {
       })
 
       expect(screen.queryByRole('button', { name: 'Start Match' })).not.toBeInTheDocument()
+      if (matchStatus === 'PLAYING') {
+        expect(screen.getByRole('button', { name: 'Complete Match' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Cancel Match' })).toBeEnabled()
+      } else {
+        expect(screen.queryByRole('button', { name: 'Complete Match' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Cancel Match' })).not.toBeInTheDocument()
+      }
     },
   )
 
@@ -331,5 +351,26 @@ describe('LiveSessionScreen', () => {
     })
 
     expect(screen.getByRole('button', { name: 'Start Match' })).toBeEnabled()
+  })
+
+  it('keeps Complete and Cancel actionable for a PLAYING Match after Session cancellation', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        session: { ...currentState.data.session, status: 'CANCELLED' },
+        matches: currentState.data.matches.filter(
+          (match) => match.status === 'PLAYING',
+        ),
+      },
+    })
+
+    expect(screen.getByRole('button', { name: 'Complete Match' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Cancel Match' })).toBeEnabled()
   })
 })

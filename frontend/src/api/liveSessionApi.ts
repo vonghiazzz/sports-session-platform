@@ -1,4 +1,5 @@
 import type {
+  CompleteMatchRequest,
   CourtResponse,
   CreateManualMatchRequest,
   MatchResponse,
@@ -74,6 +75,17 @@ export function createManualMatch(
 
 export function startMatch(matchId: string): Promise<MatchResponse> {
   return postJson(`/api/matches/${segment(matchId)}/start`)
+}
+
+export function completeMatch(
+  matchId: string,
+  request: CompleteMatchRequest,
+): Promise<MatchResponse> {
+  return postJsonWithBody(`/api/matches/${segment(matchId)}/complete`, request)
+}
+
+export function cancelMatch(matchId: string): Promise<MatchResponse> {
+  return postJson(`/api/matches/${segment(matchId)}/cancel`)
 }
 
 function participantActionPath(

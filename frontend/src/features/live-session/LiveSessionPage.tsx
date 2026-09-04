@@ -20,7 +20,7 @@ import {
 } from './useLiveSessionActions'
 import {
   useCreateManualMatch,
-  useStartMatch,
+  useMatchLifecycleActions,
 } from './useManualMatchActions'
 
 const SESSION_STATUS_LABELS: Readonly<
@@ -131,6 +131,211 @@ function MatchTeams({ match }: { readonly match: MatchView }) {
   )
 }
 
+type WinnerSelection = '' | 'A' | 'B'
+
+function completeRequest(
+  winnerTeam: WinnerSelection,
+  teamAScoreInput: string,
+  teamBScoreInput: string,
+) {
+  if (winnerTeam === '') {
+    return { error: 'Choose the winning team.', request: null }
+  }
+
+  const teamAScoreBlank = teamAScoreInput === ''
+  const teamBScoreBlank = teamBScoreInput === ''
+  if (teamAScoreBlank && teamBScoreBlank) {
+    return {
+      error: null,
+      request: { winnerTeam, teamAScore: null, teamBScore: null },
+    }
+  }
+  if (teamAScoreBlank || teamBScoreBlank) {
+    return { error: 'Enter both scores or leave both blank.', request: null }
+  }
+
+  const teamAScore = Number(teamAScoreInput)
+  const teamBScore = Number(teamBScoreInput)
+  if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore)) {
+    return { error: 'Scores must be whole numbers.', request: null }
+  }
+  if (teamAScore < 0 || teamBScore < 0) {
+    return { error: 'Scores cannot be negative.', request: null }
+  }
+  if (teamAScore === teamBScore) {
+    return { error: 'A Match cannot end in a draw.', request: null }
+  }
+  if (
+    (winnerTeam === 'A' && teamAScore < teamBScore) ||
+    (winnerTeam === 'B' && teamBScore < teamAScore)
+  ) {
+    return {
+      error: 'The winning team must have the higher score.',
+      request: null,
+    }
+  }
+
+  return {
+    error: null,
+    request: { winnerTeam, teamAScore, teamBScore },
+  }
+}
+
+function PlayingMatchPanel({
+  match,
+  sessionId,
+}: {
+  readonly match: MatchView
+  readonly sessionId: string
+}) {
+  const actionState = useMatchLifecycleActions(sessionId, match.id)
+  const [winnerTeam, setWinnerTeam] = useState<WinnerSelection>('')
+  const [teamAScore, setTeamAScore] = useState('')
+  const [teamBScore, setTeamBScore] = useState('')
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    null,
+  )
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false)
+
+  function handleComplete(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (actionState.isPending || isConfirmingCancel) {
+      return
+    }
+    const result = completeRequest(winnerTeam, teamAScore, teamBScore)
+    setValidationMessage(result.error)
+    if (result.request !== null) {
+      void actionState.execute({ type: 'COMPLETE', request: result.request })
+    }
+  }
+
+  const completeDisabled = actionState.isPending || isConfirmingCancel
+
+  return (
+    <div className="court-match">
+      <MatchTeams match={match} />
+      <dl className="inline-details">
+        <div>
+          <dt>Source</dt>
+          <dd>{match.sourceLabel}</dd>
+        </div>
+        <div>
+          <dt>Started</dt>
+          <dd>{match.startedAtLabel ?? 'Time unavailable'}</dd>
+        </div>
+        <div>
+          <dt>Elapsed</dt>
+          <dd>{match.elapsedLabel ?? 'Time unavailable'}</dd>
+        </div>
+      </dl>
+      <form className="complete-match-form" noValidate onSubmit={handleComplete}>
+        <div className="result-fields">
+          <label className="match-field winner-field">
+            <span>Winner</span>
+            <select
+              value={winnerTeam}
+              disabled={completeDisabled}
+              onChange={(event) => {
+                setWinnerTeam(event.target.value as WinnerSelection)
+                setValidationMessage(null)
+              }}
+            >
+              <option value="">Choose winner</option>
+              <option value="A">Team A</option>
+              <option value="B">Team B</option>
+            </select>
+          </label>
+          <label className="match-field">
+            <span>Team A Score (optional)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={teamAScore}
+              disabled={completeDisabled}
+              onChange={(event) => {
+                setTeamAScore(event.target.value)
+                setValidationMessage(null)
+              }}
+            />
+          </label>
+          <label className="match-field">
+            <span>Team B Score (optional)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={teamBScore}
+              disabled={completeDisabled}
+              onChange={(event) => {
+                setTeamBScore(event.target.value)
+                setValidationMessage(null)
+              }}
+            />
+          </label>
+        </div>
+        {validationMessage && (
+          <p className="action-feedback" role="alert">
+            {validationMessage}
+          </p>
+        )}
+        <div className="match-lifecycle-actions">
+          <button
+            className="primary-action-button"
+            type="submit"
+            disabled={completeDisabled}
+          >
+            {actionState.pendingAction === 'COMPLETE'
+              ? 'Completing…'
+              : 'Complete Match'}
+          </button>
+          {!isConfirmingCancel ? (
+            <button
+              className="danger-action-button"
+              type="button"
+              disabled={actionState.isPending}
+              onClick={() => setIsConfirmingCancel(true)}
+            >
+              Cancel Match
+            </button>
+          ) : (
+            <div className="cancel-confirmation">
+              <p>Cancel this playing Match? No winner will be recorded.</p>
+              <div className="action-area">
+                <button
+                  className="danger-action-button"
+                  type="button"
+                  disabled={actionState.isPending}
+                  onClick={() => void actionState.execute({ type: 'CANCEL' })}
+                >
+                  {actionState.pendingAction === 'CANCEL'
+                    ? 'Cancelling…'
+                    : 'Confirm Cancel'}
+                </button>
+                <button
+                  className="secondary-action-button"
+                  type="button"
+                  disabled={actionState.isPending}
+                  onClick={() => setIsConfirmingCancel(false)}
+                >
+                  Keep Match
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {actionState.errorMessage && (
+          <p className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </p>
+        )}
+      </form>
+    </div>
+  )
+}
+
 function CourtCard({
   court,
   sessionId,
@@ -166,23 +371,7 @@ function CourtCard({
         <p className="data-warning">Live match data unavailable.</p>
       )}
       {court.activeMatch && (
-        <div className="court-match">
-          <MatchTeams match={court.activeMatch} />
-          <dl className="inline-details">
-            <div>
-              <dt>Source</dt>
-              <dd>{court.activeMatch.sourceLabel}</dd>
-            </div>
-            <div>
-              <dt>Started</dt>
-              <dd>{court.activeMatch.startedAtLabel ?? 'Time unavailable'}</dd>
-            </div>
-            <div>
-              <dt>Elapsed</dt>
-              <dd>{court.activeMatch.elapsedLabel ?? 'Time unavailable'}</dd>
-            </div>
-          </dl>
-        </div>
+        <PlayingMatchPanel match={court.activeMatch} sessionId={sessionId} />
       )}
       {action && (
         <div className="action-area court-action-area">
@@ -576,7 +765,8 @@ function CreatedMatchCard({
   readonly sessionId: string
   readonly sessionStatus: LiveSessionModel['header']['status']
 }) {
-  const actionState = useStartMatch(sessionId, match.id)
+  const actionState = useMatchLifecycleActions(sessionId, match.id)
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false)
   const canStart = sessionStatus === 'IN_PROGRESS'
 
   return (
@@ -590,21 +780,57 @@ function CreatedMatchCard({
       </header>
       <MatchTeams match={match} />
       <p className="created-time">Created {match.createdAtLabel}</p>
-      {canStart ? (
-        <div className="action-area created-match-actions">
+      <div className="action-area created-match-actions">
+        {canStart && (
           <button
             className="primary-action-button"
             type="button"
-            disabled={actionState.isPending}
-            onClick={() => void actionState.execute()}
+            disabled={actionState.isPending || isConfirmingCancel}
+            onClick={() => void actionState.execute({ type: 'START' })}
           >
-            {actionState.isPending ? 'Starting…' : 'Start Match'}
+            {actionState.pendingAction === 'START' ? 'Starting…' : 'Start Match'}
           </button>
-        </div>
-      ) : (
+        )}
+        {!isConfirmingCancel && (
+          <button
+            className="danger-action-button"
+            type="button"
+            disabled={actionState.isPending}
+            onClick={() => setIsConfirmingCancel(true)}
+          >
+            Cancel Match
+          </button>
+        )}
+      </div>
+      {!canStart && (
         <p className="action-note">
           This Match can only start while the Session is in progress.
         </p>
+      )}
+      {isConfirmingCancel && (
+        <div className="cancel-confirmation">
+          <p>Cancel this created Match?</p>
+          <div className="action-area">
+            <button
+              className="danger-action-button"
+              type="button"
+              disabled={actionState.isPending}
+              onClick={() => void actionState.execute({ type: 'CANCEL' })}
+            >
+              {actionState.pendingAction === 'CANCEL'
+                ? 'Cancelling…'
+                : 'Confirm Cancel'}
+            </button>
+            <button
+              className="secondary-action-button"
+              type="button"
+              disabled={actionState.isPending}
+              onClick={() => setIsConfirmingCancel(false)}
+            >
+              Keep Match
+            </button>
+          </div>
+        </div>
       )}
       {actionState.errorMessage && (
         <p className="action-feedback" role="alert">

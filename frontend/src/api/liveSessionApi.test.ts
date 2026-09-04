@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createLiveSessionInput } from '../test/liveSessionFixtures'
 import {
+  cancelMatch,
   checkInParticipant,
+  completeMatch,
   createManualMatch,
   disableSessionCourt,
   enableSessionCourt,
@@ -125,6 +127,63 @@ describe('live Session action API', () => {
 
     await expect(startMatch('match-created')).resolves.toEqual(response)
     expect(fetchMock).toHaveBeenCalledWith('/api/matches/match-created/start', {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      signal: undefined,
+    })
+  })
+
+  it('completes a Match with the exact result JSON body', async () => {
+    const request = {
+      winnerTeam: 'A' as const,
+      teamAScore: 21,
+      teamBScore: 17,
+    }
+    const response = {
+      ...input.matches[0],
+      status: 'COMPLETED' as const,
+      winnerTeam: 'A' as const,
+      teamAScore: 21,
+      teamBScore: 17,
+      resultVersion: 1,
+    }
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(completeMatch('match-playing', request)).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith('/api/matches/match-playing/complete', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      signal: undefined,
+      body: JSON.stringify(request),
+    })
+  })
+
+  it('cancels a Match with a bodyless POST and parses the response', async () => {
+    const response = {
+      ...input.matches[1],
+      status: 'CANCELLED' as const,
+    }
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(cancelMatch('match-created')).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith('/api/matches/match-created/cancel', {
       method: 'POST',
       headers: { Accept: 'application/json' },
       signal: undefined,
