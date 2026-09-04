@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getJson } from './http'
+import { getJson, postJson } from './http'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -45,5 +45,45 @@ describe('getJson', () => {
       status: 503,
       message: 'Request failed with status 503',
     })
+  })
+})
+
+describe('postJson', () => {
+  it('preserves a backend ApiError for a rejected business action', async () => {
+    const backendError = {
+      timestamp: '2026-09-02T10:00:00Z',
+      status: 409,
+      error: 'Conflict',
+      message: 'Participant cannot pause from status PAUSED',
+      path: '/api/sessions/session-1/participants/participant-1/pause',
+      fieldErrors: {},
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify(backendError), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+
+    await expect(
+      postJson('/api/sessions/session-1/participants/participant-1/pause'),
+    ).rejects.toMatchObject({
+      name: 'HttpError',
+      status: 409,
+      apiError: backendError,
+    })
+  })
+
+  it('does not retry a POST after a network failure', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      postJson('/api/sessions/session-1/courts/session-court-1/disable'),
+    ).rejects.toThrow('Failed to fetch')
+    expect(fetchMock).toHaveBeenCalledOnce()
   })
 })

@@ -12,6 +12,12 @@ import {
   useLiveSessionData,
   type LiveSessionDataState,
 } from './useLiveSessionData'
+import {
+  useParticipantAction,
+  useSessionCourtAction,
+  type ParticipantAction,
+  type SessionCourtAction,
+} from './useLiveSessionActions'
 
 const SESSION_STATUS_LABELS: Readonly<
   Record<LiveSessionModel['header']['status'], string>
@@ -20,6 +26,48 @@ const SESSION_STATUS_LABELS: Readonly<
   IN_PROGRESS: 'In progress',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
+}
+
+const PARTICIPANT_ACTION_LABELS: Readonly<
+  Record<ParticipantAction, { readonly idle: string; readonly pending: string }>
+> = {
+  CHECK_IN: { idle: 'Check In', pending: 'Checking in…' },
+  PAUSE: { idle: 'Pause', pending: 'Pausing…' },
+  RESUME: { idle: 'Resume', pending: 'Resuming…' },
+  LEAVE: { idle: 'Leave', pending: 'Leaving…' },
+}
+
+const COURT_ACTION_LABELS: Readonly<
+  Record<SessionCourtAction, { readonly idle: string; readonly pending: string }>
+> = {
+  DISABLE: { idle: 'Disable Court', pending: 'Disabling…' },
+  ENABLE: { idle: 'Enable Court', pending: 'Enabling…' },
+}
+
+function isSessionMutable(status: LiveSessionModel['header']['status']) {
+  return status === 'PLANNED' || status === 'IN_PROGRESS'
+}
+
+function availableParticipantActions(
+  participantStatus: ParticipantView['status'],
+  sessionStatus: LiveSessionModel['header']['status'],
+): readonly ParticipantAction[] {
+  if (!isSessionMutable(sessionStatus)) {
+    return []
+  }
+  switch (participantStatus) {
+    case 'REGISTERED':
+      return sessionStatus === 'IN_PROGRESS'
+        ? ['CHECK_IN', 'LEAVE']
+        : ['LEAVE']
+    case 'WAITING':
+      return ['PAUSE', 'LEAVE']
+    case 'PAUSED':
+      return ['RESUME', 'LEAVE']
+    case 'PLAYING':
+    case 'LEFT':
+      return []
+  }
 }
 
 function useNow(intervalMilliseconds = 30_000): Date {
@@ -79,7 +127,24 @@ function MatchTeams({ match }: { readonly match: MatchView }) {
   )
 }
 
-function CourtCard({ court }: { readonly court: CourtView }) {
+function CourtCard({
+  court,
+  sessionId,
+  sessionStatus,
+}: {
+  readonly court: CourtView
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+}) {
+  const actionState = useSessionCourtAction(sessionId, court.sessionCourtId)
+  const action: SessionCourtAction | null = isSessionMutable(sessionStatus)
+    ? court.status === 'AVAILABLE'
+      ? 'DISABLE'
+      : court.status === 'UNAVAILABLE'
+        ? 'ENABLE'
+        : null
+    : null
+
   return (
     <article className="court-card">
       <header>
@@ -115,17 +180,109 @@ function CourtCard({ court }: { readonly court: CourtView }) {
           </dl>
         </div>
       )}
+      {action && (
+        <div className="action-area court-action-area">
+          <button
+            className="secondary-action-button"
+            type="button"
+            disabled={actionState.isPending}
+            onClick={() => actionState.execute(action)}
+          >
+            {actionState.pendingAction === action
+              ? COURT_ACTION_LABELS[action].pending
+              : COURT_ACTION_LABELS[action].idle}
+          </button>
+        </div>
+      )}
+      {actionState.errorMessage && (
+        <p className="action-feedback" role="alert">
+          {actionState.errorMessage}
+        </p>
+      )}
     </article>
+  )
+}
+
+function ParticipantRow({
+  participant,
+  sessionId,
+  sessionStatus,
+  showWaiting,
+}: {
+  readonly participant: ParticipantView
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly showWaiting: boolean
+}) {
+  const actionState = useParticipantAction(
+    sessionId,
+    participant.sessionParticipantId,
+  )
+  const actions = availableParticipantActions(participant.status, sessionStatus)
+  const checkInUnavailable =
+    participant.status === 'REGISTERED' && sessionStatus !== 'IN_PROGRESS'
+
+  return (
+    <li>
+      <div className="participant-identity">
+        <strong>{participant.displayName}</strong>
+        <span>{participant.skillLabel ?? 'Skill unavailable'}</span>
+      </div>
+      <div className="participant-operation">
+        {showWaiting && (
+          <span
+            className={
+              participant.waitingDuration === null
+                ? 'waiting-time data-warning'
+                : 'waiting-time'
+            }
+          >
+            {participant.waitingDuration ?? 'Waiting time unavailable'}
+          </span>
+        )}
+        {actions.length > 0 && (
+          <div className="action-area participant-actions">
+            {actions.map((action) => (
+              <button
+                className="secondary-action-button"
+                type="button"
+                key={action}
+                disabled={actionState.isPending}
+                onClick={() => actionState.execute(action)}
+              >
+                {actionState.pendingAction === action
+                  ? PARTICIPANT_ACTION_LABELS[action].pending
+                  : PARTICIPANT_ACTION_LABELS[action].idle}
+              </button>
+            ))}
+          </div>
+        )}
+        {checkInUnavailable && (
+          <span className="action-note">
+            Session must be in progress to check in.
+          </span>
+        )}
+        {actionState.errorMessage && (
+          <span className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </span>
+        )}
+      </div>
+    </li>
   )
 }
 
 function ParticipantList({
   title,
   participants,
+  sessionId,
+  sessionStatus,
   showWaiting = false,
 }: {
   readonly title: string
   readonly participants: readonly ParticipantView[]
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
   readonly showWaiting?: boolean
 }) {
   return (
@@ -139,23 +296,13 @@ function ParticipantList({
       ) : (
         <ul className="participant-list">
           {participants.map((participant) => (
-            <li key={participant.sessionParticipantId}>
-              <div>
-                <strong>{participant.displayName}</strong>
-                <span>{participant.skillLabel ?? 'Skill unavailable'}</span>
-              </div>
-              {showWaiting && (
-                <span
-                  className={
-                    participant.waitingDuration === null
-                      ? 'waiting-time data-warning'
-                      : 'waiting-time'
-                  }
-                >
-                  {participant.waitingDuration ?? 'Waiting time unavailable'}
-                </span>
-              )}
-            </li>
+            <ParticipantRow
+              key={participant.sessionParticipantId}
+              participant={participant}
+              sessionId={sessionId}
+              sessionStatus={sessionStatus}
+              showWaiting={showWaiting}
+            />
           ))}
         </ul>
       )}
@@ -323,7 +470,12 @@ export function LiveSessionScreen({
         ) : (
           <div className="court-grid">
             {model.courts.map((court) => (
-              <CourtCard key={court.sessionCourtId} court={court} />
+              <CourtCard
+                key={court.sessionCourtId}
+                court={court}
+                sessionId={state.data.session.id}
+                sessionStatus={model.header.status}
+              />
             ))}
           </div>
         )}
@@ -340,19 +492,27 @@ export function LiveSessionScreen({
           <ParticipantList
             title="Waiting"
             participants={model.waitingParticipants}
+            sessionId={state.data.session.id}
+            sessionStatus={model.header.status}
             showWaiting
           />
           <ParticipantList
             title="Registered"
             participants={model.registeredParticipants}
+            sessionId={state.data.session.id}
+            sessionStatus={model.header.status}
           />
           <ParticipantList
             title="Paused"
             participants={model.pausedParticipants}
+            sessionId={state.data.session.id}
+            sessionStatus={model.header.status}
           />
           <ParticipantList
             title="Playing"
             participants={model.playingParticipants}
+            sessionId={state.data.session.id}
+            sessionStatus={model.header.status}
           />
           {model.leftParticipantCount > 0 && (
             <p className="left-count">{model.leftParticipantCount} left this Session</p>

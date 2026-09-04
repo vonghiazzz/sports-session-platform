@@ -1,12 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import { LiveSessionScreen } from './LiveSessionPage'
 import type { LiveSessionDataState } from './useLiveSessionData'
 
 const refresh = vi.fn(async () => undefined)
 const now = new Date('2026-09-02T10:00:00Z')
+const queryClients: QueryClient[] = []
 
 function state(
   status: 'loading' | 'not-found' | 'error',
@@ -18,26 +20,56 @@ function state(
   }
 }
 
+function renderScreen(state: LiveSessionDataState, currentTime = now) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      mutations: { retry: false },
+      queries: { retry: false },
+    },
+  })
+  queryClients.push(queryClient)
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <LiveSessionScreen state={state} now={currentTime} />
+    </QueryClientProvider>,
+  )
+}
+
+function readyState(): LiveSessionDataState {
+  return {
+    status: 'ready',
+    data: createLiveSessionInput(),
+    refresh,
+    isRefreshing: false,
+  }
+}
+
 describe('LiveSessionScreen', () => {
   beforeEach(() => {
     refresh.mockClear()
   })
 
+  afterEach(() => {
+    queryClients.forEach((queryClient) => queryClient.clear())
+    queryClients.length = 0
+  })
+
   it('renders a distinct initial loading state', () => {
-    render(<LiveSessionScreen state={state('loading')} now={now} />)
+    renderScreen(state('loading'))
 
     expect(screen.getByRole('heading', { name: 'Loading Session…' })).toBeVisible()
     expect(screen.getByText('Gathering Courts, Players, and Matches.')).toBeVisible()
   })
 
   it('renders a clear Session not found state', () => {
-    render(<LiveSessionScreen state={state('not-found')} now={now} />)
+    renderScreen(state('not-found'))
 
     expect(screen.getByRole('heading', { name: 'Session not found' })).toBeVisible()
   })
 
   it('renders an essential-read error separately from empty data', () => {
-    render(<LiveSessionScreen state={state('error')} now={now} />)
+    renderScreen(state('error'))
 
     expect(
       screen.getByRole('heading', {
@@ -56,7 +88,7 @@ describe('LiveSessionScreen', () => {
       isRefreshing: false,
     }
 
-    render(<LiveSessionScreen state={readyState} now={fixtureNow} />)
+    renderScreen(readyState, fixtureNow)
 
     expect(
       screen.getByRole('heading', { name: 'Wednesday Badminton' }),
@@ -81,10 +113,132 @@ describe('LiveSessionScreen', () => {
       refresh,
       isRefreshing: false,
     }
-    render(<LiveSessionScreen state={readyState} now={fixtureNow} />)
+    renderScreen(readyState, fixtureNow)
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
 
     expect(refresh).toHaveBeenCalledOnce()
+  })
+
+  it('offers Participant actions from authoritative runtime states', () => {
+    renderScreen(readyState())
+    const heading = screen.getByRole('heading', { name: 'Participants' })
+    const participantPanel = heading.closest('section')
+
+    expect(participantPanel).not.toBeNull()
+    const panel = within(participantPanel as HTMLElement)
+    expect(panel.getByRole('button', { name: 'Check In' })).toBeEnabled()
+    expect(panel.getAllByRole('button', { name: 'Pause' })).toHaveLength(2)
+    expect(panel.getByRole('button', { name: 'Resume' })).toBeEnabled()
+    expect(panel.getAllByRole('button', { name: 'Leave' })).toHaveLength(4)
+  })
+
+  it('does not offer Check In before the Session is in progress', () => {
+    const input = createLiveSessionInput()
+    const registered = input.participants.find(
+      (participant) => participant.status === 'REGISTERED',
+    )
+    expect(registered).toBeDefined()
+    const plannedState = readyState()
+    if (plannedState.status !== 'ready' || registered === undefined) {
+      throw new Error('Expected ready fixture data')
+    }
+
+    renderScreen({
+      ...plannedState,
+      data: {
+        ...plannedState.data,
+        session: {
+          ...plannedState.data.session,
+          status: 'PLANNED',
+          startedAt: null,
+        },
+        participants: [registered],
+      },
+    })
+
+    const heading = screen.getByRole('heading', { name: 'Participants' })
+    const participantPanel = heading.closest('section')
+    expect(participantPanel).not.toBeNull()
+    const panel = within(participantPanel as HTMLElement)
+    expect(panel.queryByRole('button', { name: 'Check In' })).not.toBeInTheDocument()
+    expect(panel.getByRole('button', { name: 'Leave' })).toBeEnabled()
+    expect(
+      panel.getByText('Session must be in progress to check in.'),
+    ).toBeVisible()
+  })
+
+  it('offers no Participant action for PLAYING or LEFT', () => {
+    const input = createLiveSessionInput()
+    const playing = input.participants.find(
+      (participant) => participant.status === 'PLAYING',
+    )
+    const waiting = input.participants.find(
+      (participant) => participant.status === 'WAITING',
+    )
+    const currentState = readyState()
+    if (
+      currentState.status !== 'ready' ||
+      playing === undefined ||
+      waiting === undefined
+    ) {
+      throw new Error('Expected ready fixture data')
+    }
+
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        participants: [
+          playing,
+          {
+            ...waiting,
+            status: 'LEFT',
+            waitingSince: null,
+            leftAt: '2026-09-02T09:55:00Z',
+          },
+        ],
+      },
+    })
+
+    const heading = screen.getByRole('heading', { name: 'Participants' })
+    const participantPanel = heading.closest('section')
+    expect(participantPanel).not.toBeNull()
+    const panel = within(participantPanel as HTMLElement)
+    expect(panel.queryByRole('button')).not.toBeInTheDocument()
+    expect(panel.getByText('1 left this Session')).toBeVisible()
+  })
+
+  it('offers only status-valid Court actions', () => {
+    renderScreen(readyState())
+    const boardHeading = screen.getByRole('heading', { name: 'Court Board' })
+    const board = boardHeading.closest('section')
+    expect(board).not.toBeNull()
+    const boardQueries = within(board as HTMLElement)
+
+    const playingCard = boardQueries
+      .getByRole('heading', { name: 'Court One' })
+      .closest('article')
+    const availableCard = boardQueries
+      .getByRole('heading', { name: 'Court Two' })
+      .closest('article')
+    const unavailableCard = boardQueries
+      .getByRole('heading', { name: 'Court Three' })
+      .closest('article')
+    expect(playingCard).not.toBeNull()
+    expect(availableCard).not.toBeNull()
+    expect(unavailableCard).not.toBeNull()
+
+    expect(within(playingCard as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
+    expect(
+      within(availableCard as HTMLElement).getByRole('button', {
+        name: 'Disable Court',
+      }),
+    ).toBeEnabled()
+    expect(
+      within(unavailableCard as HTMLElement).getByRole('button', {
+        name: 'Enable Court',
+      }),
+    ).toBeEnabled()
   })
 })

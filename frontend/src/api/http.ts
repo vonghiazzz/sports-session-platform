@@ -44,12 +44,13 @@ export class HttpError extends Error {
   }
 }
 
-export async function getJson<T>(
+async function requestJson<T>(
   path: string,
+  method: 'GET' | 'POST',
   signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch(path, {
-    method: 'GET',
+    method,
     headers: {
       Accept: 'application/json',
     },
@@ -66,4 +67,18 @@ export async function getJson<T>(
   }
 
   return (await response.json()) as T
+}
+
+export function getJson<T>(
+  path: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  return requestJson(path, 'GET', signal)
+}
+
+export function postJson<T>(
+  path: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  return requestJson(path, 'POST', signal)
 }

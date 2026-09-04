@@ -7,7 +7,7 @@ import type {
   SessionResponse,
   VenueResponse,
 } from './contracts'
-import { getJson } from './http'
+import { getJson, postJson } from './http'
 
 function segment(value: string): string {
   return encodeURIComponent(value)
@@ -59,4 +59,70 @@ export function getSessionMatches(
   signal?: AbortSignal,
 ): Promise<readonly MatchResponse[]> {
   return getJson(`/api/sessions/${segment(sessionId)}/matches`, signal)
+}
+
+function participantActionPath(
+  sessionId: string,
+  sessionParticipantId: string,
+  action: 'check-in' | 'pause' | 'resume' | 'leave',
+): string {
+  return `/api/sessions/${segment(sessionId)}/participants/${segment(sessionParticipantId)}/${action}`
+}
+
+export function checkInParticipant(
+  sessionId: string,
+  sessionParticipantId: string,
+): Promise<SessionParticipantResponse> {
+  return postJson(
+    participantActionPath(sessionId, sessionParticipantId, 'check-in'),
+  )
+}
+
+export function pauseParticipant(
+  sessionId: string,
+  sessionParticipantId: string,
+): Promise<SessionParticipantResponse> {
+  return postJson(
+    participantActionPath(sessionId, sessionParticipantId, 'pause'),
+  )
+}
+
+export function resumeParticipant(
+  sessionId: string,
+  sessionParticipantId: string,
+): Promise<SessionParticipantResponse> {
+  return postJson(
+    participantActionPath(sessionId, sessionParticipantId, 'resume'),
+  )
+}
+
+export function leaveParticipant(
+  sessionId: string,
+  sessionParticipantId: string,
+): Promise<SessionParticipantResponse> {
+  return postJson(
+    participantActionPath(sessionId, sessionParticipantId, 'leave'),
+  )
+}
+
+function courtActionPath(
+  sessionId: string,
+  sessionCourtId: string,
+  action: 'disable' | 'enable',
+): string {
+  return `/api/sessions/${segment(sessionId)}/courts/${segment(sessionCourtId)}/${action}`
+}
+
+export function disableSessionCourt(
+  sessionId: string,
+  sessionCourtId: string,
+): Promise<SessionCourtResponse> {
+  return postJson(courtActionPath(sessionId, sessionCourtId, 'disable'))
+}
+
+export function enableSessionCourt(
+  sessionId: string,
+  sessionCourtId: string,
+): Promise<SessionCourtResponse> {
+  return postJson(courtActionPath(sessionId, sessionCourtId, 'enable'))
 }
