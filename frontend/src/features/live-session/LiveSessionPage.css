@@ -390,6 +390,115 @@
   margin: 1.5rem 0 0;
 }
 
+.live-addition {
+  margin: -0.35rem 0 1rem;
+}
+
+.live-addition-panel {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: var(--surface-subtle);
+}
+
+.live-addition-field {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.live-addition-field > span {
+  color: var(--muted-text);
+  font-size: 0.74rem;
+  font-weight: 750;
+}
+
+.live-addition-field input,
+.live-addition-field select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #aebdb8;
+  border-radius: 0.55rem;
+  padding: 0.58rem 0.65rem;
+  color: #172033;
+  background: #ffffff;
+}
+
+.live-addition-field input:focus-visible,
+.live-addition-field select:focus-visible,
+.live-candidate:focus-within {
+  outline: 3px solid #8dd7c7;
+  outline-offset: 2px;
+}
+
+.live-candidate-list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 16rem;
+  margin-top: 0.65rem;
+  overflow-y: auto;
+}
+
+.court-candidate-list {
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  margin: 0 0 0.7rem;
+}
+
+.live-candidate {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  background: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.live-candidate:has(input:checked) {
+  border-color: #66ad9c;
+  background: var(--accent);
+}
+
+.live-candidate input {
+  flex: 0 0 auto;
+  accent-color: var(--accent-strong);
+}
+
+.live-candidate span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.live-candidate small {
+  margin-left: auto;
+  color: var(--muted-text);
+}
+
+.live-addition-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+}
+
+.live-create-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.45fr) auto;
+  align-items: end;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.recovery-action {
+  margin-top: 0.7rem;
+}
+
 .action-area {
   display: flex;
   flex-wrap: wrap;
@@ -727,6 +836,15 @@
   }
 
   .primary-action-button {
+    width: 100%;
+  }
+
+  .live-create-player {
+    grid-template-columns: 1fr;
+  }
+
+  .live-addition-actions > button,
+  .live-addition-panel > button {
     width: 100%;
   }
 }

@@ -219,7 +219,12 @@ describe('LiveSessionScreen', () => {
     const participantPanel = heading.closest('section')
     expect(participantPanel).not.toBeNull()
     const panel = within(participantPanel as HTMLElement)
-    expect(panel.queryByRole('button')).not.toBeInTheDocument()
+    expect(
+      panel.queryByRole('button', {
+        name: /Điểm danh|Tạm nghỉ|Trở lại|Rời phiên/,
+      }),
+    ).not.toBeInTheDocument()
+    expect(panel.getByRole('button', { name: '+ Thêm người chơi' })).toBeEnabled()
     expect(panel.getByText('1 người đã rời phiên')).toBeVisible()
   })
 

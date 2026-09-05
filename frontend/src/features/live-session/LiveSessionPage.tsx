@@ -35,6 +35,7 @@ import {
   sportLabel,
   statusLabel,
 } from '../../lib/presentation'
+import { LiveAddCourt, LiveAddPlayer } from './LiveSessionAdditions'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -1109,6 +1110,13 @@ export function LiveSessionScreen({
           </div>
           <span>{model.courts.length} sân</span>
         </div>
+        <LiveAddCourt
+          sessionId={state.data.session.id}
+          sessionStatus={model.header.status}
+          venueId={state.data.session.venueId}
+          venueCourts={state.data.venueCourts}
+          sessionCourts={state.data.sessionCourts}
+        />
         {model.courts.length === 0 ? (
           <p className="empty-panel">Chưa có sân nào trong phiên này.</p>
         ) : (
@@ -1138,6 +1146,12 @@ export function LiveSessionScreen({
               <h2 id="participants-heading">Người chơi</h2>
             </div>
           </div>
+          <LiveAddPlayer
+            sessionId={state.data.session.id}
+            sessionStatus={model.header.status}
+            players={state.data.players}
+            participants={state.data.participants}
+          />
           <ParticipantList
             title="Đang chờ"
             participants={model.waitingParticipants}
