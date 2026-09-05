@@ -1,6 +1,7 @@
 import { Link, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { LiveSessionPage } from './features/live-session/LiveSessionPage'
+import { SessionSetupPage } from './features/session-setup/SessionSetupPage'
 
 function HomePage() {
   return (
@@ -8,6 +9,9 @@ function HomePage() {
       <p className="eyebrow">Nền tảng Phiên thể thao</p>
       <h1>Vận hành phiên chơi</h1>
       <p>Mở một phiên để vào phòng điều hành trực tiếp.</p>
+      <Link className="home-primary-link" to="/sessions/new">
+        Tạo phiên mới
+      </Link>
     </main>
   )
 }
@@ -27,6 +31,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/sessions/new" element={<SessionSetupPage />} />
       <Route path="/sessions/:sessionId" element={<LiveSessionPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

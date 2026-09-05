@@ -151,3 +151,38 @@ export interface ApiError {
   readonly path: string
   readonly fieldErrors: Readonly<Record<string, string>>
 }
+
+export interface CreateVenueRequest {
+  readonly name: string
+  readonly locationText: string | null
+  readonly active: boolean
+}
+
+export interface CreateCourtRequest {
+  readonly name: string
+  readonly sport: SportCode
+  readonly active: boolean
+}
+
+export interface CreatePlayerRequest {
+  readonly displayName: string
+  readonly sport: SportCode
+  readonly skillLevel: SkillLevel
+}
+
+export interface CreateSessionRequest {
+  readonly venueId: UUID
+  readonly title: string
+  readonly sport: SportCode
+  readonly matchFormat: MatchFormat
+  readonly plannedStartAt: ISOInstant
+  readonly plannedEndAt: ISOInstant
+}
+
+export interface AddSessionCourtRequest {
+  readonly courtId: UUID
+}
+
+export interface AddSessionParticipantRequest {
+  readonly playerId: UUID
+}

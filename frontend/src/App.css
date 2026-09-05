@@ -21,3 +21,11 @@
   color: var(--accent-strong);
   font-weight: 700;
 }
+
+.route-message .home-primary-link {
+  border-radius: 0.7rem;
+  padding: 0.75rem 1rem;
+  color: #ffffff;
+  background: var(--accent-strong);
+  text-decoration: none;
+}
