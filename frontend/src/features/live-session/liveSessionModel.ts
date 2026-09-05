@@ -12,21 +12,11 @@ import type {
   TeamSide,
   VenueResponse,
 } from '../../api/contracts'
-
-export const SKILL_LEVEL_LABELS: Readonly<Record<SkillLevel, string>> = {
-  WEAK: 'Yếu',
-  WEAK_PLUS: 'Yếu+',
-  INTERMEDIATE_MINUS: 'TB-',
-  INTERMEDIATE: 'TB',
-  INTERMEDIATE_PLUS: 'TB+',
-  GOOD: 'Khá',
-}
-
-const MATCH_SOURCE_LABELS: Readonly<Record<MatchSource, string>> = {
-  MANUAL: 'Manual',
-  RECOMMENDATION: 'Recommendation',
-  MODIFIED_RECOMMENDATION: 'Modified recommendation',
-}
+import {
+  formatVietnamDateTime,
+  matchSourceLabel,
+  skillLevelLabel,
+} from '../../lib/presentation'
 
 export interface ParticipantView {
   readonly sessionParticipantId: string
@@ -103,17 +93,6 @@ export interface LiveSessionModelInput {
   readonly now: Date
 }
 
-function formatDateTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return 'Time unavailable'
-  }
-  return new Intl.DateTimeFormat('vi-VN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
-}
-
 function durationBetween(startValue: string, now: Date): string | null {
   const start = new Date(startValue)
   if (Number.isNaN(start.getTime())) {
@@ -125,15 +104,17 @@ function durationBetween(startValue: string, now: Date): string | null {
     Math.floor((now.getTime() - start.getTime()) / 60_000),
   )
   if (totalMinutes < 1) {
-    return '<1 min'
+    return '<1 phút'
   }
   if (totalMinutes < 60) {
-    return `${totalMinutes} min`
+    return `${totalMinutes} phút`
   }
 
   const hours = Math.floor(totalMinutes / 60)
   const minutes = totalMinutes % 60
-  return minutes === 0 ? `${hours} hr` : `${hours} hr ${minutes} min`
+  return minutes === 0
+    ? `${hours} giờ`
+    : `${hours} giờ ${minutes} phút`
 }
 
 export function formatWaitingDuration(
@@ -156,24 +137,24 @@ function resolveTeamMember(
   )
 
   if (!assignment) {
-    warnings.add('A Match team assignment is incomplete.')
+    warnings.add('Phân công đội của một trận đấu chưa đầy đủ.')
     return {
       teamSide: side,
       teamSlot: slot,
       slotLabel: `${side}${slot}`,
-      displayName: 'Player data unavailable',
+      displayName: 'Không có dữ liệu người chơi',
       dataUnavailable: true,
     }
   }
 
   const participant = participantById.get(assignment.sessionParticipantId)
   if (!participant) {
-    warnings.add('A Match participant could not be resolved.')
+    warnings.add('Không thể xác định một người chơi trong trận đấu.')
     return {
       teamSide: side,
       teamSlot: slot,
       slotLabel: `${side}${slot}`,
-      displayName: 'Player data unavailable',
+      displayName: 'Không có dữ liệu người chơi',
       dataUnavailable: true,
     }
   }
@@ -203,7 +184,7 @@ export function composeLiveSessionModel({
   const participantViews = participants.map<ParticipantView>((participant) => {
     const player = playerById.get(participant.playerId)
     if (!player) {
-      warnings.add('Some Participant player data could not be resolved.')
+      warnings.add('Không thể xác định dữ liệu của một số người chơi.')
     }
 
     const profile = player?.sportProfiles.find(
@@ -215,15 +196,15 @@ export function composeLiveSessionModel({
         : null
 
     if (participant.status === 'WAITING' && waitingDuration === null) {
-      warnings.add('A WAITING Participant has no valid waiting time.')
+      warnings.add('Một người chơi đang chờ không có thời gian chờ hợp lệ.')
     }
 
     return {
       sessionParticipantId: participant.id,
-      displayName: player?.displayName ?? 'Player data unavailable',
+      displayName: player?.displayName ?? 'Không có dữ liệu người chơi',
       status: participant.status,
       skillLevel: profile?.skillLevel ?? null,
-      skillLabel: profile ? SKILL_LEVEL_LABELS[profile.skillLevel] : null,
+      skillLabel: profile ? skillLevelLabel(profile.skillLevel) : null,
       waitingSince: participant.waitingSince,
       waitingDuration,
       dataUnavailable: player === undefined,
@@ -241,11 +222,11 @@ export function composeLiveSessionModel({
   const unresolvedCourtViews = sessionCourts.map((sessionCourt) => {
     const court = courtById.get(sessionCourt.courtId)
     if (!court) {
-      warnings.add('Some physical Court data could not be resolved.')
+      warnings.add('Không thể xác định dữ liệu của một số sân.')
     }
     return {
       sessionCourtId: sessionCourt.id,
-      name: court?.name ?? 'Court data unavailable',
+      name: court?.name ?? 'Không có dữ liệu sân',
       status: sessionCourt.status,
       dataUnavailable: court === undefined,
     }
@@ -262,18 +243,20 @@ export function composeLiveSessionModel({
     .map<MatchView>((match) => {
       const court = courtViewById.get(match.sessionCourtId)
       if (!court) {
-        warnings.add('A Match Court could not be resolved.')
+        warnings.add('Không thể xác định sân của một trận đấu.')
       }
       const startedAtLabel =
-        match.startedAt === null ? null : formatDateTime(match.startedAt)
+        match.startedAt === null
+          ? null
+          : formatVietnamDateTime(match.startedAt)
 
       return {
         id: match.id,
         sessionCourtId: match.sessionCourtId,
         status: match.status,
         source: match.source,
-        sourceLabel: MATCH_SOURCE_LABELS[match.source],
-        courtName: court?.name ?? 'Court data unavailable',
+        sourceLabel: matchSourceLabel(match.source),
+        courtName: court?.name ?? 'Không có dữ liệu sân',
         teamA: [
           resolveTeamMember(match, 'A', 1, participantById, warnings),
           resolveTeamMember(match, 'A', 2, participantById, warnings),
@@ -282,7 +265,7 @@ export function composeLiveSessionModel({
           resolveTeamMember(match, 'B', 1, participantById, warnings),
           resolveTeamMember(match, 'B', 2, participantById, warnings),
         ],
-        createdAtLabel: formatDateTime(match.createdAt),
+        createdAtLabel: formatVietnamDateTime(match.createdAt),
         startedAtLabel,
         elapsedLabel:
           match.startedAt === null ? null : durationBetween(match.startedAt, now),
@@ -293,7 +276,7 @@ export function composeLiveSessionModel({
   const playingMatchByCourtId = new Map<string, MatchView>()
   for (const match of playingMatches) {
     if (playingMatchByCourtId.has(match.sessionCourtId)) {
-      warnings.add('More than one PLAYING Match was returned for a Court.')
+      warnings.add('Một sân đang có nhiều hơn một trận đấu diễn ra.')
     } else {
       playingMatchByCourtId.set(match.sessionCourtId, match)
     }
@@ -302,10 +285,10 @@ export function composeLiveSessionModel({
   const courts = unresolvedCourtViews.map<CourtView>((court) => {
     const activeMatch = playingMatchByCourtId.get(court.sessionCourtId) ?? null
     if (court.status === 'PLAYING' && activeMatch === null) {
-      warnings.add('A PLAYING Court has no resolvable PLAYING Match.')
+      warnings.add('Một sân đang chơi không có trận đấu tương ứng.')
     }
     if (court.status !== 'PLAYING' && activeMatch !== null) {
-      warnings.add('A PLAYING Match is associated with a non-PLAYING Court.')
+      warnings.add('Một trận đang chơi lại gắn với sân không ở trạng thái đang chơi.')
     }
     return {
       ...court,
@@ -324,10 +307,12 @@ export function composeLiveSessionModel({
       status: session.status,
       sport: session.sport,
       matchFormat: session.matchFormat,
-      plannedStartAtLabel: formatDateTime(session.plannedStartAt),
-      plannedEndAtLabel: formatDateTime(session.plannedEndAt),
+      plannedStartAtLabel: formatVietnamDateTime(session.plannedStartAt),
+      plannedEndAtLabel: formatVietnamDateTime(session.plannedEndAt),
       startedAtLabel:
-        session.startedAt === null ? null : formatDateTime(session.startedAt),
+        session.startedAt === null
+          ? null
+          : formatVietnamDateTime(session.startedAt),
     },
     courts,
     waitingParticipants: participantsWithStatus('WAITING').toSorted(

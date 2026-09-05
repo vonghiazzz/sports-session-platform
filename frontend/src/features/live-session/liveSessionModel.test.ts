@@ -3,7 +3,6 @@ import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import {
   composeLiveSessionModel,
   formatWaitingDuration,
-  SKILL_LEVEL_LABELS,
 } from './liveSessionModel'
 
 describe('composeLiveSessionModel', () => {
@@ -13,14 +12,17 @@ describe('composeLiveSessionModel', () => {
     expect(model.waitingParticipants[0]?.displayName).toBe('An Nguyen')
   })
 
-  it('maps every backend SkillLevel to the approved presentation label', () => {
-    expect(SKILL_LEVEL_LABELS).toEqual({
-      WEAK: 'Yếu',
-      WEAK_PLUS: 'Yếu+',
-      INTERMEDIATE_MINUS: 'TB-',
-      INTERMEDIATE: 'TB',
-      INTERMEDIATE_PLUS: 'TB+',
-      GOOD: 'Khá',
+  it('maps backend SkillLevel to the approved presentation label', () => {
+    const model = composeLiveSessionModel(createLiveSessionInput())
+
+    expect(model.waitingParticipants[0]).toMatchObject({
+      skillLevel: 'WEAK',
+      skillLabel: 'Yếu',
+    })
+
+    expect(model.waitingParticipants[1]).toMatchObject({
+      skillLevel: 'WEAK_PLUS',
+      skillLabel: 'Yếu+',
     })
   })
 
@@ -39,7 +41,7 @@ describe('composeLiveSessionModel', () => {
         '2026-09-02T09:30:00Z',
         new Date('2026-09-02T10:00:00Z'),
       ),
-    ).toBe('30 min')
+    ).toBe('30 phút')
   })
 
   it('resolves PLAYING Match A1, A2, B1, and B2 by semantic assignment', () => {
@@ -76,10 +78,10 @@ describe('composeLiveSessionModel', () => {
 
     expect(model.waitingParticipants).toHaveLength(2)
     expect(model.waitingParticipants[0]?.displayName).toBe(
-      'Player data unavailable',
+      'Không có dữ liệu người chơi',
     )
     expect(model.warnings).toContain(
-      'Some Participant player data could not be resolved.',
+      'Không thể xác định dữ liệu của một số người chơi.',
     )
   })
 
@@ -91,9 +93,9 @@ describe('composeLiveSessionModel', () => {
     })
 
     expect(model.courts).toHaveLength(3)
-    expect(model.courts[0]?.name).toBe('Court data unavailable')
+    expect(model.courts[0]?.name).toBe('Không có dữ liệu sân')
     expect(model.warnings).toContain(
-      'Some physical Court data could not be resolved.',
+      'Không thể xác định dữ liệu của một số sân.',
     )
   })
 
@@ -106,7 +108,7 @@ describe('composeLiveSessionModel', () => {
 
     expect(model.courts[0]?.activeMatch).toBeNull()
     expect(model.warnings).toContain(
-      'A PLAYING Court has no resolvable PLAYING Match.',
+      'Một sân đang chơi không có trận đấu tương ứng.',
     )
   })
 
@@ -129,8 +131,8 @@ describe('composeLiveSessionModel', () => {
     })
 
     expect(model.courts[0]?.activeMatch?.teamB[1]?.displayName).toBe(
-      'Player data unavailable',
+      'Không có dữ liệu người chơi',
     )
-    expect(model.warnings).toContain('A Match team assignment is incomplete.')
+    expect(model.warnings).toContain('Phân công đội của một trận đấu chưa đầy đủ.')
   })
 })

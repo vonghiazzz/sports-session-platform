@@ -32,15 +32,16 @@ function operationErrorMessage(
     return null
   }
   if (!(error instanceof HttpError)) {
-    return 'Connection was lost. Refresh current state before trying again.'
+    return 'Mất kết nối. Dữ liệu hiện tại đang được tải lại; hãy kiểm tra trạng thái trước khi thử lại.'
   }
   if (error.status === 409) {
-    return 'Live state changed. Current data is being refreshed.'
+    return 'Trạng thái trực tiếp đã thay đổi. Dữ liệu hiện tại đang được tải lại.'
   }
   if (error.status === 404) {
-    return `${resourceName} is no longer available. Current data is being refreshed.`
+    const resourceLabel = resourceName === 'Participant' ? 'Người chơi' : 'Sân'
+    return `${resourceLabel} không còn khả dụng. Dữ liệu hiện tại đang được tải lại.`
   }
-  return 'The action could not be completed. Refresh current state before trying again.'
+  return 'Không thể hoàn tất thao tác. Hãy làm mới trạng thái hiện tại trước khi thử lại.'
 }
 
 export function useParticipantAction(

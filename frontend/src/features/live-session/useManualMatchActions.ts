@@ -36,18 +36,18 @@ function createErrorMessage(error: Error | null): string | null {
     return null
   }
   if (!(error instanceof HttpError)) {
-    return 'Connection was lost. Match data has been refreshed. Check Created Matches before creating again.'
+    return 'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra Trận chờ bắt đầu trước khi tạo lại.'
   }
   if (error.status === 400) {
-    return 'Check the Court and four player assignments, then try again.'
+    return 'Hãy kiểm tra sân và bốn vị trí người chơi rồi thử lại.'
   }
   if (error.status === 404) {
-    return 'The Session or a selected resource is no longer available. Current data has been refreshed.'
+    return 'Phiên hoặc tài nguyên đã chọn không còn khả dụng. Dữ liệu hiện tại đã được tải lại.'
   }
   if (error.status === 409) {
-    return 'Live resources changed. Current Session state has been refreshed.'
+    return 'Tài nguyên trực tiếp đã thay đổi. Trạng thái phiên hiện tại đã được tải lại.'
   }
-  return 'The Match could not be created. Current Session state has been refreshed.'
+  return 'Không thể tạo trận. Trạng thái phiên hiện tại đã được tải lại.'
 }
 
 function lifecycleErrorMessage(
@@ -59,33 +59,33 @@ function lifecycleErrorMessage(
   }
   if (!(error instanceof HttpError)) {
     if (action === 'COMPLETE') {
-      return 'Connection was lost. Match state has been refreshed; check whether this Match completed.'
+      return 'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra trận đã kết thúc hay chưa.'
     }
     if (action === 'CANCEL') {
-      return 'Connection was lost. Match state has been refreshed; check whether this Match was cancelled.'
+      return 'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra trận đã bị hủy hay chưa.'
     }
-    return 'Connection was lost. Current Session state has been refreshed; check this Match before trying again.'
+    return 'Mất kết nối nên chưa xác định được kết quả. Trạng thái phiên đã được tải lại; hãy kiểm tra trận trước khi thử lại.'
   }
   if (error.status === 400) {
     return action === 'COMPLETE'
-      ? 'Check the winner and optional scores, then try again.'
-      : 'The Match action could not be completed.'
+      ? 'Hãy kiểm tra đội thắng và điểm số tùy chọn rồi thử lại.'
+      : 'Không thể hoàn tất thao tác với trận đấu.'
   }
   if (error.status === 404) {
-    return 'The Match or a required resource is no longer available. Current data has been refreshed.'
+    return 'Trận đấu hoặc tài nguyên bắt buộc không còn khả dụng. Dữ liệu hiện tại đã được tải lại.'
   }
   if (error.status === 409) {
     return action === 'START'
-      ? 'Live resources changed. Current Session state has been refreshed.'
-      : 'Live resources changed. Current Match state has been refreshed.'
+      ? 'Tài nguyên trực tiếp đã thay đổi. Trạng thái phiên hiện tại đã được tải lại.'
+      : 'Tài nguyên trực tiếp đã thay đổi. Trạng thái trận hiện tại đã được tải lại.'
   }
   if (action === 'COMPLETE') {
-    return 'The Match could not be completed. Current Match state has been refreshed.'
+    return 'Không thể kết thúc trận. Trạng thái trận hiện tại đã được tải lại.'
   }
   if (action === 'CANCEL') {
-    return 'The Match could not be cancelled. Current Match state has been refreshed.'
+    return 'Không thể hủy trận. Trạng thái trận hiện tại đã được tải lại.'
   }
-  return 'The Match could not be started. Current Session state has been refreshed.'
+  return 'Không thể bắt đầu trận. Trạng thái phiên hiện tại đã được tải lại.'
 }
 
 function shouldReconcileRuntime(error: Error): boolean {

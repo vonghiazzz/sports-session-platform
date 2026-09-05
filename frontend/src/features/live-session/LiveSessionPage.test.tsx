@@ -58,14 +58,14 @@ describe('LiveSessionScreen', () => {
   it('renders a distinct initial loading state', () => {
     renderScreen(state('loading'))
 
-    expect(screen.getByRole('heading', { name: 'Loading Session…' })).toBeVisible()
-    expect(screen.getByText('Gathering Courts, Players, and Matches.')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang tải phiên…' })).toBeVisible()
+    expect(screen.getByText('Đang tải sân, người chơi và trận đấu.')).toBeVisible()
   })
 
   it('renders a clear Session not found state', () => {
     renderScreen(state('not-found'))
 
-    expect(screen.getByRole('heading', { name: 'Session not found' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Không tìm thấy phiên' })).toBeVisible()
   })
 
   it('renders an essential-read error separately from empty data', () => {
@@ -73,10 +73,10 @@ describe('LiveSessionScreen', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Unable to load live Session data.',
+        name: 'Không thể tải dữ liệu phiên trực tiếp.',
       }),
     ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Thử lại' })).toBeEnabled()
   })
 
   it('renders realistic multi-Court and multi-Participant data read-only', () => {
@@ -98,10 +98,24 @@ describe('LiveSessionScreen', () => {
     expect(screen.getAllByRole('heading', { name: 'Court Two' })).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Court Three' })).toBeVisible()
     expect(screen.getAllByText('An Nguyen')).toHaveLength(2)
-    expect(screen.getByText('30 min')).toBeVisible()
-    expect(screen.getByText('Created — not started')).toBeVisible()
+    expect(screen.getByText('30 phút')).toBeVisible()
+    expect(screen.getByText('Đã tạo — chưa bắt đầu')).toBeVisible()
+    expect(screen.getByText(/16:00 02\/09\/2026/)).toBeVisible()
+    expect(screen.getByText(/19:00 02\/09\/2026/)).toBeVisible()
+    expect(screen.getByText('16:05 02/09/2026')).toBeVisible()
+    expect(screen.getByText('Tạo lúc 16:40 02/09/2026')).toBeVisible()
+    expect(screen.getByText('16:45 02/09/2026')).toBeVisible()
+    expect(screen.getByText('Đang diễn ra')).toBeVisible()
+    expect(screen.getByText('Cầu lông')).toBeVisible()
+    expect(screen.getByText('Đánh đôi')).toBeVisible()
+    expect(screen.getAllByText('Thủ công')).toHaveLength(2)
+    expect(screen.getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByText('Tạm khóa')).toBeVisible()
+    expect(screen.queryByText('IN_PROGRESS')).not.toBeInTheDocument()
+    expect(screen.queryByText('INTERMEDIATE_MINUS')).not.toBeInTheDocument()
+    expect(screen.queryByText('AVAILABLE')).not.toBeInTheDocument()
     expect(screen.queryByText(/reserved/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
   })
 
   it('uses the single manual Refresh control for read refresh', async () => {
@@ -115,22 +129,22 @@ describe('LiveSessionScreen', () => {
     }
     renderScreen(readyState, fixtureNow)
 
-    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    await user.click(screen.getByRole('button', { name: 'Làm mới' }))
 
     expect(refresh).toHaveBeenCalledOnce()
   })
 
   it('offers Participant actions from authoritative runtime states', () => {
     renderScreen(readyState())
-    const heading = screen.getByRole('heading', { name: 'Participants' })
+    const heading = screen.getByRole('heading', { name: 'Người chơi' })
     const participantPanel = heading.closest('section')
 
     expect(participantPanel).not.toBeNull()
     const panel = within(participantPanel as HTMLElement)
-    expect(panel.getByRole('button', { name: 'Check In' })).toBeEnabled()
-    expect(panel.getAllByRole('button', { name: 'Pause' })).toHaveLength(2)
-    expect(panel.getByRole('button', { name: 'Resume' })).toBeEnabled()
-    expect(panel.getAllByRole('button', { name: 'Leave' })).toHaveLength(4)
+    expect(panel.getByRole('button', { name: 'Điểm danh' })).toBeEnabled()
+    expect(panel.getAllByRole('button', { name: 'Tạm nghỉ' })).toHaveLength(2)
+    expect(panel.getByRole('button', { name: 'Trở lại' })).toBeEnabled()
+    expect(panel.getAllByRole('button', { name: 'Rời phiên' })).toHaveLength(4)
   })
 
   it('does not offer Check In before the Session is in progress', () => {
@@ -157,14 +171,14 @@ describe('LiveSessionScreen', () => {
       },
     })
 
-    const heading = screen.getByRole('heading', { name: 'Participants' })
+    const heading = screen.getByRole('heading', { name: 'Người chơi' })
     const participantPanel = heading.closest('section')
     expect(participantPanel).not.toBeNull()
     const panel = within(participantPanel as HTMLElement)
-    expect(panel.queryByRole('button', { name: 'Check In' })).not.toBeInTheDocument()
-    expect(panel.getByRole('button', { name: 'Leave' })).toBeEnabled()
+    expect(panel.queryByRole('button', { name: 'Điểm danh' })).not.toBeInTheDocument()
+    expect(panel.getByRole('button', { name: 'Rời phiên' })).toBeEnabled()
     expect(
-      panel.getByText('Session must be in progress to check in.'),
+      panel.getByText('Phiên phải đang diễn ra để điểm danh.'),
     ).toBeVisible()
   })
 
@@ -201,17 +215,17 @@ describe('LiveSessionScreen', () => {
       },
     })
 
-    const heading = screen.getByRole('heading', { name: 'Participants' })
+    const heading = screen.getByRole('heading', { name: 'Người chơi' })
     const participantPanel = heading.closest('section')
     expect(participantPanel).not.toBeNull()
     const panel = within(participantPanel as HTMLElement)
     expect(panel.queryByRole('button')).not.toBeInTheDocument()
-    expect(panel.getByText('1 left this Session')).toBeVisible()
+    expect(panel.getByText('1 người đã rời phiên')).toBeVisible()
   })
 
   it('offers only status-valid Court actions', () => {
     renderScreen(readyState())
-    const boardHeading = screen.getByRole('heading', { name: 'Court Board' })
+    const boardHeading = screen.getByRole('heading', { name: 'Bảng sân' })
     const board = boardHeading.closest('section')
     expect(board).not.toBeNull()
     const boardQueries = within(board as HTMLElement)
@@ -231,17 +245,17 @@ describe('LiveSessionScreen', () => {
 
     expect(
       within(playingCard as HTMLElement).queryByRole('button', {
-        name: /Enable Court|Disable Court/,
+        name: /Mở sân|Tạm khóa sân/,
       }),
     ).not.toBeInTheDocument()
     expect(
       within(availableCard as HTMLElement).getByRole('button', {
-        name: 'Disable Court',
+        name: 'Tạm khóa sân',
       }),
     ).toBeEnabled()
     expect(
       within(unavailableCard as HTMLElement).getByRole('button', {
-        name: 'Enable Court',
+        name: 'Mở sân',
       }),
     ).toBeEnabled()
   })
@@ -249,10 +263,10 @@ describe('LiveSessionScreen', () => {
   it('shows Create and Start controls only while the Session is in progress', () => {
     renderScreen(readyState())
 
-    expect(screen.getByRole('button', { name: 'Create Match' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Start Match' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Bắt đầu trận' })).toBeEnabled()
     expect(
-      screen.getByText(/does not reserve its Court or players/i),
+      screen.getByText(/chưa giữ sân hoặc người chơi/i),
     ).toBeVisible()
   })
 
@@ -275,25 +289,25 @@ describe('LiveSessionScreen', () => {
         },
       })
 
-      expect(screen.queryByRole('button', { name: 'Create Match' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Start Match' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Tạo trận' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
       const createdMatches = screen
-        .getByRole('heading', { name: 'Created Matches' })
+        .getByRole('heading', { name: 'Trận chờ bắt đầu' })
         .closest('section')
       expect(createdMatches).not.toBeNull()
       expect(
         within(createdMatches as HTMLElement).getByRole('button', {
-          name: 'Cancel Match',
+          name: 'Hủy trận',
         }),
       ).toBeEnabled()
       expect(
         screen.getByText(
-          'Manual Matches can only be created while the Session is in progress.',
+          'Chỉ có thể tạo trận thủ công khi phiên đang diễn ra.',
         ),
       ).toBeVisible()
       expect(
         screen.getByText(
-          'This Match can only start while the Session is in progress.',
+          'Trận này chỉ có thể bắt đầu khi phiên đang diễn ra.',
         ),
       ).toBeVisible()
     },
@@ -321,13 +335,13 @@ describe('LiveSessionScreen', () => {
         },
       })
 
-      expect(screen.queryByRole('button', { name: 'Start Match' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
       if (matchStatus === 'PLAYING') {
-        expect(screen.getByRole('button', { name: 'Complete Match' })).toBeEnabled()
-        expect(screen.getByRole('button', { name: 'Cancel Match' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Kết thúc trận' })).toBeEnabled()
+        expect(screen.getByRole('button', { name: 'Hủy trận' })).toBeEnabled()
       } else {
-        expect(screen.queryByRole('button', { name: 'Complete Match' })).not.toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'Cancel Match' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Kết thúc trận' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Hủy trận' })).not.toBeInTheDocument()
       }
     },
   )
@@ -350,7 +364,7 @@ describe('LiveSessionScreen', () => {
       },
     })
 
-    expect(screen.getByRole('button', { name: 'Start Match' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Bắt đầu trận' })).toBeEnabled()
   })
 
   it('keeps Complete and Cancel actionable for a PLAYING Match after Session cancellation', () => {
@@ -370,7 +384,7 @@ describe('LiveSessionScreen', () => {
       },
     })
 
-    expect(screen.getByRole('button', { name: 'Complete Match' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Cancel Match' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Kết thúc trận' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Hủy trận' })).toBeEnabled()
   })
 })

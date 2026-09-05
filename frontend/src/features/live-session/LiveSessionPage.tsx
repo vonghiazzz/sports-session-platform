@@ -26,31 +26,15 @@ import {
   useSessionLifecycleActions,
   type SessionLifecycleAction,
 } from './useSessionLifecycleActions'
-
-const SESSION_STATUS_LABELS: Readonly<
-  Record<LiveSessionModel['header']['status'], string>
-> = {
-  PLANNED: 'Planned',
-  IN_PROGRESS: 'In progress',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-}
-
-const PARTICIPANT_ACTION_LABELS: Readonly<
-  Record<ParticipantAction, { readonly idle: string; readonly pending: string }>
-> = {
-  CHECK_IN: { idle: 'Check In', pending: 'Checking in…' },
-  PAUSE: { idle: 'Pause', pending: 'Pausing…' },
-  RESUME: { idle: 'Resume', pending: 'Resuming…' },
-  LEAVE: { idle: 'Leave', pending: 'Leaving…' },
-}
-
-const COURT_ACTION_LABELS: Readonly<
-  Record<SessionCourtAction, { readonly idle: string; readonly pending: string }>
-> = {
-  DISABLE: { idle: 'Disable Court', pending: 'Disabling…' },
-  ENABLE: { idle: 'Enable Court', pending: 'Enabling…' },
-}
+import {
+  COURT_ACTION_LABELS,
+  MATCH_ACTION_LABELS,
+  matchFormatLabel,
+  PARTICIPANT_ACTION_LABELS,
+  SESSION_ACTION_LABELS,
+  sportLabel,
+  statusLabel,
+} from '../../lib/presentation'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -93,10 +77,13 @@ function useNow(intervalMilliseconds = 30_000): Date {
 }
 
 function StatusBadge({ status }: { readonly status: string }) {
-  const statusClassName = status.toLowerCase().replaceAll(' ', '-')
+  const statusClassName = status
+    .toLowerCase()
+    .replaceAll('_', '-')
+    .replaceAll(' ', '-')
   return (
     <span className={`status-badge status-${statusClassName}`}>
-      {status.replaceAll('_', ' ')}
+      {statusLabel(status)}
     </span>
   )
 }
@@ -126,11 +113,11 @@ function TeamList({
 function MatchTeams({ match }: { readonly match: MatchView }) {
   return (
     <div className="match-teams">
-      <TeamList label="Team A" members={match.teamA} />
-      <span className="versus" aria-label="versus">
-        vs
+      <TeamList label="Đội A" members={match.teamA} />
+      <span className="versus" aria-label="đối đầu">
+        đấu
       </span>
-      <TeamList label="Team B" members={match.teamB} />
+      <TeamList label="Đội B" members={match.teamB} />
     </div>
   )
 }
@@ -143,7 +130,7 @@ function completeRequest(
   teamBScoreInput: string,
 ) {
   if (winnerTeam === '') {
-    return { error: 'Choose the winning team.', request: null }
+    return { error: 'Hãy chọn đội thắng.', request: null }
   }
 
   const teamAScoreBlank = teamAScoreInput === ''
@@ -155,26 +142,26 @@ function completeRequest(
     }
   }
   if (teamAScoreBlank || teamBScoreBlank) {
-    return { error: 'Enter both scores or leave both blank.', request: null }
+    return { error: 'Hãy nhập cả hai tỷ số hoặc để trống cả hai.', request: null }
   }
 
   const teamAScore = Number(teamAScoreInput)
   const teamBScore = Number(teamBScoreInput)
   if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore)) {
-    return { error: 'Scores must be whole numbers.', request: null }
+    return { error: 'Tỷ số phải là số nguyên.', request: null }
   }
   if (teamAScore < 0 || teamBScore < 0) {
-    return { error: 'Scores cannot be negative.', request: null }
+    return { error: 'Tỷ số không được là số âm.', request: null }
   }
   if (teamAScore === teamBScore) {
-    return { error: 'A Match cannot end in a draw.', request: null }
+    return { error: 'Trận đấu không thể kết thúc với tỷ số hòa.', request: null }
   }
   if (
     (winnerTeam === 'A' && teamAScore < teamBScore) ||
     (winnerTeam === 'B' && teamBScore < teamAScore)
   ) {
     return {
-      error: 'The winning team must have the higher score.',
+      error: 'Đội thắng phải có tỷ số cao hơn.',
       request: null,
     }
   }
@@ -220,22 +207,22 @@ function PlayingMatchPanel({
       <MatchTeams match={match} />
       <dl className="inline-details">
         <div>
-          <dt>Source</dt>
+          <dt>Nguồn</dt>
           <dd>{match.sourceLabel}</dd>
         </div>
         <div>
-          <dt>Started</dt>
-          <dd>{match.startedAtLabel ?? 'Time unavailable'}</dd>
+          <dt>Bắt đầu</dt>
+          <dd>{match.startedAtLabel ?? '—'}</dd>
         </div>
         <div>
-          <dt>Elapsed</dt>
-          <dd>{match.elapsedLabel ?? 'Time unavailable'}</dd>
+          <dt>Thời gian đã chơi</dt>
+          <dd>{match.elapsedLabel ?? '—'}</dd>
         </div>
       </dl>
       <form className="complete-match-form" noValidate onSubmit={handleComplete}>
         <div className="result-fields">
           <label className="match-field winner-field">
-            <span>Winner</span>
+            <span>Đội thắng</span>
             <select
               value={winnerTeam}
               disabled={completeDisabled}
@@ -244,13 +231,13 @@ function PlayingMatchPanel({
                 setValidationMessage(null)
               }}
             >
-              <option value="">Choose winner</option>
-              <option value="A">Team A</option>
-              <option value="B">Team B</option>
+              <option value="">Chọn đội thắng</option>
+              <option value="A">Đội A</option>
+              <option value="B">Đội B</option>
             </select>
           </label>
           <label className="match-field">
-            <span>Team A Score (optional)</span>
+            <span>Tỷ số Đội A (không bắt buộc)</span>
             <input
               type="number"
               min="0"
@@ -265,7 +252,7 @@ function PlayingMatchPanel({
             />
           </label>
           <label className="match-field">
-            <span>Team B Score (optional)</span>
+            <span>Tỷ số Đội B (không bắt buộc)</span>
             <input
               type="number"
               min="0"
@@ -292,8 +279,8 @@ function PlayingMatchPanel({
             disabled={completeDisabled}
           >
             {actionState.pendingAction === 'COMPLETE'
-              ? 'Completing…'
-              : 'Complete Match'}
+              ? MATCH_ACTION_LABELS.COMPLETE.pending
+              : MATCH_ACTION_LABELS.COMPLETE.idle}
           </button>
           {!isConfirmingCancel ? (
             <button
@@ -302,11 +289,11 @@ function PlayingMatchPanel({
               disabled={actionState.isPending}
               onClick={() => setIsConfirmingCancel(true)}
             >
-              Cancel Match
+              {MATCH_ACTION_LABELS.CANCEL.idle}
             </button>
           ) : (
             <div className="cancel-confirmation">
-              <p>Cancel this playing Match? No winner will be recorded.</p>
+              <p>Hủy trận đang chơi này? Kết quả sẽ không ghi nhận đội thắng.</p>
               <div className="action-area">
                 <button
                   className="danger-action-button"
@@ -315,8 +302,8 @@ function PlayingMatchPanel({
                   onClick={() => void actionState.execute({ type: 'CANCEL' })}
                 >
                   {actionState.pendingAction === 'CANCEL'
-                    ? 'Cancelling…'
-                    : 'Confirm Cancel'}
+                    ? MATCH_ACTION_LABELS.CANCEL.pending
+                    : 'Xác nhận hủy'}
                 </button>
                 <button
                   className="secondary-action-button"
@@ -324,7 +311,7 @@ function PlayingMatchPanel({
                   disabled={actionState.isPending}
                   onClick={() => setIsConfirmingCancel(false)}
                 >
-                  Keep Match
+                  Giữ trận đấu
                 </button>
               </div>
             </div>
@@ -366,13 +353,13 @@ function CourtCard({
       </header>
 
       {court.status === 'AVAILABLE' && (
-        <p className="court-note">Ready for play.</p>
+        <p className="court-note">Sẵn sàng thi đấu.</p>
       )}
       {court.status === 'UNAVAILABLE' && (
-        <p className="court-note">Unavailable for this Session.</p>
+        <p className="court-note">Tạm khóa trong phiên này.</p>
       )}
       {court.status === 'PLAYING' && court.activeMatch === null && (
-        <p className="data-warning">Live match data unavailable.</p>
+        <p className="data-warning">Không có dữ liệu trận đấu trực tiếp.</p>
       )}
       {court.activeMatch && (
         <PlayingMatchPanel match={court.activeMatch} sessionId={sessionId} />
@@ -423,7 +410,7 @@ function ParticipantRow({
     <li>
       <div className="participant-identity">
         <strong>{participant.displayName}</strong>
-        <span>{participant.skillLabel ?? 'Skill unavailable'}</span>
+        <span>{participant.skillLabel ?? 'Không có trình độ'}</span>
       </div>
       <div className="participant-operation">
         {showWaiting && (
@@ -434,7 +421,7 @@ function ParticipantRow({
                 : 'waiting-time'
             }
           >
-            {participant.waitingDuration ?? 'Waiting time unavailable'}
+            {participant.waitingDuration ?? 'Không có thời gian chờ'}
           </span>
         )}
         {actions.length > 0 && (
@@ -456,7 +443,7 @@ function ParticipantRow({
         )}
         {checkInUnavailable && (
           <span className="action-note">
-            Session must be in progress to check in.
+            Phiên phải đang diễn ra để điểm danh.
           </span>
         )}
         {actionState.errorMessage && (
@@ -489,7 +476,7 @@ function ParticipantList({
         <span>{participants.length}</span>
       </div>
       {participants.length === 0 ? (
-        <p className="empty-state">No players.</p>
+        <p className="empty-state">Không có người chơi.</p>
       ) : (
         <ul className="participant-list">
           {participants.map((participant) => (
@@ -510,10 +497,10 @@ function ParticipantList({
 function participantOptionLabel(participant: ParticipantView): string {
   return [
     participant.displayName,
-    participant.skillLabel ?? 'Skill unavailable',
+    participant.skillLabel ?? 'Không có trình độ',
     participant.waitingDuration === null
-      ? 'waiting time unavailable'
-      : `waiting ${participant.waitingDuration}`,
+      ? 'không có thời gian chờ'
+      : `đã chờ ${participant.waitingDuration}`,
   ].join(' · ')
 }
 
@@ -525,10 +512,10 @@ const MATCH_SLOTS: readonly {
   readonly teamSide: 'A' | 'B'
   readonly teamSlot: 1 | 2
 }[] = [
-  { id: 'A1', label: 'Team A — Slot 1', teamSide: 'A', teamSlot: 1 },
-  { id: 'A2', label: 'Team A — Slot 2', teamSide: 'A', teamSlot: 2 },
-  { id: 'B1', label: 'Team B — Slot 1', teamSide: 'B', teamSlot: 1 },
-  { id: 'B2', label: 'Team B — Slot 2', teamSide: 'B', teamSlot: 2 },
+  { id: 'A1', label: 'Đội A — Vị trí 1', teamSide: 'A', teamSlot: 1 },
+  { id: 'A2', label: 'Đội A — Vị trí 2', teamSide: 'A', teamSlot: 2 },
+  { id: 'B1', label: 'Đội B — Vị trí 1', teamSide: 'B', teamSlot: 1 },
+  { id: 'B2', label: 'Đội B — Vị trí 2', teamSide: 'B', teamSlot: 2 },
 ]
 
 const EMPTY_MATCH_SLOTS: Readonly<Record<MatchSlot, string>> = {
@@ -566,12 +553,12 @@ function CreateManualMatchForm({
       <section className="panel manual-match-creator" aria-labelledby="create-match-heading">
         <div className="section-title section-title-large">
           <div>
-            <p className="eyebrow">Match operations</p>
-            <h2 id="create-match-heading">Create Manual Match</h2>
+            <p className="eyebrow">Vận hành trận đấu</p>
+            <h2 id="create-match-heading">Tạo trận thủ công</h2>
           </div>
         </div>
         <p className="empty-panel">
-          Manual Matches can only be created while the Session is in progress.
+          Chỉ có thể tạo trận thủ công khi phiên đang diễn ra.
         </p>
       </section>
     )
@@ -619,14 +606,14 @@ function CreateManualMatchForm({
     <section className="panel manual-match-creator" aria-labelledby="create-match-heading">
       <div className="section-title section-title-large">
         <div>
-          <p className="eyebrow">Match operations</p>
-          <h2 id="create-match-heading">Create Manual Match</h2>
+          <p className="eyebrow">Vận hành trận đấu</p>
+          <h2 id="create-match-heading">Tạo trận thủ công</h2>
         </div>
       </div>
       <form onSubmit={(event) => void handleSubmit(event)}>
         <div className="manual-match-fields">
           <label className="match-field court-field">
-            <span>Session Court</span>
+            <span>Sân trong phiên</span>
             <select
               value={
                 availableCourtIds.has(sessionCourtId) ? sessionCourtId : ''
@@ -634,7 +621,7 @@ function CreateManualMatchForm({
               disabled={actionState.isPending || availableCourts.length === 0}
               onChange={(event) => setSessionCourtId(event.target.value)}
             >
-              <option value="">Choose an available Court</option>
+              <option value="">Chọn sân sẵn sàng</option>
               {availableCourts.map((court) => (
                 <option key={court.sessionCourtId} value={court.sessionCourtId}>
                   {court.name}
@@ -642,7 +629,7 @@ function CreateManualMatchForm({
               ))}
             </select>
           </label>
-          <div className="team-fields" aria-label="Team A assignments">
+          <div className="team-fields" aria-label="Phân công Đội A">
             {MATCH_SLOTS.filter((slot) => slot.teamSide === 'A').map((slot) => (
               <label className="match-field" key={slot.id}>
                 <span>{slot.label}</span>
@@ -660,7 +647,7 @@ function CreateManualMatchForm({
                     }))
                   }
                 >
-                  <option value="">Choose a waiting player</option>
+                  <option value="">Chọn người chơi đang chờ</option>
                   {waitingParticipants.map((participant) => {
                     const selectedElsewhere = MATCH_SLOTS.some(
                       (candidateSlot) =>
@@ -682,7 +669,7 @@ function CreateManualMatchForm({
               </label>
             ))}
           </div>
-          <div className="team-fields" aria-label="Team B assignments">
+          <div className="team-fields" aria-label="Phân công Đội B">
             {MATCH_SLOTS.filter((slot) => slot.teamSide === 'B').map((slot) => (
               <label className="match-field" key={slot.id}>
                 <span>{slot.label}</span>
@@ -700,7 +687,7 @@ function CreateManualMatchForm({
                     }))
                   }
                 >
-                  <option value="">Choose a waiting player</option>
+                  <option value="">Chọn người chơi đang chờ</option>
                   {waitingParticipants.map((participant) => {
                     const selectedElsewhere = MATCH_SLOTS.some(
                       (candidateSlot) =>
@@ -724,22 +711,22 @@ function CreateManualMatchForm({
           </div>
         </div>
         {availableCourts.length === 0 && (
-          <p className="form-note">No AVAILABLE Court can be selected.</p>
+          <p className="form-note">Không có sân sẵn sàng để chọn.</p>
         )}
         {waitingParticipants.length < 4 && (
           <p className="form-note">
-            At least four WAITING players are needed to create a Match.
+            Cần ít nhất bốn người chơi đang chờ để tạo trận.
           </p>
         )}
         {hasStaleSelection && (
           <p className="form-note" role="status">
-            A previous selection is no longer eligible. Choose from the current
-            options before creating.
+            Lựa chọn trước đó không còn hợp lệ. Hãy chọn lại từ các tùy chọn
+            hiện tại trước khi tạo trận.
           </p>
         )}
         <p className="form-note">
-          Creating a Match does not reserve its Court or players. Availability
-          is checked again when the Match starts.
+          Việc tạo trận chưa giữ sân hoặc người chơi. Hệ thống sẽ kiểm tra lại
+          trạng thái sẵn sàng khi trận bắt đầu.
         </p>
         <div className="create-match-actions">
           <button
@@ -747,7 +734,7 @@ function CreateManualMatchForm({
             type="submit"
             disabled={!formIsValid || actionState.isPending}
           >
-            {actionState.isPending ? 'Creating…' : 'Create Match'}
+            {actionState.isPending ? 'Đang tạo…' : 'Tạo trận'}
           </button>
         </div>
         {actionState.errorMessage && (
@@ -778,12 +765,12 @@ function CreatedMatchCard({
       <header>
         <div>
           <h3>{match.courtName}</h3>
-          <p>Created — not started</p>
+          <p>Đã tạo — chưa bắt đầu</p>
         </div>
         <span className="source-label">{match.sourceLabel}</span>
       </header>
       <MatchTeams match={match} />
-      <p className="created-time">Created {match.createdAtLabel}</p>
+      <p className="created-time">Tạo lúc {match.createdAtLabel}</p>
       <div className="action-area created-match-actions">
         {canStart && (
           <button
@@ -792,7 +779,9 @@ function CreatedMatchCard({
             disabled={actionState.isPending || isConfirmingCancel}
             onClick={() => void actionState.execute({ type: 'START' })}
           >
-            {actionState.pendingAction === 'START' ? 'Starting…' : 'Start Match'}
+            {actionState.pendingAction === 'START'
+              ? MATCH_ACTION_LABELS.START.pending
+              : MATCH_ACTION_LABELS.START.idle}
           </button>
         )}
         {!isConfirmingCancel && (
@@ -802,18 +791,18 @@ function CreatedMatchCard({
             disabled={actionState.isPending}
             onClick={() => setIsConfirmingCancel(true)}
           >
-            Cancel Match
+            {MATCH_ACTION_LABELS.CANCEL.idle}
           </button>
         )}
       </div>
       {!canStart && (
         <p className="action-note">
-          This Match can only start while the Session is in progress.
+          Trận này chỉ có thể bắt đầu khi phiên đang diễn ra.
         </p>
       )}
       {isConfirmingCancel && (
         <div className="cancel-confirmation">
-          <p>Cancel this created Match?</p>
+          <p>Hủy trận đã tạo này?</p>
           <div className="action-area">
             <button
               className="danger-action-button"
@@ -822,8 +811,8 @@ function CreatedMatchCard({
               onClick={() => void actionState.execute({ type: 'CANCEL' })}
             >
               {actionState.pendingAction === 'CANCEL'
-                ? 'Cancelling…'
-                : 'Confirm Cancel'}
+                ? MATCH_ACTION_LABELS.CANCEL.pending
+                : 'Xác nhận hủy'}
             </button>
             <button
               className="secondary-action-button"
@@ -831,7 +820,7 @@ function CreatedMatchCard({
               disabled={actionState.isPending}
               onClick={() => setIsConfirmingCancel(false)}
             >
-              Keep Match
+              Giữ trận đấu
             </button>
           </div>
         </div>
@@ -861,7 +850,7 @@ function SessionHeader({
   return (
     <header className="session-header">
       <div>
-        <p className="eyebrow">Host Live Session Control Room</p>
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
         <h1>{model.header.title}</h1>
         <p className="venue-line">
           {model.header.venueName}
@@ -876,32 +865,32 @@ function SessionHeader({
         disabled={isRefreshing}
         onClick={() => void onRefresh()}
       >
-        {isRefreshing ? 'Refreshing…' : 'Refresh'}
+        {isRefreshing ? 'Đang làm mới…' : 'Làm mới'}
       </button>
       <dl className="session-facts">
         <div>
-          <dt>Status</dt>
+          <dt>Trạng thái</dt>
           <dd>
-            <StatusBadge status={SESSION_STATUS_LABELS[model.header.status]} />
+            <StatusBadge status={model.header.status} />
           </dd>
         </div>
         <div>
-          <dt>Sport</dt>
-          <dd>{model.header.sport === 'BADMINTON' ? 'Badminton' : model.header.sport}</dd>
+          <dt>Môn thể thao</dt>
+          <dd>{sportLabel(model.header.sport)}</dd>
         </div>
         <div>
-          <dt>Format</dt>
-          <dd>{model.header.matchFormat === 'DOUBLES' ? 'Doubles' : model.header.matchFormat}</dd>
+          <dt>Thể thức</dt>
+          <dd>{matchFormatLabel(model.header.matchFormat)}</dd>
         </div>
         <div>
-          <dt>Planned</dt>
+          <dt>Dự kiến</dt>
           <dd>
             {model.header.plannedStartAtLabel} – {model.header.plannedEndAtLabel}
           </dd>
         </div>
         <div>
-          <dt>Started</dt>
-          <dd>{model.header.startedAtLabel ?? 'Not started'}</dd>
+          <dt>Bắt đầu</dt>
+          <dd>{model.header.startedAtLabel ?? 'Chưa bắt đầu'}</dd>
         </div>
       </dl>
       <SessionLifecycleControls
@@ -939,10 +928,10 @@ function SessionLifecycleControls({
   const controlsLocked = actionState.isPending || activeConfirmation !== null
   const confirmationMessage =
     activeConfirmation === 'COMPLETE'
-      ? 'Complete this Session? This terminal action cannot be undone.'
+      ? 'Kết thúc phiên này? Thao tác cuối cùng này không thể hoàn tác.'
       : hasPlayingMatch
-        ? 'Cancel this Session? Playing Matches will not be resolved automatically. Complete or cancel them afterward to release Courts and players.'
-        : 'Cancel this Session? This terminal action cannot be undone.'
+        ? 'Hủy phiên này? Phiên sẽ bị hủy nhưng trận đang chơi không tự kết thúc. Sau đó, bạn vẫn phải kết thúc hoặc hủy trận để giải phóng sân và người chơi.'
+        : 'Hủy phiên này? Thao tác cuối cùng này không thể hoàn tác.'
 
   function executeConfirmedAction() {
     if (activeConfirmation === null) {
@@ -959,8 +948,8 @@ function SessionLifecycleControls({
       aria-labelledby="session-lifecycle-heading"
     >
       <div>
-        <p className="eyebrow">Session operations</p>
-        <h2 id="session-lifecycle-heading">End Session</h2>
+        <p className="eyebrow">Vận hành phiên chơi</p>
+        <h2 id="session-lifecycle-heading">Kết thúc phiên</h2>
       </div>
       <div className="session-lifecycle-operation">
         <div className="action-area session-lifecycle-actions">
@@ -972,8 +961,8 @@ function SessionLifecycleControls({
               onClick={() => setConfirmation('COMPLETE')}
             >
               {actionState.pendingAction === 'COMPLETE'
-                ? 'Completing…'
-                : 'Complete Session'}
+                ? SESSION_ACTION_LABELS.COMPLETE.pending
+                : SESSION_ACTION_LABELS.COMPLETE.idle}
             </button>
           )}
           <button
@@ -983,14 +972,14 @@ function SessionLifecycleControls({
             onClick={() => setConfirmation('CANCEL')}
           >
             {actionState.pendingAction === 'CANCEL'
-              ? 'Cancelling…'
-              : 'Cancel Session'}
+              ? SESSION_ACTION_LABELS.CANCEL.pending
+              : SESSION_ACTION_LABELS.CANCEL.idle}
           </button>
         </div>
         {completeIsAvailable && hasPlayingMatch && (
           <p className="session-lifecycle-note" role="status">
-            Complete Session is unavailable while a Match is PLAYING. Complete
-            or cancel the playing Match first.
+            Không thể kết thúc phiên khi đang có trận thi đấu. Hãy kết thúc
+            hoặc hủy trận đang chơi trước.
           </p>
         )}
         {activeConfirmation !== null && (
@@ -1008,12 +997,12 @@ function SessionLifecycleControls({
                 onClick={executeConfirmedAction}
               >
                 {actionState.pendingAction === 'COMPLETE'
-                  ? 'Completing…'
+                  ? SESSION_ACTION_LABELS.COMPLETE.pending
                   : actionState.pendingAction === 'CANCEL'
-                    ? 'Cancelling…'
+                    ? SESSION_ACTION_LABELS.CANCEL.pending
                     : activeConfirmation === 'COMPLETE'
-                      ? 'Confirm Complete'
-                      : 'Confirm Cancel'}
+                      ? 'Xác nhận kết thúc'
+                      : 'Xác nhận hủy'}
               </button>
               <button
                 className="secondary-action-button"
@@ -1021,7 +1010,7 @@ function SessionLifecycleControls({
                 disabled={actionState.isPending}
                 onClick={() => setConfirmation(null)}
               >
-                Keep Session
+                Giữ phiên
               </button>
             </div>
           </div>
@@ -1054,9 +1043,9 @@ export function LiveSessionScreen({
   if (state.status === 'loading') {
     return (
       <main className="route-state" aria-live="polite">
-        <p className="eyebrow">Host Live Session Control Room</p>
-        <h1>Loading Session…</h1>
-        <p>Gathering Courts, Players, and Matches.</p>
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>Đang tải phiên…</h1>
+        <p>Đang tải sân, người chơi và trận đấu.</p>
       </main>
     )
   }
@@ -1064,9 +1053,9 @@ export function LiveSessionScreen({
   if (state.status === 'not-found') {
     return (
       <main className="route-state">
-        <p className="eyebrow">Host Live Session Control Room</p>
-        <h1>Session not found</h1>
-        <p>The requested Session is not available.</p>
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>Không tìm thấy phiên</h1>
+        <p>Phiên bạn yêu cầu không khả dụng.</p>
       </main>
     )
   }
@@ -1074,16 +1063,16 @@ export function LiveSessionScreen({
   if (state.status === 'error' || model === null) {
     return (
       <main className="route-state" role="alert">
-        <p className="eyebrow">Host Live Session Control Room</p>
-        <h1>Unable to load live Session data.</h1>
-        <p>One or more required reads failed. Try again.</p>
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>Không thể tải dữ liệu phiên trực tiếp.</h1>
+        <p>Một hoặc nhiều dữ liệu bắt buộc không tải được. Hãy thử lại.</p>
         <button
           className="refresh-button"
           type="button"
           disabled={state.isRefreshing}
           onClick={() => void state.refresh()}
         >
-          {state.isRefreshing ? 'Retrying…' : 'Retry'}
+          {state.isRefreshing ? 'Đang thử lại…' : 'Thử lại'}
         </button>
       </main>
     )
@@ -1103,7 +1092,7 @@ export function LiveSessionScreen({
 
       {model.warnings.length > 0 && (
         <aside className="consistency-warning" aria-live="polite">
-          <strong>Live data may be out of sync. Refresh.</strong>
+          <strong>Dữ liệu trực tiếp có thể chưa đồng bộ. Hãy làm mới.</strong>
           <ul>
             {model.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
@@ -1115,13 +1104,13 @@ export function LiveSessionScreen({
       <section className="court-board" aria-labelledby="court-board-heading">
         <div className="section-title section-title-large">
           <div>
-            <p className="eyebrow">Live floor</p>
-            <h2 id="court-board-heading">Court Board</h2>
+            <p className="eyebrow">Khu vực thi đấu</p>
+            <h2 id="court-board-heading">Bảng sân</h2>
           </div>
-          <span>{model.courts.length} Courts</span>
+          <span>{model.courts.length} sân</span>
         </div>
         {model.courts.length === 0 ? (
-          <p className="empty-panel">No Courts are attached to this Session.</p>
+          <p className="empty-panel">Chưa có sân nào trong phiên này.</p>
         ) : (
           <div className="court-grid">
             {model.courts.map((court) => (
@@ -1145,50 +1134,52 @@ export function LiveSessionScreen({
         <section className="panel participant-panel" aria-labelledby="participants-heading">
           <div className="section-title section-title-large">
             <div>
-              <p className="eyebrow">People</p>
-              <h2 id="participants-heading">Participants</h2>
+              <p className="eyebrow">Người chơi</p>
+              <h2 id="participants-heading">Người chơi</h2>
             </div>
           </div>
           <ParticipantList
-            title="Waiting"
+            title="Đang chờ"
             participants={model.waitingParticipants}
             sessionId={state.data.session.id}
             sessionStatus={model.header.status}
             showWaiting
           />
           <ParticipantList
-            title="Registered"
+            title="Đã đăng ký"
             participants={model.registeredParticipants}
             sessionId={state.data.session.id}
             sessionStatus={model.header.status}
           />
           <ParticipantList
-            title="Paused"
+            title="Tạm nghỉ"
             participants={model.pausedParticipants}
             sessionId={state.data.session.id}
             sessionStatus={model.header.status}
           />
           <ParticipantList
-            title="Playing"
+            title="Đang chơi"
             participants={model.playingParticipants}
             sessionId={state.data.session.id}
             sessionStatus={model.header.status}
           />
           {model.leftParticipantCount > 0 && (
-            <p className="left-count">{model.leftParticipantCount} left this Session</p>
+            <p className="left-count">
+              {model.leftParticipantCount} người đã rời phiên
+            </p>
           )}
         </section>
 
         <section className="panel created-matches" aria-labelledby="created-matches-heading">
           <div className="section-title section-title-large">
             <div>
-              <p className="eyebrow">Durable queue</p>
-              <h2 id="created-matches-heading">Created Matches</h2>
+              <p className="eyebrow">Hàng chờ bền vững</p>
+              <h2 id="created-matches-heading">Trận chờ bắt đầu</h2>
             </div>
             <span>{model.createdMatches.length}</span>
           </div>
           {model.createdMatches.length === 0 ? (
-            <p className="empty-panel">No Matches are waiting to start.</p>
+            <p className="empty-panel">Không có trận nào đang chờ bắt đầu.</p>
           ) : (
             <div className="created-match-list">
               {model.createdMatches.map((match) => (
@@ -1203,8 +1194,7 @@ export function LiveSessionScreen({
           )}
           {model.resolvedMatchCount > 0 && (
             <p className="resolved-count">
-              {model.resolvedMatchCount} completed or cancelled Match
-              {model.resolvedMatchCount === 1 ? '' : 'es'}
+              {model.resolvedMatchCount} trận đã kết thúc hoặc bị hủy
             </p>
           )}
         </section>

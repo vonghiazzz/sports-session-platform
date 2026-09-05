@@ -137,7 +137,7 @@ function sessionHeader() {
 
 function createdMatchCard() {
   const createdMatches = screen
-    .getByRole('heading', { name: 'Created Matches' })
+    .getByRole('heading', { name: 'Trận chờ bắt đầu' })
     .closest('section')
   const card = createdMatches
     ? within(createdMatches).getByRole('heading', { name: 'Court Two' }).closest('article')
@@ -149,13 +149,13 @@ function createdMatchCard() {
 }
 
 async function confirmComplete(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Complete Session' }))
-  await user.click(screen.getByRole('button', { name: 'Confirm Complete' }))
+  await user.click(screen.getByRole('button', { name: 'Kết thúc phiên' }))
+  await user.click(screen.getByRole('button', { name: 'Xác nhận kết thúc' }))
 }
 
 async function confirmCancel(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Cancel Session' }))
-  await user.click(screen.getByRole('button', { name: 'Confirm Cancel' }))
+  await user.click(screen.getByRole('button', { name: 'Hủy phiên' }))
+  await user.click(screen.getByRole('button', { name: 'Xác nhận hủy' }))
 }
 
 async function expectRuntimeReadsTwice() {
@@ -189,10 +189,10 @@ describe('Session lifecycle action matrix', () => {
     renderControlRoom()
 
     expect(
-      await screen.findByRole('button', { name: 'Cancel Session' }),
+      await screen.findByRole('button', { name: 'Hủy phiên' }),
     ).toBeEnabled()
     expect(
-      screen.queryByRole('button', { name: 'Complete Session' }),
+      screen.queryByRole('button', { name: 'Kết thúc phiên' }),
     ).not.toBeInTheDocument()
   })
 
@@ -204,9 +204,9 @@ describe('Session lifecycle action matrix', () => {
     renderControlRoom()
 
     expect(
-      await screen.findByRole('button', { name: 'Complete Session' }),
+      await screen.findByRole('button', { name: 'Kết thúc phiên' }),
     ).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Cancel Session' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Hủy phiên' })).toBeEnabled()
   })
 
   it.each(['COMPLETED', 'CANCELLED'] as const)(
@@ -218,13 +218,13 @@ describe('Session lifecycle action matrix', () => {
 
       await screen.findByRole('heading', { name: 'Wednesday Badminton' })
       expect(
-        screen.queryByRole('heading', { name: 'End Session' }),
+        screen.queryByRole('heading', { name: 'Kết thúc phiên' }),
       ).not.toBeInTheDocument()
       expect(
-        screen.queryByRole('button', { name: 'Complete Session' }),
+        screen.queryByRole('button', { name: 'Kết thúc phiên' }),
       ).not.toBeInTheDocument()
       expect(
-        screen.queryByRole('button', { name: 'Cancel Session' }),
+        screen.queryByRole('button', { name: 'Hủy phiên' }),
       ).not.toBeInTheDocument()
     },
   )
@@ -234,12 +234,12 @@ describe('Session lifecycle action matrix', () => {
     renderControlRoom()
 
     expect(
-      await screen.findByRole('button', { name: 'Complete Session' }),
+      await screen.findByRole('button', { name: 'Kết thúc phiên' }),
     ).toBeDisabled()
     expect(
-      screen.getByText(/unavailable while a Match is PLAYING/i),
+      screen.getByText(/không thể kết thúc phiên khi đang có trận thi đấu/i),
     ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Cancel Session' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Hủy phiên' })).toBeEnabled()
     expect(completeSessionMock).not.toHaveBeenCalled()
   })
 })
@@ -259,23 +259,23 @@ describe('Session lifecycle authoritative reconciliation', () => {
     completeSessionMock.mockResolvedValue(completedSession)
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Complete Session' })
-    await user.click(screen.getByRole('button', { name: 'Complete Session' }))
+    await screen.findByRole('button', { name: 'Kết thúc phiên' })
+    await user.click(screen.getByRole('button', { name: 'Kết thúc phiên' }))
     expect(
-      screen.getByText(/terminal action cannot be undone/i),
+      screen.getByText(/thao tác cuối cùng này không thể hoàn tác/i),
     ).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Confirm Complete' }))
+    await user.click(screen.getByRole('button', { name: 'Xác nhận kết thúc' }))
 
     await expectRuntimeReadsTwice()
     expect(completeSessionMock).toHaveBeenCalledOnce()
     expect(completeSessionMock).toHaveBeenCalledWith(SESSION_ID)
-    expect(within(sessionHeader()).getByText('Completed')).toBeVisible()
+    expect(within(sessionHeader()).getByText('Đã kết thúc')).toBeVisible()
     const matchCard = createdMatchCard()
     expect(
-      within(matchCard).queryByRole('button', { name: 'Start Match' }),
+      within(matchCard).queryByRole('button', { name: 'Bắt đầu trận' }),
     ).not.toBeInTheDocument()
     expect(
-      within(matchCard).getByRole('button', { name: 'Cancel Match' }),
+      within(matchCard).getByRole('button', { name: 'Hủy trận' }),
     ).toBeEnabled()
   })
 
@@ -289,37 +289,37 @@ describe('Session lifecycle authoritative reconciliation', () => {
     cancelSessionMock.mockResolvedValue(cancelledSession)
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Cancel Session' })
-    await user.click(screen.getByRole('button', { name: 'Cancel Session' }))
+    await screen.findByRole('button', { name: 'Hủy phiên' })
+    await user.click(screen.getByRole('button', { name: 'Hủy phiên' }))
     expect(
-      screen.getByText(/Playing Matches will not be resolved automatically/i),
+      screen.getByText(/trận đang chơi không tự kết thúc/i),
     ).toBeVisible()
-    await user.click(screen.getByRole('button', { name: 'Confirm Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'Xác nhận hủy' }))
 
     await expectRuntimeReadsTwice()
     expect(cancelSessionMock).toHaveBeenCalledOnce()
-    expect(within(sessionHeader()).getByText('Cancelled')).toBeVisible()
+    expect(within(sessionHeader()).getByText('Đã hủy')).toBeVisible()
     const playingCourt = screen
-      .getByRole('heading', { name: 'Court Board' })
+      .getByRole('heading', { name: 'Bảng sân' })
       .closest('section')
     expect(playingCourt).not.toBeNull()
     const courtOne = within(playingCourt as HTMLElement)
       .getByRole('heading', { name: 'Court One' })
       .closest('article')
     expect(courtOne).not.toBeNull()
-    expect(within(courtOne as HTMLElement).getByText('PLAYING')).toBeVisible()
+    expect(within(courtOne as HTMLElement).getByText('Đang chơi')).toBeVisible()
     expect(
       within(courtOne as HTMLElement).getByRole('button', {
-        name: 'Complete Match',
+        name: 'Kết thúc trận',
       }),
     ).toBeEnabled()
     expect(
       within(courtOne as HTMLElement).getByRole('button', {
-        name: 'Cancel Match',
+        name: 'Hủy trận',
       }),
     ).toBeEnabled()
     const playingParticipants = screen
-      .getByRole('heading', { name: 'Playing' })
+      .getByRole('heading', { name: 'Đang chơi' })
       .closest('section')
     expect(playingParticipants).not.toBeNull()
     expect(playingParticipants).toHaveTextContent('Giang Vo')
@@ -347,7 +347,7 @@ describe('Session lifecycle authoritative reconciliation', () => {
       renderControlRoom()
 
       await screen.findByRole('button', {
-        name: action === 'COMPLETE' ? 'Complete Session' : 'Cancel Session',
+        name: action === 'COMPLETE' ? 'Kết thúc phiên' : 'Hủy phiên',
       })
       if (action === 'COMPLETE') {
         await confirmComplete(user)
@@ -356,9 +356,9 @@ describe('Session lifecycle authoritative reconciliation', () => {
       }
 
       await expectRuntimeReadsTwice()
-      expect(within(sessionHeader()).getByText('In progress')).toBeVisible()
+      expect(within(sessionHeader()).getByText('Đang diễn ra')).toBeVisible()
       expect(
-        screen.queryByText(responseStatus === 'COMPLETED' ? 'Completed' : 'Cancelled'),
+        screen.queryByText(responseStatus === 'COMPLETED' ? 'Đã kết thúc' : 'Đã hủy'),
       ).not.toBeInTheDocument()
     },
   )
@@ -375,15 +375,15 @@ describe('Session lifecycle pending and failure safety', () => {
     completeSessionMock.mockReturnValue(request.promise)
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Complete Session' })
-    await user.click(screen.getByRole('button', { name: 'Complete Session' }))
-    const confirmButton = screen.getByRole('button', { name: 'Confirm Complete' })
+    await screen.findByRole('button', { name: 'Kết thúc phiên' })
+    await user.click(screen.getByRole('button', { name: 'Kết thúc phiên' }))
+    const confirmButton = screen.getByRole('button', { name: 'Xác nhận kết thúc' })
     fireEvent.click(confirmButton)
     fireEvent.click(confirmButton)
 
-    expect(await screen.findByRole('button', { name: 'Completing…' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Cancel Session' })).toBeDisabled()
-    expect(within(sessionHeader()).getByText('In progress')).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Đang kết thúc…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Hủy phiên' })).toBeDisabled()
+    expect(within(sessionHeader()).getByText('Đang diễn ra')).toBeVisible()
     expect(completeSessionMock).toHaveBeenCalledOnce()
     expect(cancelSessionMock).not.toHaveBeenCalled()
 
@@ -401,15 +401,15 @@ describe('Session lifecycle pending and failure safety', () => {
     cancelSessionMock.mockReturnValue(request.promise)
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Cancel Session' })
-    await user.click(screen.getByRole('button', { name: 'Cancel Session' }))
-    const confirmButton = screen.getByRole('button', { name: 'Confirm Cancel' })
+    await screen.findByRole('button', { name: 'Hủy phiên' })
+    await user.click(screen.getByRole('button', { name: 'Hủy phiên' }))
+    const confirmButton = screen.getByRole('button', { name: 'Xác nhận hủy' })
     fireEvent.click(confirmButton)
     fireEvent.click(confirmButton)
 
-    expect(await screen.findByRole('button', { name: 'Cancelling…' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Complete Session' })).toBeDisabled()
-    expect(within(sessionHeader()).getByText('In progress')).toBeVisible()
+    expect(await screen.findByRole('button', { name: 'Đang hủy…' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Kết thúc phiên' })).toBeDisabled()
+    expect(within(sessionHeader()).getByText('Đang diễn ra')).toBeVisible()
     expect(cancelSessionMock).toHaveBeenCalledOnce()
     expect(completeSessionMock).not.toHaveBeenCalled()
 
@@ -429,17 +429,17 @@ describe('Session lifecycle pending and failure safety', () => {
     completeSessionMock.mockRejectedValue(new HttpError(409, 'Conflict'))
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Complete Session' })
+    await screen.findByRole('button', { name: 'Kết thúc phiên' })
     await confirmComplete(user)
 
     await expectRuntimeReadsTwice()
     expect(completeSessionMock).toHaveBeenCalledOnce()
     expect(
-      screen.getByText('Session state changed. Current runtime data has been refreshed.'),
+      screen.getByText('Trạng thái phiên đã thay đổi. Dữ liệu vận hành hiện tại đã được tải lại.'),
     ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Complete Session' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Kết thúc phiên' })).toBeDisabled()
     expect(
-      screen.getByText(/unavailable while a Match is PLAYING/i),
+      screen.getByText(/không thể kết thúc phiên khi đang có trận thi đấu/i),
     ).toBeVisible()
   })
 
@@ -449,16 +449,16 @@ describe('Session lifecycle pending and failure safety', () => {
     cancelSessionMock.mockRejectedValue(new HttpError(409, 'Conflict'))
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Cancel Session' })
+    await screen.findByRole('button', { name: 'Hủy phiên' })
     await confirmCancel(user)
 
     await expectRuntimeReadsTwice()
     expect(cancelSessionMock).toHaveBeenCalledOnce()
-    const controls = screen.getByRole('heading', { name: 'End Session' }).closest('section')
+    const controls = screen.getByRole('heading', { name: 'Kết thúc phiên' }).closest('section')
     expect(controls).not.toBeNull()
     expect(
       within(controls as HTMLElement).getByRole('alert'),
-    ).toHaveTextContent('Session state changed')
+    ).toHaveTextContent('Trạng thái phiên đã thay đổi')
   })
 
   it('reconciles a network-unknown Complete without replay and renders COMPLETED only from GET', async () => {
@@ -475,12 +475,12 @@ describe('Session lifecycle pending and failure safety', () => {
     completeSessionMock.mockRejectedValue(new TypeError('Network lost'))
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Complete Session' })
+    await screen.findByRole('button', { name: 'Kết thúc phiên' })
     await confirmComplete(user)
 
     await expectRuntimeReadsTwice()
     expect(completeSessionMock).toHaveBeenCalledOnce()
-    expect(within(sessionHeader()).getByText('Completed')).toBeVisible()
+    expect(within(sessionHeader()).getByText('Đã kết thúc')).toBeVisible()
   })
 
   it('reconciles a network-unknown Cancel without replay or claiming a definite failure', async () => {
@@ -492,15 +492,15 @@ describe('Session lifecycle pending and failure safety', () => {
     cancelSessionMock.mockRejectedValue(new TypeError('Network lost'))
     renderControlRoom()
 
-    await screen.findByRole('button', { name: 'Cancel Session' })
+    await screen.findByRole('button', { name: 'Hủy phiên' })
     await confirmCancel(user)
 
     await expectRuntimeReadsTwice()
     expect(cancelSessionMock).toHaveBeenCalledOnce()
-    expect(within(sessionHeader()).getByText('In progress')).toBeVisible()
+    expect(within(sessionHeader()).getByText('Đang diễn ra')).toBeVisible()
     expect(
       screen.getByText(
-        'Connection was lost. Session state has been refreshed; check whether this Session was cancelled.',
+        'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra phiên đã bị hủy hay chưa.',
       ),
     ).toBeVisible()
   })

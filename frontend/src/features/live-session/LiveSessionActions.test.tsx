@@ -122,7 +122,7 @@ function participantRow(groupName: string, playerName: string) {
 }
 
 function courtCard(courtName: string) {
-  const board = screen.getByRole('heading', { name: 'Court Board' }).closest('section')
+  const board = screen.getByRole('heading', { name: 'Bảng sân' }).closest('section')
   if (board === null) {
     throw new Error('Court Board was not rendered')
   }
@@ -186,7 +186,7 @@ describe('Participant live actions', () => {
     checkInParticipantMock.mockResolvedValue(waiting)
 
     renderControlRoom()
-    const button = await screen.findByRole('button', { name: 'Check In' })
+    const button = await screen.findByRole('button', { name: 'Điểm danh' })
     await user.click(button)
 
     expect(checkInParticipantMock).toHaveBeenCalledOnce()
@@ -197,8 +197,8 @@ describe('Participant live actions', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(1)
     await waitFor(() =>
       expect(
-        within(participantRow('Waiting', 'Chi Le')).getByRole('button', {
-          name: 'Pause',
+        within(participantRow('Đang chờ', 'Chi Le')).getByRole('button', {
+          name: 'Tạm nghỉ',
         }),
       ).toBeEnabled(),
     )
@@ -218,14 +218,14 @@ describe('Participant live actions', () => {
 
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    const row = participantRow('Waiting', 'An Nguyen')
-    const pauseButton = within(row).getByRole('button', { name: 'Pause' })
+    const row = participantRow('Đang chờ', 'An Nguyen')
+    const pauseButton = within(row).getByRole('button', { name: 'Tạm nghỉ' })
     await user.click(pauseButton)
 
-    const pendingButton = within(row).getByRole('button', { name: 'Pausing…' })
+    const pendingButton = within(row).getByRole('button', { name: 'Đang tạm nghỉ…' })
     expect(pendingButton).toBeDisabled()
-    expect(within(participantRow('Waiting', 'An Nguyen')).getByText('An Nguyen')).toBeVisible()
-    expect(within(screen.getByRole('heading', { name: 'Paused' }).closest('section') as HTMLElement).queryByText('An Nguyen')).not.toBeInTheDocument()
+    expect(within(participantRow('Đang chờ', 'An Nguyen')).getByText('An Nguyen')).toBeVisible()
+    expect(within(screen.getByRole('heading', { name: 'Tạm nghỉ' }).closest('section') as HTMLElement).queryByText('An Nguyen')).not.toBeInTheDocument()
 
     await user.click(pendingButton)
     expect(pauseParticipantMock).toHaveBeenCalledOnce()
@@ -234,7 +234,7 @@ describe('Participant live actions', () => {
     await waitFor(() =>
       expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2),
     )
-    expect(within(participantRow('Waiting', 'An Nguyen')).getByText('An Nguyen')).toBeVisible()
+    expect(within(participantRow('Đang chờ', 'An Nguyen')).getByText('An Nguyen')).toBeVisible()
   })
 
   it('reconciles Participants and shows scoped feedback after a 409', async () => {
@@ -246,16 +246,16 @@ describe('Participant live actions', () => {
 
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    const row = participantRow('Waiting', 'An Nguyen')
-    await user.click(within(row).getByRole('button', { name: 'Pause' }))
+    const row = participantRow('Đang chờ', 'An Nguyen')
+    await user.click(within(row).getByRole('button', { name: 'Tạm nghỉ' }))
 
     await waitFor(() =>
       expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2),
     )
     expect(pauseParticipantMock).toHaveBeenCalledOnce()
     expect(
-      within(participantRow('Waiting', 'An Nguyen')).getByRole('alert'),
-    ).toHaveTextContent('Live state changed. Current data is being refreshed.')
+      within(participantRow('Đang chờ', 'An Nguyen')).getByRole('alert'),
+    ).toHaveTextContent('Trạng thái trực tiếp đã thay đổi. Dữ liệu hiện tại đang được tải lại.')
   })
 
   it('does not retry an unknown-outcome POST and reconciles Participants', async () => {
@@ -265,17 +265,17 @@ describe('Participant live actions', () => {
 
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    const row = participantRow('Waiting', 'An Nguyen')
-    await user.click(within(row).getByRole('button', { name: 'Leave' }))
+    const row = participantRow('Đang chờ', 'An Nguyen')
+    await user.click(within(row).getByRole('button', { name: 'Rời phiên' }))
 
     await waitFor(() =>
       expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2),
     )
     expect(leaveParticipantMock).toHaveBeenCalledOnce()
     expect(
-      within(participantRow('Waiting', 'An Nguyen')).getByRole('alert'),
+      within(participantRow('Đang chờ', 'An Nguyen')).getByRole('alert'),
     ).toHaveTextContent(
-      'Connection was lost. Refresh current state before trying again.',
+      'Mất kết nối. Dữ liệu hiện tại đang được tải lại; hãy kiểm tra trạng thái trước khi thử lại.',
     )
   })
 })
@@ -304,7 +304,7 @@ describe('Court live actions', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await user.click(
       within(courtCard('Court Two')).getByRole('button', {
-        name: 'Disable Court',
+        name: 'Tạm khóa sân',
       }),
     )
 
@@ -315,7 +315,7 @@ describe('Court live actions', () => {
     await waitFor(() =>
       expect(
         within(courtCard('Court Two')).getByRole('button', {
-          name: 'Enable Court',
+          name: 'Mở sân',
         }),
       ).toBeEnabled(),
     )
@@ -337,21 +337,21 @@ describe('Court live actions', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     const card = courtCard('Court Two')
     await user.click(
-      within(card).getByRole('button', { name: 'Disable Court' }),
+      within(card).getByRole('button', { name: 'Tạm khóa sân' }),
     )
 
     const pendingButton = within(card).getByRole('button', {
-      name: 'Disabling…',
+      name: 'Đang tạm khóa…',
     })
     expect(pendingButton).toBeDisabled()
-    expect(within(card).getByText('AVAILABLE')).toBeVisible()
+    expect(within(card).getByText('Sẵn sàng')).toBeVisible()
 
     await user.click(pendingButton)
     expect(disableSessionCourtMock).toHaveBeenCalledOnce()
 
     disableRequest.resolve(sessionCourtWithStatus(available, 'UNAVAILABLE'))
     await waitFor(() => expect(getSessionCourtsMock).toHaveBeenCalledTimes(2))
-    expect(within(courtCard('Court Two')).getByText('AVAILABLE')).toBeVisible()
+    expect(within(courtCard('Court Two')).getByText('Sẵn sàng')).toBeVisible()
   })
 
   it('reconciles Session Courts and shows scoped feedback after a 409', async () => {
@@ -365,13 +365,13 @@ describe('Court live actions', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     const card = courtCard('Court Two')
     await user.click(
-      within(card).getByRole('button', { name: 'Disable Court' }),
+      within(card).getByRole('button', { name: 'Tạm khóa sân' }),
     )
 
     await waitFor(() => expect(getSessionCourtsMock).toHaveBeenCalledTimes(2))
     expect(disableSessionCourtMock).toHaveBeenCalledOnce()
     expect(within(courtCard('Court Two')).getByRole('alert')).toHaveTextContent(
-      'Live state changed. Current data is being refreshed.',
+      'Trạng thái trực tiếp đã thay đổi. Dữ liệu hiện tại đang được tải lại.',
     )
   })
 })

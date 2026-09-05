@@ -108,7 +108,7 @@ function renderControlRoom() {
 }
 
 function playingCourtCard() {
-  const board = screen.getByRole('heading', { name: 'Court Board' }).closest('section')
+  const board = screen.getByRole('heading', { name: 'Bảng sân' }).closest('section')
   const heading = board
     ? within(board).getByRole('heading', { name: 'Court One' })
     : null
@@ -201,7 +201,7 @@ async function chooseWinner(
   winner: 'A' | 'B',
 ) {
   await user.selectOptions(
-    within(playingCourtCard()).getByLabelText('Winner'),
+    within(playingCourtCard()).getByLabelText('Đội thắng'),
     winner,
   )
 }
@@ -213,10 +213,10 @@ async function enterScores(
 ) {
   const card = playingCourtCard()
   if (teamAScore !== '') {
-    await user.type(within(card).getByLabelText('Team A Score (optional)'), teamAScore)
+    await user.type(within(card).getByLabelText('Tỷ số Đội A (không bắt buộc)'), teamAScore)
   }
   if (teamBScore !== '') {
-    await user.type(within(card).getByLabelText('Team B Score (optional)'), teamBScore)
+    await user.type(within(card).getByLabelText('Tỷ số Đội B (không bắt buộc)'), teamBScore)
   }
 }
 
@@ -224,8 +224,8 @@ async function requestCancel(
   user: ReturnType<typeof userEvent.setup>,
   card: HTMLElement,
 ) {
-  await user.click(within(card).getByRole('button', { name: 'Cancel Match' }))
-  await user.click(within(card).getByRole('button', { name: 'Confirm Cancel' }))
+  await user.click(within(card).getByRole('button', { name: 'Hủy trận' }))
+  await user.click(within(card).getByRole('button', { name: 'Xác nhận hủy' }))
 }
 
 beforeEach(() => {
@@ -251,7 +251,7 @@ describe('Complete Match result form', () => {
 
     await chooseWinner(user, 'A')
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     expect(completeMatchMock).toHaveBeenCalledOnce()
@@ -268,49 +268,49 @@ describe('Complete Match result form', () => {
       winner: '' as const,
       a: '',
       b: '',
-      message: 'Choose the winning team.',
+      message: 'Hãy chọn đội thắng.',
     },
     {
       name: 'one missing score',
       winner: 'A' as const,
       a: '21',
       b: '',
-      message: 'Enter both scores or leave both blank.',
+      message: 'Hãy nhập cả hai tỷ số hoặc để trống cả hai.',
     },
     {
       name: 'negative score',
       winner: 'A' as const,
       a: '-1',
       b: '0',
-      message: 'Scores cannot be negative.',
+      message: 'Tỷ số không được là số âm.',
     },
     {
       name: 'non-integer score',
       winner: 'A' as const,
       a: '21.5',
       b: '17',
-      message: 'Scores must be whole numbers.',
+      message: 'Tỷ số phải là số nguyên.',
     },
     {
       name: 'tie',
       winner: 'A' as const,
       a: '15',
       b: '15',
-      message: 'A Match cannot end in a draw.',
+      message: 'Trận đấu không thể kết thúc với tỷ số hòa.',
     },
     {
       name: 'Team A winner with lower score',
       winner: 'A' as const,
       a: '15',
       b: '21',
-      message: 'The winning team must have the higher score.',
+      message: 'Đội thắng phải có tỷ số cao hơn.',
     },
     {
       name: 'Team B winner with lower score',
       winner: 'B' as const,
       a: '21',
       b: '15',
-      message: 'The winning team must have the higher score.',
+      message: 'Đội thắng phải có tỷ số cao hơn.',
     },
   ])('rejects $name without a POST', async ({ winner, a, b, message }) => {
     const user = userEvent.setup()
@@ -323,7 +323,7 @@ describe('Complete Match result form', () => {
     await enterScores(user, a, b)
 
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     expect(completeMatchMock).not.toHaveBeenCalled()
@@ -348,7 +348,7 @@ describe('Complete Match result form', () => {
     await enterScores(user, a, b)
 
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     expect(completeMatchMock).toHaveBeenCalledWith('match-playing', {
@@ -371,7 +371,7 @@ describe('Complete Match lifecycle', () => {
     await enterScores(user, '21', '17')
 
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
@@ -379,10 +379,10 @@ describe('Complete Match lifecycle', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Complete Match' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: 'Kết thúc trận' })).not.toBeInTheDocument(),
     )
-    expect(within(playingCourtCard()).getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('Giang Vo')
+    expect(within(playingCourtCard()).getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('Giang Vo')
   })
 
   it('keeps PLAYING state pending, blocks duplicate Complete and same-Match Cancel', async () => {
@@ -395,15 +395,15 @@ describe('Complete Match lifecycle', () => {
     await chooseWinner(user, 'A')
     const card = playingCourtCard()
 
-    await user.click(within(card).getByRole('button', { name: 'Complete Match' }))
+    await user.click(within(card).getByRole('button', { name: 'Kết thúc trận' }))
 
-    const pendingButton = within(card).getByRole('button', { name: 'Completing…' })
+    const pendingButton = within(card).getByRole('button', { name: 'Đang kết thúc…' })
     expect(pendingButton).toBeDisabled()
-    expect(within(card).getByText('PLAYING')).toBeVisible()
-    expect(within(card).getByRole('button', { name: 'Cancel Match' })).toBeDisabled()
-    expect(screen.getByRole('heading', { name: 'Playing' }).closest('section')).toHaveTextContent('Giang Vo')
+    expect(within(card).getByText('Đang chơi')).toBeVisible()
+    expect(within(card).getByRole('button', { name: 'Hủy trận' })).toBeDisabled()
+    expect(screen.getByRole('heading', { name: 'Đang chơi' }).closest('section')).toHaveTextContent('Giang Vo')
     await user.click(pendingButton)
-    await user.click(within(card).getByRole('button', { name: 'Cancel Match' }))
+    await user.click(within(card).getByRole('button', { name: 'Hủy trận' }))
     expect(completeMatchMock).toHaveBeenCalledOnce()
     expect(cancelMatchMock).not.toHaveBeenCalled()
 
@@ -419,13 +419,13 @@ describe('Complete Match lifecycle', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await chooseWinner(user, 'A')
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-    expect(within(playingCourtCard()).getByText('PLAYING')).toBeVisible()
-    expect(within(playingCourtCard()).getByLabelText('Winner')).toHaveValue('A')
-    expect(screen.getByRole('heading', { name: 'Playing' }).closest('section')).toHaveTextContent('Giang Vo')
+    expect(within(playingCourtCard()).getByText('Đang chơi')).toBeVisible()
+    expect(within(playingCourtCard()).getByLabelText('Đội thắng')).toHaveValue('A')
+    expect(screen.getByRole('heading', { name: 'Đang chơi' }).closest('section')).toHaveTextContent('Giang Vo')
   })
 
   it('reconciles three reads and retains GET state after a Complete 409', async () => {
@@ -436,7 +436,7 @@ describe('Complete Match lifecycle', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await chooseWinner(user, 'A')
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
@@ -445,9 +445,9 @@ describe('Complete Match lifecycle', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     expect(within(playingCourtCard()).getAllByRole('alert').at(-1)).toHaveTextContent(
-      'Live resources changed. Current Match state has been refreshed.',
+      'Tài nguyên trực tiếp đã thay đổi. Trạng thái trận hiện tại đã được tải lại.',
     )
-    expect(within(playingCourtCard()).getByText('PLAYING')).toBeVisible()
+    expect(within(playingCourtCard()).getByText('Đang chơi')).toBeVisible()
   })
 
   it('does not retry an unknown Complete outcome and lets refreshed GETs resolve it', async () => {
@@ -459,7 +459,7 @@ describe('Complete Match lifecycle', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await chooseWinner(user, 'A')
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
@@ -468,9 +468,9 @@ describe('Complete Match lifecycle', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Complete Match' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: 'Kết thúc trận' })).not.toBeInTheDocument(),
     )
-    expect(within(playingCourtCard()).getByText('AVAILABLE')).toBeVisible()
+    expect(within(playingCourtCard()).getByText('Sẵn sàng')).toBeVisible()
   })
 
   it('shows safe scoped feedback when an unknown Complete outcome remains PLAYING', async () => {
@@ -482,16 +482,16 @@ describe('Complete Match lifecycle', () => {
     await chooseWinner(user, 'A')
 
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
     expect(completeMatchMock).toHaveBeenCalledOnce()
     expect(within(playingCourtCard()).getByRole('alert')).toHaveTextContent(
-      'Connection was lost. Match state has been refreshed; check whether this Match completed.',
+      'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra trận đã kết thúc hay chưa.',
     )
-    expect(within(playingCourtCard()).getByText('PLAYING')).toBeVisible()
-    expect(within(playingCourtCard()).getByLabelText('Winner')).toHaveValue('A')
+    expect(within(playingCourtCard()).getByText('Đang chơi')).toBeVisible()
+    expect(within(playingCourtCard()).getByLabelText('Đội thắng')).toHaveValue('A')
   })
 })
 
@@ -520,9 +520,9 @@ describe('Cancel Match lifecycle', () => {
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText('Created — not started')).not.toBeInTheDocument()
-    expect(screen.getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('An Nguyen')
+    expect(screen.queryByText('Đã tạo — chưa bắt đầu')).not.toBeInTheDocument()
+    expect(screen.getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
   })
 
   it('cancels PLAYING and renders resource release from GET data', async () => {
@@ -539,10 +539,10 @@ describe('Cancel Match lifecycle', () => {
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Complete Match' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: 'Kết thúc trận' })).not.toBeInTheDocument(),
     )
-    expect(within(playingCourtCard()).getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('Giang Vo')
+    expect(within(playingCourtCard()).getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('Giang Vo')
   })
 
   it('keeps PLAYING state when Cancel is pending or only its POST response is CANCELLED', async () => {
@@ -553,22 +553,22 @@ describe('Cancel Match lifecycle', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     const card = playingCourtCard()
-    await user.click(within(card).getByRole('button', { name: 'Cancel Match' }))
-    await user.click(within(card).getByRole('button', { name: 'Confirm Cancel' }))
+    await user.click(within(card).getByRole('button', { name: 'Hủy trận' }))
+    await user.click(within(card).getByRole('button', { name: 'Xác nhận hủy' }))
 
-    const pendingButton = within(card).getByRole('button', { name: 'Cancelling…' })
+    const pendingButton = within(card).getByRole('button', { name: 'Đang hủy…' })
     expect(pendingButton).toBeDisabled()
-    expect(within(card).getByText('PLAYING')).toBeVisible()
-    expect(within(card).getByRole('button', { name: 'Complete Match' })).toBeDisabled()
-    expect(screen.getByRole('heading', { name: 'Playing' }).closest('section')).toHaveTextContent('Giang Vo')
+    expect(within(card).getByText('Đang chơi')).toBeVisible()
+    expect(within(card).getByRole('button', { name: 'Kết thúc trận' })).toBeDisabled()
+    expect(screen.getByRole('heading', { name: 'Đang chơi' }).closest('section')).toHaveTextContent('Giang Vo')
     await user.click(pendingButton)
-    await user.click(within(card).getByRole('button', { name: 'Complete Match' }))
+    await user.click(within(card).getByRole('button', { name: 'Kết thúc trận' }))
     expect(cancelMatchMock).toHaveBeenCalledOnce()
     expect(completeMatchMock).not.toHaveBeenCalled()
 
     request.resolve(resolveMatch(input.matches[0], 'CANCELLED'))
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-    expect(within(playingCourtCard()).getByText('PLAYING')).toBeVisible()
+    expect(within(playingCourtCard()).getByText('Đang chơi')).toBeVisible()
   })
 
   it('blocks same-Match Cancel while Start is pending', async () => {
@@ -579,11 +579,11 @@ describe('Cancel Match lifecycle', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     const card = createdMatchCard()
-    await user.click(within(card).getByRole('button', { name: 'Start Match' }))
+    await user.click(within(card).getByRole('button', { name: 'Bắt đầu trận' }))
 
-    expect(within(card).getByRole('button', { name: 'Starting…' })).toBeDisabled()
-    expect(within(card).getByRole('button', { name: 'Cancel Match' })).toBeDisabled()
-    await user.click(within(card).getByRole('button', { name: 'Cancel Match' }))
+    expect(within(card).getByRole('button', { name: 'Đang bắt đầu…' })).toBeDisabled()
+    expect(within(card).getByRole('button', { name: 'Hủy trận' })).toBeDisabled()
+    await user.click(within(card).getByRole('button', { name: 'Hủy trận' }))
     expect(startMatchMock).toHaveBeenCalledOnce()
     expect(cancelMatchMock).not.toHaveBeenCalled()
 
@@ -607,9 +607,9 @@ describe('Cancel Match lifecycle', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     expect(within(card).getAllByRole('alert').at(-1)).toHaveTextContent(
-      'Live resources changed. Current Match state has been refreshed.',
+      'Tài nguyên trực tiếp đã thay đổi. Trạng thái trận hiện tại đã được tải lại.',
     )
-    expect(within(card).getByText('PLAYING')).toBeVisible()
+    expect(within(card).getByText('Đang chơi')).toBeVisible()
   })
 
   it('does not retry an unknown Cancel outcome and lets refreshed GETs decide', async () => {
@@ -628,9 +628,9 @@ describe('Cancel Match lifecycle', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Complete Match' })).not.toBeInTheDocument(),
+      expect(screen.queryByRole('button', { name: 'Kết thúc trận' })).not.toBeInTheDocument(),
     )
-    expect(within(playingCourtCard()).getByText('AVAILABLE')).toBeVisible()
+    expect(within(playingCourtCard()).getByText('Sẵn sàng')).toBeVisible()
   })
 
   it('shows safe scoped feedback when an unknown Cancel outcome remains PLAYING', async () => {
@@ -646,9 +646,9 @@ describe('Cancel Match lifecycle', () => {
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
     expect(cancelMatchMock).toHaveBeenCalledOnce()
     expect(within(card).getByRole('alert')).toHaveTextContent(
-      'Connection was lost. Match state has been refreshed; check whether this Match was cancelled.',
+      'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra trận đã bị hủy hay chưa.',
     )
-    expect(within(card).getByText('PLAYING')).toBeVisible()
+    expect(within(card).getByText('Đang chơi')).toBeVisible()
   })
 
   it('keeps lifecycle guards target-scoped across different Matches', async () => {
@@ -663,11 +663,11 @@ describe('Cancel Match lifecycle', () => {
     await chooseWinner(user, 'A')
 
     await user.click(
-      within(playingCourtCard()).getByRole('button', { name: 'Complete Match' }),
+      within(playingCourtCard()).getByRole('button', { name: 'Kết thúc trận' }),
     )
     const createdCard = createdMatchCard()
     expect(
-      within(createdCard).getByRole('button', { name: 'Cancel Match' }),
+      within(createdCard).getByRole('button', { name: 'Hủy trận' }),
     ).toBeEnabled()
     await requestCancel(user, createdCard)
 

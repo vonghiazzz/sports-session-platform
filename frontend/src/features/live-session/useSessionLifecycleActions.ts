@@ -22,18 +22,18 @@ function sessionLifecycleErrorMessage(
   }
   if (!(error instanceof HttpError)) {
     return action === 'COMPLETE'
-      ? 'Connection was lost. Session state has been refreshed; check whether this Session completed.'
-      : 'Connection was lost. Session state has been refreshed; check whether this Session was cancelled.'
+      ? 'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra phiên đã kết thúc hay chưa.'
+      : 'Mất kết nối nên chưa xác định được kết quả. Dữ liệu đã được tải lại; hãy kiểm tra phiên đã bị hủy hay chưa.'
   }
   if (error.status === 404) {
-    return 'This Session is no longer available. Current runtime data has been refreshed.'
+    return 'Phiên này không còn khả dụng. Dữ liệu vận hành hiện tại đã được tải lại.'
   }
   if (error.status === 409) {
-    return 'Session state changed. Current runtime data has been refreshed.'
+    return 'Trạng thái phiên đã thay đổi. Dữ liệu vận hành hiện tại đã được tải lại.'
   }
   return action === 'COMPLETE'
-    ? 'Session completion could not be confirmed. Current runtime data has been refreshed.'
-    : 'Session cancellation could not be confirmed. Current runtime data has been refreshed.'
+    ? 'Chưa thể xác nhận phiên đã kết thúc. Dữ liệu vận hành hiện tại đã được tải lại.'
+    : 'Chưa thể xác nhận phiên đã bị hủy. Dữ liệu vận hành hiện tại đã được tải lại.'
 }
 
 export function useSessionLifecycleActions(

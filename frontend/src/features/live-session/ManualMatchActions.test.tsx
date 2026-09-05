@@ -167,23 +167,23 @@ function renderControlRoom() {
 
 async function selectValidMatch(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(
-    screen.getByLabelText('Session Court'),
+    screen.getByLabelText('Sân trong phiên'),
     'session-court-2',
   )
   await user.selectOptions(
-    screen.getByLabelText('Team A — Slot 1'),
+    screen.getByLabelText('Đội A — Vị trí 1'),
     'participant-1',
   )
   await user.selectOptions(
-    screen.getByLabelText('Team A — Slot 2'),
+    screen.getByLabelText('Đội A — Vị trí 2'),
     'participant-2',
   )
   await user.selectOptions(
-    screen.getByLabelText('Team B — Slot 1'),
+    screen.getByLabelText('Đội B — Vị trí 1'),
     'participant-3',
   )
   await user.selectOptions(
-    screen.getByLabelText('Team B — Slot 2'),
+    screen.getByLabelText('Đội B — Vị trí 2'),
     'participant-4',
   )
 }
@@ -213,30 +213,30 @@ describe('Create Manual Match form', () => {
     createManualMatchMock.mockResolvedValue(newCreatedMatch(input.matches[1]))
     renderControlRoom()
 
-    const courtSelect = await screen.findByLabelText('Session Court')
+    const courtSelect = await screen.findByLabelText('Sân trong phiên')
     expect(within(courtSelect).getByRole('option', { name: 'Court Two' })).toBeEnabled()
     expect(within(courtSelect).queryByRole('option', { name: 'Court One' })).not.toBeInTheDocument()
     expect(within(courtSelect).queryByRole('option', { name: 'Court Three' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Team A — Slot 1')).toBeVisible()
-    expect(screen.getByLabelText('Team A — Slot 2')).toBeVisible()
-    expect(screen.getByLabelText('Team B — Slot 1')).toBeVisible()
-    expect(screen.getByLabelText('Team B — Slot 2')).toBeVisible()
+    expect(screen.getByLabelText('Đội A — Vị trí 1')).toBeVisible()
+    expect(screen.getByLabelText('Đội A — Vị trí 2')).toBeVisible()
+    expect(screen.getByLabelText('Đội B — Vị trí 1')).toBeVisible()
+    expect(screen.getByLabelText('Đội B — Vị trí 2')).toBeVisible()
     expect(
-      within(screen.getByLabelText('Team A — Slot 1')).queryByRole('option', {
+      within(screen.getByLabelText('Đội A — Vị trí 1')).queryByRole('option', {
         name: /Giang Vo/,
       }),
     ).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create Match' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
 
-    await user.selectOptions(screen.getByLabelText('Team A — Slot 1'), 'participant-1')
+    await user.selectOptions(screen.getByLabelText('Đội A — Vị trí 1'), 'participant-1')
     expect(
-      within(screen.getByLabelText('Team A — Slot 2')).getByRole('option', {
+      within(screen.getByLabelText('Đội A — Vị trí 2')).getByRole('option', {
         name: /An Nguyen/,
       }),
     ).toBeDisabled()
 
     await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Create Match' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
 
     expect(createManualMatchMock).toHaveBeenCalledOnce()
     expect(createManualMatchMock).toHaveBeenCalledWith(SESSION_ID, {
@@ -266,12 +266,12 @@ describe('Create Manual Match form', () => {
     renderControlRoom()
 
     expect(
-      await screen.findByText('No AVAILABLE Court can be selected.'),
+      await screen.findByText('Không có sân sẵn sàng để chọn.'),
     ).toBeVisible()
     expect(
-      screen.getByText('At least four WAITING players are needed to create a Match.'),
+      screen.getByText('Cần ít nhất bốn người chơi đang chờ để tạo trận.'),
     ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Create Match' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
   })
 })
 
@@ -288,23 +288,23 @@ describe('Create Manual Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Create Match' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(1)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(1)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
-    expect(screen.getAllByText('Created — not started')).toHaveLength(2)
-    const courtBoard = screen.getByRole('heading', { name: 'Court Board' }).closest('section')
+    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(2)
+    const courtBoard = screen.getByRole('heading', { name: 'Bảng sân' }).closest('section')
     expect(courtBoard).not.toBeNull()
     const courtTwo = within(courtBoard as HTMLElement)
       .getByRole('heading', { name: 'Court Two' })
       .closest('article')
     expect(courtTwo).not.toBeNull()
-    expect(within(courtTwo as HTMLElement).getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('An Nguyen')
+    expect(within(courtTwo as HTMLElement).getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
     expect(
-      screen.getByText(/does not reserve its Court or players/i),
+      screen.getByText(/chưa giữ sân hoặc người chơi/i),
     ).toBeVisible()
   })
 
@@ -317,13 +317,13 @@ describe('Create Manual Match mutation', () => {
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await selectValidMatch(user)
 
-    const createButton = screen.getByRole('button', { name: 'Create Match' })
+    const createButton = screen.getByRole('button', { name: 'Tạo trận' })
     await user.click(createButton)
-    const pendingButton = screen.getByRole('button', { name: 'Creating…' })
+    const pendingButton = screen.getByRole('button', { name: 'Đang tạo…' })
     expect(pendingButton).toBeDisabled()
-    expect(screen.getAllByText('Created — not started')).toHaveLength(1)
-    expect(screen.getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('An Nguyen')
+    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(1)
+    expect(screen.getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
 
     await user.click(pendingButton)
     expect(createManualMatchMock).toHaveBeenCalledOnce()
@@ -339,10 +339,10 @@ describe('Create Manual Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Create Match' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-    expect(screen.getAllByText('Created — not started')).toHaveLength(1)
+    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(1)
   })
 
   it('reconciles four runtime reads and shows scoped feedback after 409', async () => {
@@ -352,7 +352,7 @@ describe('Create Manual Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Create Match' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
 
     await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
     expect(createManualMatchMock).toHaveBeenCalledOnce()
@@ -360,9 +360,9 @@ describe('Create Manual Match mutation', () => {
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Live resources changed. Current Session state has been refreshed.',
+      'Tài nguyên trực tiếp đã thay đổi. Trạng thái phiên hiện tại đã được tải lại.',
     )
-    expect(screen.getAllByText('Created — not started')).toHaveLength(1)
+    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(1)
   })
 
   it('does not retry an unknown Create outcome and warns the Host to inspect Matches', async () => {
@@ -372,7 +372,7 @@ describe('Create Manual Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Create Match' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
 
     await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
     expect(createManualMatchMock).toHaveBeenCalledOnce()
@@ -380,7 +380,7 @@ describe('Create Manual Match mutation', () => {
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Check Created Matches before creating again.',
+      'chưa xác định được kết quả',
     )
   })
 })
@@ -410,19 +410,19 @@ describe('Start Match mutation', () => {
 
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    await user.click(within(createdMatchCard()).getByRole('button', { name: 'Start Match' }))
+    await user.click(within(createdMatchCard()).getByRole('button', { name: 'Bắt đầu trận' }))
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     await waitFor(() =>
-      expect(screen.queryByText('Created — not started')).not.toBeInTheDocument(),
+      expect(screen.queryByText('Đã tạo — chưa bắt đầu')).not.toBeInTheDocument(),
     )
     const courtTwo = screen.getByRole('heading', { name: 'Court Two' }).closest('article')
     expect(courtTwo).not.toBeNull()
-    expect(within(courtTwo as HTMLElement).getByText('PLAYING')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Playing' }).closest('section')).toHaveTextContent('An Nguyen')
+    expect(within(courtTwo as HTMLElement).getByText('Đang chơi')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chơi' }).closest('section')).toHaveTextContent('An Nguyen')
   })
 
   it('keeps CREATED/WAITING/AVAILABLE state while pending and blocks duplicate Start', async () => {
@@ -433,13 +433,13 @@ describe('Start Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     const card = createdMatchCard()
-    await user.click(within(card).getByRole('button', { name: 'Start Match' }))
+    await user.click(within(card).getByRole('button', { name: 'Bắt đầu trận' }))
 
-    const pendingButton = within(card).getByRole('button', { name: 'Starting…' })
+    const pendingButton = within(card).getByRole('button', { name: 'Đang bắt đầu…' })
     expect(pendingButton).toBeDisabled()
-    expect(within(card).getByText('Created — not started')).toBeVisible()
-    expect(screen.getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('An Nguyen')
+    expect(within(card).getByText('Đã tạo — chưa bắt đầu')).toBeVisible()
+    expect(screen.getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
 
     await user.click(pendingButton)
     expect(startMatchMock).toHaveBeenCalledOnce()
@@ -454,13 +454,13 @@ describe('Start Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await user.click(
-      within(createdMatchCard()).getByRole('button', { name: 'Start Match' }),
+      within(createdMatchCard()).getByRole('button', { name: 'Bắt đầu trận' }),
     )
 
     await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-    expect(screen.getByText('Created — not started')).toBeVisible()
-    expect(screen.getByText('AVAILABLE')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Waiting' }).closest('section')).toHaveTextContent('An Nguyen')
+    expect(screen.getByText('Đã tạo — chưa bắt đầu')).toBeVisible()
+    expect(screen.getByText('Sẵn sàng')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
   })
 
   it('reconciles four runtime reads and shows scoped feedback after 409', async () => {
@@ -470,7 +470,7 @@ describe('Start Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await user.click(
-      within(createdMatchCard()).getByRole('button', { name: 'Start Match' }),
+      within(createdMatchCard()).getByRole('button', { name: 'Bắt đầu trận' }),
     )
 
     await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
@@ -479,7 +479,7 @@ describe('Start Match mutation', () => {
     expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
     expect(within(createdMatchCard()).getByRole('alert')).toHaveTextContent(
-      'Live resources changed. Current Session state has been refreshed.',
+      'Tài nguyên trực tiếp đã thay đổi. Trạng thái phiên hiện tại đã được tải lại.',
     )
   })
 
@@ -512,16 +512,16 @@ describe('Start Match mutation', () => {
     renderControlRoom()
     await screen.findByRole('heading', { name: 'Wednesday Badminton' })
     await user.click(
-      within(createdMatchCard()).getByRole('button', { name: 'Start Match' }),
+      within(createdMatchCard()).getByRole('button', { name: 'Bắt đầu trận' }),
     )
 
     await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
     expect(startMatchMock).toHaveBeenCalledOnce()
     await waitFor(() =>
-      expect(screen.queryByText('Created — not started')).not.toBeInTheDocument(),
+      expect(screen.queryByText('Đã tạo — chưa bắt đầu')).not.toBeInTheDocument(),
     )
     const courtTwo = screen.getByRole('heading', { name: 'Court Two' }).closest('article')
     expect(courtTwo).not.toBeNull()
-    expect(within(courtTwo as HTMLElement).getByText('PLAYING')).toBeVisible()
+    expect(within(courtTwo as HTMLElement).getByText('Đang chơi')).toBeVisible()
   })
 })

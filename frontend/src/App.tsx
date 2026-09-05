@@ -5,9 +5,9 @@ import { LiveSessionPage } from './features/live-session/LiveSessionPage'
 function HomePage() {
   return (
     <main className="route-message">
-      <p className="eyebrow">Sports Session Platform</p>
-      <h1>Host operations</h1>
-      <p>Open a Session to view the Host Live Session Control Room.</p>
+      <p className="eyebrow">Nền tảng Phiên thể thao</p>
+      <h1>Vận hành phiên chơi</h1>
+      <p>Mở một phiên để vào phòng điều hành trực tiếp.</p>
     </main>
   )
 }
@@ -15,10 +15,10 @@ function HomePage() {
 function NotFoundPage() {
   return (
     <main className="route-message">
-      <p className="eyebrow">Sports Session Platform</p>
-      <h1>Page not found</h1>
-      <p>The requested page does not exist.</p>
-      <Link to="/">Return home</Link>
+      <p className="eyebrow">Nền tảng Phiên thể thao</p>
+      <h1>Không tìm thấy trang</h1>
+      <p>Trang bạn yêu cầu không tồn tại.</p>
+      <Link to="/">Về trang chủ</Link>
     </main>
   )
 }
