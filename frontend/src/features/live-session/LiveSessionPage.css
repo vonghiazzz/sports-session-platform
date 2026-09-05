@@ -616,10 +616,84 @@
   padding: clamp(1rem, 2vw, 1.5rem);
 }
 
-.participant-group + .participant-group {
-  margin-top: 1.25rem;
-  border-top: 1px solid var(--border);
-  padding-top: 1.25rem;
+.participant-panel,
+.created-matches {
+  grid-column: 1 / -1;
+}
+
+.people-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.people-heading .section-title-large {
+  flex: 1 1 auto;
+}
+
+.people-heading .live-addition {
+  flex: 0 1 32rem;
+  margin: 0;
+}
+
+.people-search {
+  display: grid;
+  gap: 0.35rem;
+  max-width: 30rem;
+}
+
+.people-search > span {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.people-search input {
+  width: 100%;
+  border: 1px solid #aebdb8;
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.7rem;
+  color: #172033;
+  background: #ffffff;
+}
+
+.people-search input:focus-visible {
+  outline: 3px solid #8dd7c7;
+  outline-offset: 2px;
+}
+
+.participant-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  align-items: start;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.participant-group {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: var(--surface-subtle);
+}
+
+.participant-group-priority {
+  border-color: #8bc7b8;
+  background: #f3fbf8;
+}
+
+.participant-group-subdued {
+  opacity: 0.78;
+}
+
+.people-search-empty {
+  margin: 1rem 0 0;
+  border-radius: 0.65rem;
+  padding: 0.85rem;
+  color: var(--muted-text);
+  background: var(--surface-subtle);
 }
 
 .participant-list {
@@ -632,7 +706,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   border-top: 1px solid #edf0f4;
-  padding: 0.55rem 0;
+  padding: 0.5rem 0;
 }
 
 .participant-list li:first-child {
@@ -656,7 +730,7 @@
 }
 
 .participant-list strong {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
 }
 
 .participant-list li > div > span {
@@ -820,6 +894,17 @@
 
   .participant-list li {
     align-items: flex-start;
+  }
+
+  .people-heading {
+    flex-direction: column;
+  }
+
+  .people-heading .live-addition,
+  .people-heading .live-addition > button,
+  .people-search {
+    width: 100%;
+    max-width: none;
   }
 
   .participant-operation {

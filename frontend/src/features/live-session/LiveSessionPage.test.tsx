@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import { LiveSessionScreen } from './LiveSessionPage'
 import type { LiveSessionDataState } from './useLiveSessionData'
+import type { ParticipantStatus } from '../../api/contracts'
 
 const refresh = vi.fn(async () => undefined)
 const now = new Date('2026-09-02T10:00:00Z')
@@ -98,7 +99,7 @@ describe('LiveSessionScreen', () => {
     expect(screen.getAllByRole('heading', { name: 'Court Two' })).toHaveLength(2)
     expect(screen.getByRole('heading', { name: 'Court Three' })).toBeVisible()
     expect(screen.getAllByText('An Nguyen')).toHaveLength(2)
-    expect(screen.getByText('30 phút')).toBeVisible()
+    expect(screen.getByText('Chờ 30 phút')).toBeVisible()
     expect(screen.getByText('Đã tạo — chưa bắt đầu')).toBeVisible()
     expect(screen.getByText(/16:00 02\/09\/2026/)).toBeVisible()
     expect(screen.getByText(/19:00 02\/09\/2026/)).toBeVisible()
@@ -116,6 +117,115 @@ describe('LiveSessionScreen', () => {
     expect(screen.queryByText('AVAILABLE')).not.toBeInTheDocument()
     expect(screen.queryByText(/reserved/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
+  })
+
+  it('renders People groups in operational priority order with counts', () => {
+    renderScreen(readyState())
+    const panel = screen.getByRole('heading', { name: 'Người chơi' }).closest('section')
+    expect(panel).not.toBeNull()
+    const people = within(panel as HTMLElement)
+
+    expect(
+      people.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent),
+    ).toEqual(['Đang chờ', 'Đang chơi', 'Đã đăng ký', 'Tạm nghỉ', 'Đã rời'])
+    expect(people.getByText('8 người chơi')).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đang chờ: 2 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đang chơi: 4 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đã đăng ký: 1 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Tạm nghỉ: 1 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đã rời: 0 người' })).toBeVisible()
+    expect(people.getAllByText('An Nguyen')).toHaveLength(1)
+  })
+
+  it('filters current Participants across groups case- and diacritic-insensitively', async () => {
+    const user = userEvent.setup()
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        players: currentState.data.players.map((player) =>
+          player.id === 'player-1'
+            ? { ...player, displayName: 'Nguyễn Nghĩa' }
+            : player.id === 'player-4'
+              ? { ...player, displayName: 'Nghĩa Tạm Nghỉ' }
+              : player,
+        ),
+      },
+    })
+
+    await user.type(screen.getByLabelText('Tìm người chơi'), 'NGHIA')
+
+    expect(screen.getByRole('region', { name: 'Đang chờ: 1 người' })).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Tạm nghỉ: 1 người' })).toBeVisible()
+    expect(screen.queryByRole('region', { name: /Đang chơi:/ })).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Đang chờ: 1 người' })).getByText(
+        'Nguyễn Nghĩa',
+      ),
+    ).toBeVisible()
+    expect(
+      within(screen.getByRole('region', { name: 'Tạm nghỉ: 1 người' })).getByText(
+        'Nghĩa Tạm Nghỉ',
+      ),
+    ).toBeVisible()
+  })
+
+  it('shows a Session-scoped empty state when People search has no match', async () => {
+    const user = userEvent.setup()
+    renderScreen(readyState())
+
+    await user.type(screen.getByLabelText('Tìm người chơi'), 'không tồn tại')
+
+    expect(screen.getByText('Không tìm thấy người chơi trong phiên.')).toBeVisible()
+  })
+
+  it('renders a representative 25-Participant Session with exact group counts', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+    const playerTemplate = currentState.data.players[0]
+    const participantTemplate = currentState.data.participants[0]
+    const statuses: ParticipantStatus[] = [
+      ...Array<ParticipantStatus>(8).fill('WAITING'),
+      ...Array<ParticipantStatus>(8).fill('PLAYING'),
+      ...Array<ParticipantStatus>(4).fill('REGISTERED'),
+      ...Array<ParticipantStatus>(3).fill('PAUSED'),
+      ...Array<ParticipantStatus>(2).fill('LEFT'),
+    ]
+    const players = statuses.map((_, index) => ({
+      ...playerTemplate,
+      id: `scale-player-${index}`,
+      displayName: `Người chơi ${index + 1}`,
+    }))
+    const participants = statuses.map((status, index) => ({
+      ...participantTemplate,
+      id: `scale-participant-${index}`,
+      playerId: `scale-player-${index}`,
+      status,
+      waitingSince:
+        status === 'WAITING'
+          ? `2026-09-02T09:${String(index).padStart(2, '0')}:00Z`
+          : null,
+    }))
+    renderScreen({
+      ...currentState,
+      data: { ...currentState.data, players, participants, matches: [] },
+    })
+
+    const panel = screen.getByRole('heading', { name: 'Người chơi' }).closest('section')
+    expect(panel).not.toBeNull()
+    const people = within(panel as HTMLElement)
+    expect(people.getByText('25 người chơi')).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đang chờ: 8 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đang chơi: 8 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đã đăng ký: 4 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Tạm nghỉ: 3 người' })).toBeVisible()
+    expect(people.getByRole('region', { name: 'Đã rời: 2 người' })).toBeVisible()
   })
 
   it('uses the single manual Refresh control for read refresh', async () => {
@@ -225,7 +335,7 @@ describe('LiveSessionScreen', () => {
       }),
     ).not.toBeInTheDocument()
     expect(panel.getByRole('button', { name: '+ Thêm người chơi' })).toBeEnabled()
-    expect(panel.getByText('1 người đã rời phiên')).toBeVisible()
+    expect(panel.getByRole('region', { name: 'Đã rời: 1 người' })).toBeVisible()
   })
 
   it('offers only status-valid Court actions', () => {
@@ -391,5 +501,17 @@ describe('LiveSessionScreen', () => {
 
     expect(screen.getByRole('button', { name: 'Kết thúc trận' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Hủy trận' })).toBeEnabled()
+    const peoplePanel = screen
+      .getByRole('heading', { name: 'Người chơi' })
+      .closest('section')
+    expect(peoplePanel).not.toBeNull()
+    const people = within(peoplePanel as HTMLElement)
+    expect(people.getByRole('region', { name: 'Đang chơi: 4 người' })).toBeVisible()
+    expect(people.getByText('Giang Vo')).toBeVisible()
+    expect(
+      people.queryByRole('button', {
+        name: /Điểm danh|Tạm nghỉ|Trở lại|Rời phiên|\+ Thêm người chơi/,
+      }),
+    ).not.toBeInTheDocument()
   })
 })

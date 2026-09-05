@@ -36,6 +36,11 @@ import {
   statusLabel,
 } from '../../lib/presentation'
 import { LiveAddCourt, LiveAddPlayer } from './LiveSessionAdditions'
+import { filterParticipantsByName } from './peopleOperations'
+import type {
+  PlayerResponse,
+  SessionParticipantResponse,
+} from '../../api/contracts'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -411,7 +416,7 @@ function ParticipantRow({
     <li>
       <div className="participant-identity">
         <strong>{participant.displayName}</strong>
-        <span>{participant.skillLabel ?? 'Không có trình độ'}</span>
+        <span>{participant.skillLabel ?? '—'}</span>
       </div>
       <div className="participant-operation">
         {showWaiting && (
@@ -422,7 +427,9 @@ function ParticipantRow({
                 : 'waiting-time'
             }
           >
-            {participant.waitingDuration ?? 'Không có thời gian chờ'}
+            {participant.waitingDuration === null
+              ? 'Chờ —'
+              : `Chờ ${participant.waitingDuration}`}
           </span>
         )}
         {actions.length > 0 && (
@@ -463,21 +470,30 @@ function ParticipantList({
   sessionId,
   sessionStatus,
   showWaiting = false,
+  emptyMessage,
+  priority = false,
+  subdued = false,
 }: {
   readonly title: string
   readonly participants: readonly ParticipantView[]
   readonly sessionId: string
   readonly sessionStatus: LiveSessionModel['header']['status']
   readonly showWaiting?: boolean
+  readonly emptyMessage: string
+  readonly priority?: boolean
+  readonly subdued?: boolean
 }) {
   return (
-    <section className="participant-group">
+    <section
+      className={`participant-group${priority ? ' participant-group-priority' : ''}${subdued ? ' participant-group-subdued' : ''}`}
+      aria-label={`${title}: ${participants.length} người`}
+    >
       <div className="section-title">
         <h3>{title}</h3>
         <span>{participants.length}</span>
       </div>
       {participants.length === 0 ? (
-        <p className="empty-state">Không có người chơi.</p>
+        <p className="empty-state">{emptyMessage}</p>
       ) : (
         <ul className="participant-list">
           {participants.map((participant) => (
@@ -490,6 +506,117 @@ function ParticipantList({
             />
           ))}
         </ul>
+      )}
+    </section>
+  )
+}
+
+function PeoplePanel({
+  model,
+  sessionId,
+  players,
+  participants,
+}: {
+  readonly model: LiveSessionModel
+  readonly sessionId: string
+  readonly players: readonly PlayerResponse[]
+  readonly participants: readonly SessionParticipantResponse[]
+}) {
+  const [search, setSearch] = useState('')
+  const groups = [
+    {
+      title: 'Đang chờ',
+      participants: filterParticipantsByName(model.waitingParticipants, search),
+      showWaiting: true,
+      emptyMessage: 'Không có người chơi đang chờ.',
+      priority: true,
+      subdued: false,
+    },
+    {
+      title: 'Đang chơi',
+      participants: filterParticipantsByName(model.playingParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi đang chơi.',
+      priority: false,
+      subdued: false,
+    },
+    {
+      title: 'Đã đăng ký',
+      participants: filterParticipantsByName(model.registeredParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi chưa điểm danh.',
+      priority: false,
+      subdued: false,
+    },
+    {
+      title: 'Tạm nghỉ',
+      participants: filterParticipantsByName(model.pausedParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi đang tạm nghỉ.',
+      priority: false,
+      subdued: false,
+    },
+    {
+      title: 'Đã rời',
+      participants: filterParticipantsByName(model.leftParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi đã rời phiên.',
+      priority: false,
+      subdued: true,
+    },
+  ] as const
+  const hasSearch = search.trim().length > 0
+  const matchingCount = groups.reduce(
+    (total, group) => total + group.participants.length,
+    0,
+  )
+
+  return (
+    <section className="panel participant-panel" aria-labelledby="participants-heading">
+      <div className="people-heading">
+        <div className="section-title section-title-large">
+          <div>
+            <p className="eyebrow">Người chơi</p>
+            <h2 id="participants-heading">Người chơi</h2>
+          </div>
+          <span>{model.participantCount} người chơi</span>
+        </div>
+        <LiveAddPlayer
+          sessionId={sessionId}
+          sessionStatus={model.header.status}
+          players={players}
+          participants={participants}
+        />
+      </div>
+      <label className="people-search">
+        <span>Tìm người chơi</span>
+        <input
+          type="search"
+          value={search}
+          placeholder="Nhập tên người chơi trong phiên"
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
+      {hasSearch && matchingCount === 0 ? (
+        <p className="people-search-empty">Không tìm thấy người chơi trong phiên.</p>
+      ) : (
+        <div className="participant-groups">
+          {groups
+            .filter((group) => !hasSearch || group.participants.length > 0)
+            .map((group) => (
+              <ParticipantList
+                key={group.title}
+                title={group.title}
+                participants={group.participants}
+                sessionId={sessionId}
+                sessionStatus={model.header.status}
+                showWaiting={group.showWaiting}
+                emptyMessage={group.emptyMessage}
+                priority={group.priority}
+                subdued={group.subdued}
+              />
+            ))}
+        </div>
       )}
     </section>
   )
@@ -1139,50 +1266,12 @@ export function LiveSessionScreen({
       />
 
       <div className="operational-grid">
-        <section className="panel participant-panel" aria-labelledby="participants-heading">
-          <div className="section-title section-title-large">
-            <div>
-              <p className="eyebrow">Người chơi</p>
-              <h2 id="participants-heading">Người chơi</h2>
-            </div>
-          </div>
-          <LiveAddPlayer
-            sessionId={state.data.session.id}
-            sessionStatus={model.header.status}
-            players={state.data.players}
-            participants={state.data.participants}
-          />
-          <ParticipantList
-            title="Đang chờ"
-            participants={model.waitingParticipants}
-            sessionId={state.data.session.id}
-            sessionStatus={model.header.status}
-            showWaiting
-          />
-          <ParticipantList
-            title="Đã đăng ký"
-            participants={model.registeredParticipants}
-            sessionId={state.data.session.id}
-            sessionStatus={model.header.status}
-          />
-          <ParticipantList
-            title="Tạm nghỉ"
-            participants={model.pausedParticipants}
-            sessionId={state.data.session.id}
-            sessionStatus={model.header.status}
-          />
-          <ParticipantList
-            title="Đang chơi"
-            participants={model.playingParticipants}
-            sessionId={state.data.session.id}
-            sessionStatus={model.header.status}
-          />
-          {model.leftParticipantCount > 0 && (
-            <p className="left-count">
-              {model.leftParticipantCount} người đã rời phiên
-            </p>
-          )}
-        </section>
+        <PeoplePanel
+          model={model}
+          sessionId={state.data.session.id}
+          players={state.data.players}
+          participants={state.data.participants}
+        />
 
         <section className="panel created-matches" aria-labelledby="created-matches-heading">
           <div className="section-title section-title-large">

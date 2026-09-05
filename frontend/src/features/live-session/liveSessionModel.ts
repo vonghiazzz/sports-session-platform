@@ -76,7 +76,8 @@ export interface LiveSessionModel {
   readonly registeredParticipants: readonly ParticipantView[]
   readonly pausedParticipants: readonly ParticipantView[]
   readonly playingParticipants: readonly ParticipantView[]
-  readonly leftParticipantCount: number
+  readonly leftParticipants: readonly ParticipantView[]
+  readonly participantCount: number
   readonly createdMatches: readonly MatchView[]
   readonly resolvedMatchCount: number
   readonly warnings: readonly string[]
@@ -299,6 +300,30 @@ export function composeLiveSessionModel({
   const participantsWithStatus = (status: ParticipantStatus) =>
     participantViews.filter((participant) => participant.status === status)
 
+  const waitingParticipants = participantsWithStatus('WAITING').toSorted(
+    (left, right) => {
+      if (left.waitingSince === null && right.waitingSince !== null) {
+        return 1
+      }
+      if (left.waitingSince !== null && right.waitingSince === null) {
+        return -1
+      }
+      const waitingComparison = (left.waitingSince ?? '').localeCompare(
+        right.waitingSince ?? '',
+      )
+      if (waitingComparison !== 0) {
+        return waitingComparison
+      }
+      const nameComparison = left.displayName.localeCompare(
+        right.displayName,
+        'vi-VN',
+      )
+      return nameComparison !== 0
+        ? nameComparison
+        : left.sessionParticipantId.localeCompare(right.sessionParticipantId)
+    },
+  )
+
   return {
     header: {
       title: session.title,
@@ -315,14 +340,12 @@ export function composeLiveSessionModel({
           : formatVietnamDateTime(session.startedAt),
     },
     courts,
-    waitingParticipants: participantsWithStatus('WAITING').toSorted(
-      (left, right) =>
-        (left.waitingSince ?? '').localeCompare(right.waitingSince ?? ''),
-    ),
+    waitingParticipants,
     registeredParticipants: participantsWithStatus('REGISTERED'),
     pausedParticipants: participantsWithStatus('PAUSED'),
     playingParticipants: participantsWithStatus('PLAYING'),
-    leftParticipantCount: participantsWithStatus('LEFT').length,
+    leftParticipants: participantsWithStatus('LEFT'),
+    participantCount: participantViews.length,
     createdMatches: liveMatches.filter((match) => match.status === 'CREATED'),
     resolvedMatchCount: matches.filter(
       (match) => match.status === 'COMPLETED' || match.status === 'CANCELLED',

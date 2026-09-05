@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
+import type { ParticipantStatus } from '../../api/contracts'
 import {
   composeLiveSessionModel,
   formatWaitingDuration,
@@ -42,6 +43,92 @@ describe('composeLiveSessionModel', () => {
         new Date('2026-09-02T10:00:00Z'),
       ),
     ).toBe('30 phút')
+  })
+
+  it('formats a long WAITING duration as elapsed hours and minutes', () => {
+    expect(
+      formatWaitingDuration(
+        '2026-09-02T08:48:00Z',
+        new Date('2026-09-02T10:00:00Z'),
+      ),
+    ).toBe('1 giờ 12 phút')
+  })
+
+  it('orders WAITING Participants by oldest waitingSince first', () => {
+    const input = createLiveSessionInput()
+    const model = composeLiveSessionModel({
+      ...input,
+      participants: input.participants.map((participant) =>
+        participant.status === 'WAITING'
+          ? {
+              ...participant,
+              waitingSince:
+                participant.playerId === 'player-1'
+                  ? '2026-09-02T09:55:00Z'
+                  : '2026-09-02T09:15:00Z',
+            }
+          : participant,
+      ),
+    })
+
+    expect(model.waitingParticipants.map((participant) => participant.displayName)).toEqual([
+      'Bao Tran',
+      'An Nguyen',
+    ])
+  })
+
+  it('groups a 25-Participant Session exactly once with correct counts', () => {
+    const input = createLiveSessionInput()
+    const playerTemplate = input.players[0]
+    const participantTemplate = input.participants[0]
+    const statuses: ParticipantStatus[] = [
+      ...Array<ParticipantStatus>(8).fill('WAITING'),
+      ...Array<ParticipantStatus>(8).fill('PLAYING'),
+      ...Array<ParticipantStatus>(4).fill('REGISTERED'),
+      ...Array<ParticipantStatus>(3).fill('PAUSED'),
+      ...Array<ParticipantStatus>(2).fill('LEFT'),
+    ]
+    const players = statuses.map((_, index) => ({
+      ...playerTemplate,
+      id: `scale-player-${index}`,
+      displayName: `Người chơi ${index + 1}`,
+    }))
+    const participants = statuses.map((status, index) => ({
+      ...participantTemplate,
+      id: `scale-participant-${index}`,
+      playerId: `scale-player-${index}`,
+      status,
+      waitingSince:
+        status === 'WAITING'
+          ? `2026-09-02T09:${String(index).padStart(2, '0')}:00Z`
+          : null,
+      pausedAt: status === 'PAUSED' ? '2026-09-02T09:30:00Z' : null,
+      leftAt: status === 'LEFT' ? '2026-09-02T09:30:00Z' : null,
+    }))
+
+    const model = composeLiveSessionModel({
+      ...input,
+      players,
+      participants,
+      matches: [],
+    })
+    const groupedIds = [
+      ...model.waitingParticipants,
+      ...model.playingParticipants,
+      ...model.registeredParticipants,
+      ...model.pausedParticipants,
+      ...model.leftParticipants,
+    ].map((participant) => participant.sessionParticipantId)
+
+    expect(model.participantCount).toBe(25)
+    expect([
+      model.waitingParticipants.length,
+      model.playingParticipants.length,
+      model.registeredParticipants.length,
+      model.pausedParticipants.length,
+      model.leftParticipants.length,
+    ]).toEqual([8, 8, 4, 3, 2])
+    expect(new Set(groupedIds).size).toBe(25)
   })
 
   it('resolves PLAYING Match A1, A2, B1, and B2 by semantic assignment', () => {
