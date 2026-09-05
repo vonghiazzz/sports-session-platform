@@ -41,6 +41,7 @@ import type {
   PlayerResponse,
   SessionParticipantResponse,
 } from '../../api/contracts'
+import { MatchmakingRecommendation } from './MatchmakingRecommendation'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -337,10 +338,12 @@ function CourtCard({
   court,
   sessionId,
   sessionStatus,
+  participants,
 }: {
   readonly court: CourtView
   readonly sessionId: string
   readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly participants: readonly ParticipantView[]
 }) {
   const actionState = useSessionCourtAction(sessionId, court.sessionCourtId)
   const action: SessionCourtAction | null = isSessionMutable(sessionStatus)
@@ -369,6 +372,13 @@ function CourtCard({
       )}
       {court.activeMatch && (
         <PlayingMatchPanel match={court.activeMatch} sessionId={sessionId} />
+      )}
+      {sessionStatus === 'IN_PROGRESS' && court.status === 'AVAILABLE' && (
+        <MatchmakingRecommendation
+          sessionId={sessionId}
+          court={court}
+          participants={participants}
+        />
       )}
       {action && (
         <div className="action-area court-action-area">
@@ -1261,6 +1271,13 @@ export function LiveSessionScreen({
                 court={court}
                 sessionId={state.data.session.id}
                 sessionStatus={model.header.status}
+                participants={[
+                  ...model.waitingParticipants,
+                  ...model.registeredParticipants,
+                  ...model.pausedParticipants,
+                  ...model.playingParticipants,
+                  ...model.leftParticipants,
+                ]}
               />
             ))}
           </div>

@@ -400,6 +400,83 @@
   margin: 1.5rem 0 0;
 }
 
+.matchmaking-recommendation {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.recommendation-card {
+  border: 1px solid #9ccfc1;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: #f2fbf8;
+}
+
+.recommendation-heading,
+.recommendation-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.recommendation-heading h4,
+.recommendation-heading p,
+.recommendation-teams h5 {
+  margin: 0;
+}
+
+.recommendation-heading > span,
+.recommendation-note,
+.recommendation-fallback {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+}
+
+.recommendation-teams {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}
+
+.recommendation-teams ul {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recommendation-teams li {
+  display: grid;
+  gap: 0.1rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  background: #ffffff;
+}
+
+.recommendation-teams li span {
+  color: var(--muted-text);
+  font-size: 0.7rem;
+}
+
+.recommendation-note {
+  margin: 0.8rem 0 0;
+  line-height: 1.45;
+}
+
+.recommendation-actions {
+  justify-content: flex-start;
+  margin-top: 0.8rem;
+}
+
+.recommendation-fallback {
+  margin: 0.7rem 0 0;
+}
+
 .live-addition {
   margin: -0.35rem 0 1rem;
 }

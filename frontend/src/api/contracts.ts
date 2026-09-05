@@ -143,6 +143,70 @@ export interface MatchResponse {
   readonly version: number
 }
 
+export type MatchmakingGenerationOutcome = 'RECOMMENDED' | 'UNAVAILABLE'
+export type MatchmakingUnavailableReason = 'INSUFFICIENT_ELIGIBLE_PLAYERS'
+export type MatchmakingRatingBasis = 'PERSISTED' | 'INITIAL_PRIOR'
+
+export interface MatchmakingPlayerResponse {
+  readonly sessionParticipantId: UUID
+  readonly playerId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+  readonly waitingSince: ISOInstant
+  readonly waitingSeconds: number
+  readonly ratingValue: number
+  readonly uncertainty: number
+  readonly ratedMatches: number
+  readonly ratingBasis: MatchmakingRatingBasis
+}
+
+export interface MatchmakingTeamResponse {
+  readonly slot1: MatchmakingPlayerResponse
+  readonly slot2: MatchmakingPlayerResponse
+}
+
+interface MatchmakingGenerationBase {
+  readonly algorithmVersion: string
+  readonly evaluationTime: ISOInstant
+  readonly sessionId: UUID
+  readonly sessionCourtId: UUID
+  readonly sportCode: SportCode
+  readonly matchFormat: MatchFormat
+  readonly eligiblePlayerCount: number
+}
+
+export interface MatchRecommendationResponse
+  extends MatchmakingGenerationBase {
+  readonly outcome: 'RECOMMENDED'
+  readonly teamA: MatchmakingTeamResponse
+  readonly teamB: MatchmakingTeamResponse
+  readonly teamARatingTotal: number
+  readonly teamBRatingTotal: number
+  readonly ratingDifference: number
+  readonly oldestWaitingSince: ISOInstant
+}
+
+export interface MatchmakingUnavailableResponse
+  extends MatchmakingGenerationBase {
+  readonly outcome: 'UNAVAILABLE'
+  readonly reason: MatchmakingUnavailableReason
+}
+
+export type MatchmakingGenerationResponse =
+  | MatchRecommendationResponse
+  | MatchmakingUnavailableResponse
+
+export interface AcceptMatchmakingAssignmentRequest {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface AcceptMatchmakingRecommendationRequest {
+  readonly algorithmVersion: string
+  readonly assignments: readonly AcceptMatchmakingAssignmentRequest[]
+}
+
 export interface ApiError {
   readonly timestamp: ISOInstant
   readonly status: number

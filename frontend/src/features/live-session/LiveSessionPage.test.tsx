@@ -381,7 +381,7 @@ describe('LiveSessionScreen', () => {
 
     expect(
       within(playingCard as HTMLElement).queryByRole('button', {
-        name: /Mở sân|Tạm khóa sân/,
+        name: /Mở sân|Tạm khóa sân|Tạo đề xuất/,
       }),
     ).not.toBeInTheDocument()
     expect(
@@ -390,10 +390,20 @@ describe('LiveSessionScreen', () => {
       }),
     ).toBeEnabled()
     expect(
+      within(availableCard as HTMLElement).getByRole('button', {
+        name: 'Tạo đề xuất',
+      }),
+    ).toBeEnabled()
+    expect(
       within(unavailableCard as HTMLElement).getByRole('button', {
         name: 'Mở sân',
       }),
     ).toBeEnabled()
+    expect(
+      within(unavailableCard as HTMLElement).queryByRole('button', {
+        name: 'Tạo đề xuất',
+      }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows Create and Start controls only while the Session is in progress', () => {
@@ -427,6 +437,7 @@ describe('LiveSessionScreen', () => {
 
       expect(screen.queryByRole('button', { name: 'Tạo trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Tạo đề xuất' })).not.toBeInTheDocument()
       const createdMatches = screen
         .getByRole('heading', { name: 'Trận chờ bắt đầu' })
         .closest('section')
