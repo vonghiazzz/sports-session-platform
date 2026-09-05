@@ -13,7 +13,10 @@ import {
   getVenueCourts,
 } from '../../api/liveSessionApi'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
-import { useLiveSessionData } from './useLiveSessionData'
+import {
+  LIVE_SESSION_POLL_INTERVAL_MS,
+  useLiveSessionData,
+} from './useLiveSessionData'
 
 vi.mock('../../api/liveSessionApi', () => ({
   getPlayers: vi.fn(),
@@ -146,6 +149,78 @@ describe('useLiveSessionData', () => {
     expect(getVenueMock.mock.calls[0]?.[0]).toBe(input.session.venueId)
     expect(getVenueCourtsMock).toHaveBeenCalledTimes(1)
     expect(getVenueCourtsMock.mock.calls[0]?.[0]).toBe(input.session.venueId)
+    queryClient.clear()
+  })
+
+  it('polls only the four runtime queries every five seconds', async () => {
+    arrangeSuccessfulReads()
+    const { result, queryClient } = renderLiveSessionData()
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    const intervalFor = (queryKey: readonly string[]) =>
+      (queryClient.getQueryCache().find({ queryKey, exact: true })?.options as
+        | { readonly refetchInterval?: number }
+        | undefined)?.refetchInterval
+    expect(intervalFor(['session', SESSION_ID])).toBe(
+      LIVE_SESSION_POLL_INTERVAL_MS,
+    )
+    expect(intervalFor(['sessionParticipants', SESSION_ID])).toBe(
+      LIVE_SESSION_POLL_INTERVAL_MS,
+    )
+    expect(intervalFor(['sessionCourts', SESSION_ID])).toBe(
+      LIVE_SESSION_POLL_INTERVAL_MS,
+    )
+    expect(intervalFor(['sessionMatches', SESSION_ID])).toBe(
+      LIVE_SESSION_POLL_INTERVAL_MS,
+    )
+    expect(intervalFor(['players'])).toBeUndefined()
+    expect(intervalFor(['venue', 'venue-1'])).toBeUndefined()
+    expect(intervalFor(['venueCourts', 'venue-1'])).toBeUndefined()
+    queryClient.clear()
+  })
+
+  it('keeps Match polling enabled for a terminal Session', async () => {
+    const input = arrangeSuccessfulReads()
+    getSessionMock.mockResolvedValue({
+      ...input.session,
+      status: 'CANCELLED',
+      cancelledAt: '2026-09-02T10:00:00Z',
+    })
+    const { result, queryClient } = renderLiveSessionData()
+
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    expect(
+      (queryClient.getQueryCache().find({
+        queryKey: ['sessionMatches', SESSION_ID],
+        exact: true,
+      })?.options as { readonly refetchInterval?: number } | undefined)
+        ?.refetchInterval,
+    ).toBe(LIVE_SESSION_POLL_INTERVAL_MS)
+    queryClient.clear()
+  })
+
+  it('keeps cached data ready after a transient background refetch failure', async () => {
+    const input = arrangeSuccessfulReads()
+    const { result, queryClient } = renderLiveSessionData()
+    await waitFor(() => expect(result.current.status).toBe('ready'))
+
+    getSessionMock.mockRejectedValue(new HttpError(404, 'temporarily unavailable'))
+    await act(async () => {
+      await queryClient.refetchQueries({
+        queryKey: ['session', SESSION_ID],
+        exact: true,
+      })
+    })
+
+    await waitFor(() => {
+      expect(result.current.status).toBe('ready')
+      expect(result.current.hasBackgroundError).toBe(true)
+    })
+    if (result.current.status === 'ready') {
+      expect(result.current.data.session).toEqual(input.session)
+    }
     queryClient.clear()
   })
 

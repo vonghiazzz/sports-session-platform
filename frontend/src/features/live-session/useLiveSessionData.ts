@@ -3,7 +3,7 @@ import {
   useQueryClient,
   type QueryKey,
 } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import type {
   CourtResponse,
   MatchResponse,
@@ -37,7 +37,10 @@ export interface LiveSessionData {
 interface LiveSessionQueryState {
   readonly refresh: () => Promise<void>
   readonly isRefreshing: boolean
+  readonly hasBackgroundError?: boolean
 }
+
+export const LIVE_SESSION_POLL_INTERVAL_MS = 5_000
 
 export type LiveSessionDataState =
   | (LiveSessionQueryState & { readonly status: 'loading' })
@@ -54,6 +57,7 @@ function retryRead(failureCount: number, error: Error): boolean {
 
 export function useLiveSessionData(sessionId: string): LiveSessionDataState {
   const queryClient = useQueryClient()
+  const [manualRefreshPending, setManualRefreshPending] = useState(false)
   const enabled = sessionId.length > 0
 
   const sessionQuery = useQuery({
@@ -61,18 +65,21 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     queryFn: ({ signal }) => getSession(sessionId, signal),
     enabled,
     retry: retryRead,
+    refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const participantsQuery = useQuery({
     queryKey: ['sessionParticipants', sessionId],
     queryFn: ({ signal }) => getSessionParticipants(sessionId, signal),
     enabled,
     retry: retryRead,
+    refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const sessionCourtsQuery = useQuery({
     queryKey: ['sessionCourts', sessionId],
     queryFn: ({ signal }) => getSessionCourts(sessionId, signal),
     enabled,
     retry: retryRead,
+    refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const playersQuery = useQuery({
     queryKey: ['players'],
@@ -85,6 +92,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     queryFn: ({ signal }) => getSessionMatches(sessionId, signal),
     enabled,
     retry: retryRead,
+    refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
 
   const venueId = sessionQuery.data?.venueId
@@ -122,11 +130,16 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     if (venueId) {
       queryKeys.push(['venue', venueId], ['venueCourts', venueId])
     }
-    await Promise.all(
-      queryKeys.map((queryKey) =>
-        queryClient.invalidateQueries({ queryKey, exact: true }),
-      ),
-    )
+    setManualRefreshPending(true)
+    try {
+      await Promise.all(
+        queryKeys.map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey, exact: true }),
+        ),
+      )
+    } finally {
+      setManualRefreshPending(false)
+    }
   }, [queryClient, sessionId, venueId])
 
   const queries = [
@@ -140,17 +153,21 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
   ]
   const state = {
     refresh,
-    isRefreshing: queries.some((query) => query.isFetching),
+    isRefreshing: manualRefreshPending,
+    hasBackgroundError: queries.some(
+      (query) => query.isError && query.data !== undefined,
+    ),
   }
 
   if (
     sessionQuery.error instanceof HttpError &&
-    sessionQuery.error.status === 404
+    sessionQuery.error.status === 404 &&
+    sessionQuery.data === undefined
   ) {
     return { ...state, status: 'not-found' }
   }
 
-  if (queries.some((query) => query.isError)) {
+  if (queries.some((query) => query.isError && query.data === undefined)) {
     return { ...state, status: 'error' }
   }
 

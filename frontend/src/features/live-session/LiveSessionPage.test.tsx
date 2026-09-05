@@ -80,6 +80,27 @@ describe('LiveSessionScreen', () => {
     expect(screen.getByRole('button', { name: 'Thử lại' })).toBeEnabled()
   })
 
+  it('keeps rendered data visible when a background refresh fails', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+
+    renderScreen({ ...currentState, hasBackgroundError: true })
+
+    expect(
+      screen.getByRole('heading', { name: 'Wednesday Badminton' }),
+    ).toBeVisible()
+    expect(
+      screen.getByText(/Dữ liệu gần nhất vẫn được giữ lại/),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Không thể tải dữ liệu phiên trực tiếp.',
+      }),
+    ).not.toBeInTheDocument()
+  })
+
   it('renders realistic multi-Court and multi-Participant data read-only', () => {
     const { now: fixtureNow, ...data } = createLiveSessionInput()
     const readyState: LiveSessionDataState = {

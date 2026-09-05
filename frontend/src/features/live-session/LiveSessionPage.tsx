@@ -1229,6 +1229,13 @@ export function LiveSessionScreen({
         </aside>
       )}
 
+      {state.hasBackgroundError && (
+        <aside className="background-refresh-warning" role="status">
+          Dữ liệu gần nhất vẫn được giữ lại. Một lần đồng bộ nền chưa thành công;
+          bạn có thể dùng “Làm mới”.
+        </aside>
+      )}
+
       <section className="court-board" aria-labelledby="court-board-heading">
         <div className="section-title section-title-large">
           <div>
