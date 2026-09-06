@@ -6,6 +6,7 @@ import {
 import { useCallback, useState } from 'react'
 import type {
   CourtResponse,
+  MatchPlanResponse,
   MatchResponse,
   PlayerResponse,
   SessionCourtResponse,
@@ -23,6 +24,7 @@ import {
   getVenue,
   getVenueCourts,
 } from '../../api/liveSessionApi'
+import { getSessionMatchPlans } from '../../api/matchPlanApi'
 
 export interface LiveSessionData {
   readonly session: SessionResponse
@@ -32,6 +34,7 @@ export interface LiveSessionData {
   readonly participants: readonly SessionParticipantResponse[]
   readonly players: readonly PlayerResponse[]
   readonly matches: readonly MatchResponse[]
+  readonly matchPlans: readonly MatchPlanResponse[]
 }
 
 interface LiveSessionQueryState {
@@ -94,6 +97,13 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     retry: retryRead,
     refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
+  const matchPlansQuery = useQuery({
+    queryKey: ['sessionMatchPlans', sessionId],
+    queryFn: ({ signal }) => getSessionMatchPlans(sessionId, signal),
+    enabled,
+    retry: retryRead,
+    refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
+  })
 
   const venueId = sessionQuery.data?.venueId
   const venueQuery = useQuery({
@@ -126,6 +136,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
       ['sessionCourts', sessionId],
       ['players'],
       ['sessionMatches', sessionId],
+      ['sessionMatchPlans', sessionId],
     ]
     if (venueId) {
       queryKeys.push(['venue', venueId], ['venueCourts', venueId])
@@ -148,6 +159,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     sessionCourtsQuery,
     playersQuery,
     matchesQuery,
+    matchPlansQuery,
     venueQuery,
     venueCourtsQuery,
   ]
@@ -177,6 +189,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     sessionCourtsQuery,
     playersQuery,
     matchesQuery,
+    matchPlansQuery,
   ]
   if (
     coreQueries.some((query) => query.isPending) ||
@@ -193,7 +206,8 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     !venueCourtsQuery.data ||
     !participantsQuery.data ||
     !playersQuery.data ||
-    !matchesQuery.data
+    !matchesQuery.data ||
+    !matchPlansQuery.data
   ) {
     return { ...state, status: 'error' }
   }
@@ -209,6 +223,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
       participants: participantsQuery.data,
       players: playersQuery.data,
       matches: matchesQuery.data,
+      matchPlans: matchPlansQuery.data,
     },
   }
 }

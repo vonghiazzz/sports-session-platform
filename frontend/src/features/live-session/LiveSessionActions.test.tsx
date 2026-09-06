@@ -22,6 +22,7 @@ import {
   pauseParticipant,
 } from '../../api/liveSessionApi'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
+import { getSessionMatchPlans } from '../../api/matchPlanApi'
 import { LiveSessionScreen } from './LiveSessionPage'
 import { useLiveSessionData } from './useLiveSessionData'
 
@@ -44,6 +45,9 @@ vi.mock('../../api/liveSessionApi', () => ({
   resumeParticipant: vi.fn(),
   startMatch: vi.fn(),
 }))
+vi.mock('../../api/matchPlanApi', () => ({
+  getSessionMatchPlans: vi.fn(),
+}))
 
 const SESSION_ID = 'session-1'
 const NOW = new Date('2026-09-02T10:00:00Z')
@@ -60,6 +64,7 @@ const getVenueMock = vi.mocked(getVenue)
 const getVenueCourtsMock = vi.mocked(getVenueCourts)
 const leaveParticipantMock = vi.mocked(leaveParticipant)
 const pauseParticipantMock = vi.mocked(pauseParticipant)
+const getSessionMatchPlansMock = vi.mocked(getSessionMatchPlans)
 
 function deferred<T>() {
   let resolvePromise: (value: T | PromiseLike<T>) => void = () => {
@@ -78,6 +83,7 @@ function arrangeReadSuccess() {
   getSessionCourtsMock.mockResolvedValue(input.sessionCourts)
   getPlayersMock.mockResolvedValue(input.players)
   getSessionMatchesMock.mockResolvedValue(input.matches)
+  getSessionMatchPlansMock.mockResolvedValue(input.matchPlans)
   getVenueMock.mockResolvedValue(input.venue)
   getVenueCourtsMock.mockResolvedValue(input.venueCourts)
   return input

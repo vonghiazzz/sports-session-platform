@@ -1,5 +1,6 @@
 import type {
   CourtResponse,
+  MatchPlanResponse,
   MatchResponse,
   MatchSource,
   ParticipantStatus,
@@ -27,6 +28,8 @@ export interface ParticipantView {
   readonly waitingSince: string | null
   readonly waitingDuration: string | null
   readonly dataUnavailable: boolean
+  readonly plannedMatchCount: number
+  readonly planningLabel: string | null
 }
 
 export interface TeamMemberView {
@@ -91,6 +94,7 @@ export interface LiveSessionModelInput {
   readonly participants: readonly SessionParticipantResponse[]
   readonly players: readonly PlayerResponse[]
   readonly matches: readonly MatchResponse[]
+  readonly matchPlans: readonly MatchPlanResponse[]
   readonly now: Date
 }
 
@@ -177,10 +181,31 @@ export function composeLiveSessionModel({
   participants,
   players,
   matches,
+  matchPlans,
   now,
 }: LiveSessionModelInput): LiveSessionModel {
   const warnings = new Set<string>()
   const playerById = new Map(players.map((player) => [player.id, player]))
+
+  const activePlans = matchPlans.filter((plan) => plan.status === 'QUEUED')
+  const courtNameBySessionCourtId = new Map(
+    sessionCourts.map((sessionCourt) => [
+      sessionCourt.id,
+      venueCourts.find((court) => court.id === sessionCourt.courtId)?.name ??
+        'Không có dữ liệu sân',
+    ]),
+  )
+  const plansByParticipantId = new Map<string, MatchPlanResponse[]>()
+  for (const plan of activePlans) {
+    for (const assignment of plan.participants) {
+      const current = plansByParticipantId.get(assignment.sessionParticipantId)
+      if (current) {
+        current.push(plan)
+      } else {
+        plansByParticipantId.set(assignment.sessionParticipantId, [plan])
+      }
+    }
+  }
 
   const participantViews = participants.map<ParticipantView>((participant) => {
     const player = playerById.get(participant.playerId)
@@ -200,6 +225,22 @@ export function composeLiveSessionModel({
       warnings.add('Một người chơi đang chờ không có thời gian chờ hợp lệ.')
     }
 
+    const plannedMatches = (
+      plansByParticipantId.get(participant.id) ?? []
+    ).toSorted(
+      (left, right) =>
+        (left.queuePosition ?? Number.MAX_SAFE_INTEGER) -
+          (right.queuePosition ?? Number.MAX_SAFE_INTEGER) ||
+        left.createdAt.localeCompare(right.createdAt),
+    )
+    const nearestPlan = plannedMatches[0]
+    const planningLabel =
+      plannedMatches.length === 0
+        ? null
+        : plannedMatches.length === 1 && nearestPlan
+          ? `Sắp chơi • ${courtNameBySessionCourtId.get(nearestPlan.sessionCourtId) ?? 'Không có dữ liệu sân'} • lượt ${nearestPlan.queuePosition ?? '—'}`
+          : `Đã xếp ${plannedMatches.length} trận sắp tới`
+
     return {
       sessionParticipantId: participant.id,
       displayName: player?.displayName ?? 'Không có dữ liệu người chơi',
@@ -209,6 +250,8 @@ export function composeLiveSessionModel({
       waitingSince: participant.waitingSince,
       waitingDuration,
       dataUnavailable: player === undefined,
+      plannedMatchCount: plannedMatches.length,
+      planningLabel,
     }
   })
 

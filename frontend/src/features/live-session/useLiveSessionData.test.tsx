@@ -12,6 +12,7 @@ import {
   getVenue,
   getVenueCourts,
 } from '../../api/liveSessionApi'
+import { getSessionMatchPlans } from '../../api/matchPlanApi'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import {
   LIVE_SESSION_POLL_INTERVAL_MS,
@@ -27,6 +28,9 @@ vi.mock('../../api/liveSessionApi', () => ({
   getVenue: vi.fn(),
   getVenueCourts: vi.fn(),
 }))
+vi.mock('../../api/matchPlanApi', () => ({
+  getSessionMatchPlans: vi.fn(),
+}))
 
 const SESSION_ID = 'session-1'
 
@@ -37,6 +41,7 @@ const getSessionMatchesMock = vi.mocked(getSessionMatches)
 const getSessionParticipantsMock = vi.mocked(getSessionParticipants)
 const getVenueMock = vi.mocked(getVenue)
 const getVenueCourtsMock = vi.mocked(getVenueCourts)
+const getSessionMatchPlansMock = vi.mocked(getSessionMatchPlans)
 
 function deferred<T>() {
   let resolvePromise: (value: T | PromiseLike<T>) => void = () => {
@@ -56,6 +61,7 @@ function arrangeSuccessfulReads() {
   getSessionCourtsMock.mockResolvedValue(input.sessionCourts)
   getPlayersMock.mockResolvedValue(input.players)
   getSessionMatchesMock.mockResolvedValue(input.matches)
+  getSessionMatchPlansMock.mockResolvedValue(input.matchPlans)
   getVenueMock.mockResolvedValue(input.venue)
   getVenueCourtsMock.mockResolvedValue(input.venueCourts)
 
@@ -96,6 +102,8 @@ function expectRootReadsOnce() {
   expect(getPlayersMock).toHaveBeenCalledTimes(1)
   expect(getSessionMatchesMock).toHaveBeenCalledTimes(1)
   expect(getSessionMatchesMock.mock.calls[0]?.[0]).toBe(SESSION_ID)
+  expect(getSessionMatchPlansMock).toHaveBeenCalledTimes(1)
+  expect(getSessionMatchPlansMock.mock.calls[0]?.[0]).toBe(SESSION_ID)
 }
 
 describe('useLiveSessionData', () => {
@@ -103,7 +111,7 @@ describe('useLiveSessionData', () => {
     vi.resetAllMocks()
   })
 
-  it('starts the five root reads from the Session ID before venue data is available', async () => {
+  it('starts the six root reads from the Session ID before venue data is available', async () => {
     const input = arrangeSuccessfulReads()
     const sessionRead = deferred<typeof input.session>()
     getSessionMock.mockReturnValue(sessionRead.promise)
@@ -138,7 +146,7 @@ describe('useLiveSessionData', () => {
     queryClient.clear()
   })
 
-  it('performs exactly seven logical API reads for a normal ready load', async () => {
+  it('performs exactly eight logical API reads for a normal ready load', async () => {
     const input = arrangeSuccessfulReads()
     const { result, queryClient } = renderLiveSessionData()
 
@@ -152,7 +160,7 @@ describe('useLiveSessionData', () => {
     queryClient.clear()
   })
 
-  it('polls only the four runtime queries every five seconds', async () => {
+  it('polls only the five runtime queries every five seconds', async () => {
     arrangeSuccessfulReads()
     const { result, queryClient } = renderLiveSessionData()
 
@@ -172,6 +180,9 @@ describe('useLiveSessionData', () => {
       LIVE_SESSION_POLL_INTERVAL_MS,
     )
     expect(intervalFor(['sessionMatches', SESSION_ID])).toBe(
+      LIVE_SESSION_POLL_INTERVAL_MS,
+    )
+    expect(intervalFor(['sessionMatchPlans', SESSION_ID])).toBe(
       LIVE_SESSION_POLL_INTERVAL_MS,
     )
     expect(intervalFor(['players'])).toBeUndefined()
@@ -224,7 +235,7 @@ describe('useLiveSessionData', () => {
     queryClient.clear()
   })
 
-  it('re-reads all seven active queries after manual Refresh', async () => {
+  it('re-reads all eight active queries after manual Refresh', async () => {
     arrangeSuccessfulReads()
     const { result, queryClient } = renderLiveSessionData()
 
@@ -240,6 +251,7 @@ describe('useLiveSessionData', () => {
       expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
       expect(getPlayersMock).toHaveBeenCalledTimes(2)
       expect(getSessionMatchesMock).toHaveBeenCalledTimes(2)
+      expect(getSessionMatchPlansMock).toHaveBeenCalledTimes(2)
       expect(getVenueMock).toHaveBeenCalledTimes(2)
       expect(getVenueCourtsMock).toHaveBeenCalledTimes(2)
     })

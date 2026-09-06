@@ -38,10 +38,12 @@ import {
 import { LiveAddCourt, LiveAddPlayer } from './LiveSessionAdditions'
 import { filterParticipantsByName } from './peopleOperations'
 import type {
+  MatchPlanResponse,
   PlayerResponse,
   SessionParticipantResponse,
 } from '../../api/contracts'
 import { MatchmakingRecommendation } from './MatchmakingRecommendation'
+import { MatchPlanQueue } from './MatchPlanQueue'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -339,11 +341,15 @@ function CourtCard({
   sessionId,
   sessionStatus,
   participants,
+  courts,
+  matchPlans,
 }: {
   readonly court: CourtView
   readonly sessionId: string
   readonly sessionStatus: LiveSessionModel['header']['status']
   readonly participants: readonly ParticipantView[]
+  readonly courts: readonly CourtView[]
+  readonly matchPlans: readonly MatchPlanResponse[]
 }) {
   const actionState = useSessionCourtAction(sessionId, court.sessionCourtId)
   const action: SessionCourtAction | null = isSessionMutable(sessionStatus)
@@ -380,6 +386,14 @@ function CourtCard({
           participants={participants}
         />
       )}
+      <MatchPlanQueue
+        sessionId={sessionId}
+        sessionStatus={sessionStatus}
+        court={court}
+        courts={courts}
+        participants={participants}
+        matchPlans={matchPlans}
+      />
       {action && (
         <div className="action-area court-action-area">
           <button
@@ -440,6 +454,11 @@ function ParticipantRow({
             {participant.waitingDuration === null
               ? 'Chờ —'
               : `Chờ ${participant.waitingDuration}`}
+          </span>
+        )}
+        {participant.planningLabel && (
+          <span className="participant-planning-context">
+            {participant.planningLabel}
           </span>
         )}
         {actions.length > 0 && (
@@ -1278,6 +1297,8 @@ export function LiveSessionScreen({
                   ...model.playingParticipants,
                   ...model.leftParticipants,
                 ]}
+                courts={model.courts}
+                matchPlans={state.data.matchPlans}
               />
             ))}
           </div>

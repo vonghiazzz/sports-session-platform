@@ -46,7 +46,7 @@ export class HttpError extends Error {
 
 async function requestJson<T>(
   path: string,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'PUT',
   signal?: AbortSignal,
   body?: unknown,
 ): Promise<T> {
@@ -93,4 +93,12 @@ export function postJsonWithBody<TResponse, TBody>(
   signal?: AbortSignal,
 ): Promise<TResponse> {
   return requestJson(path, 'POST', signal, body)
+}
+
+export function putJsonWithBody<TResponse, TBody>(
+  path: string,
+  body: TBody,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  return requestJson(path, 'PUT', signal, body)
 }

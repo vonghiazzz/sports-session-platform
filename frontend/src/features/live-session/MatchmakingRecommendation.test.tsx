@@ -46,6 +46,8 @@ const participants: readonly ParticipantView[] = [
   waitingSince: '2026-09-02T09:30:00Z',
   waitingDuration,
   dataUnavailable: false,
+  plannedMatchCount: 0,
+  planningLabel: null,
 })) as readonly ParticipantView[]
 
 function recommendedPlayer(

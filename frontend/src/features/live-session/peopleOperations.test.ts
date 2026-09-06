@@ -15,6 +15,8 @@ function participant(displayName: string): ParticipantView {
     waitingSince: '2026-09-02T09:00:00Z',
     waitingDuration: '1 giờ',
     dataUnavailable: false,
+    plannedMatchCount: 0,
+    planningLabel: null,
   }
 }
 

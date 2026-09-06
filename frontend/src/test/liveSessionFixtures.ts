@@ -187,6 +187,7 @@ export function createLiveSessionInput(): LiveSessionModelInput {
       match('match-playing', 'session-court-1', 'PLAYING', playingAssignments),
       match('match-created', 'session-court-2', 'CREATED', createdAssignments),
     ],
+    matchPlans: [],
     now: new Date('2026-09-02T10:00:00Z'),
   }
 }

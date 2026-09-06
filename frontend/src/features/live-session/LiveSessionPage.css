@@ -406,6 +406,128 @@
   padding-top: 1rem;
 }
 
+.match-plan-queue {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.match-plan-queue-heading,
+.match-plan-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.match-plan-queue-heading h4,
+.match-plan-queue-heading p,
+.match-plan-summary p {
+  margin: 0;
+}
+
+.match-plan-queue-heading > span {
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  color: var(--muted-text);
+  background: #e9eeec;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.match-plan-empty,
+.match-plan-readiness,
+.match-plan-court-warning {
+  margin: 0.65rem 0;
+  color: var(--muted-text);
+  font-size: 0.76rem;
+}
+
+.match-plan-court-warning,
+.match-plan-readiness {
+  color: #8a2438;
+  font-weight: 750;
+}
+
+.match-plan-ready {
+  margin: 0.55rem 0 0;
+  color: #126451;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.match-plan-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.match-plan-card {
+  border: 1px solid #cad7d2;
+  border-radius: 0.65rem;
+  padding: 0.7rem;
+  background: #ffffff;
+}
+
+.match-plan-summary {
+  align-items: flex-start;
+}
+
+.match-plan-summary > strong {
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+}
+
+.match-plan-summary > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.match-plan-summary p {
+  overflow-wrap: anywhere;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.team-label {
+  color: var(--muted-text);
+  font-size: 0.65rem;
+}
+
+.match-plan-actions,
+.match-plan-team-fields {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.match-plan-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.65rem;
+}
+
+.match-plan-actions button {
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+}
+
+.match-plan-editor,
+.match-plan-move-form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.match-plan-create-button {
+  margin-top: 0.75rem;
+}
+
+.participant-planning-context {
+  color: #126451 !important;
+  font-weight: 750;
+}
+
 .recommendation-card {
   border: 1px solid #9ccfc1;
   border-radius: 0.75rem;

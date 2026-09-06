@@ -222,4 +222,64 @@ describe('composeLiveSessionModel', () => {
     )
     expect(model.warnings).toContain('Phân công đội của một trận đấu chưa đầy đủ.')
   })
+
+  it('derives a compact nearest-plan label for People operations', () => {
+    const input = createLiveSessionInput()
+    const matchPlan = {
+      id: 'plan-1',
+      sessionId: input.session.id,
+      sessionCourtId: 'session-court-2',
+      source: 'MANUAL' as const,
+      status: 'QUEUED' as const,
+      queuePosition: 1,
+      startedMatchId: null,
+      participants: [
+        { id: 'plan-player-1', sessionParticipantId: 'participant-1', teamSide: 'A' as const, teamSlot: 1 },
+      ],
+      createdAt: '2026-09-02T10:00:00Z',
+      startedAt: null,
+      cancelledAt: null,
+      updatedAt: '2026-09-02T10:00:00Z',
+      version: 0,
+    }
+    const model = composeLiveSessionModel({ ...input, matchPlans: [matchPlan] })
+
+    expect(model.waitingParticipants[0]?.planningLabel).toBe(
+      'Sắp chơi • Court Two • lượt 1',
+    )
+  })
+
+  it('aggregates multiple active plans without including cancelled history', () => {
+    const input = createLiveSessionInput()
+    const base = {
+      id: 'plan-1',
+      sessionId: input.session.id,
+      sessionCourtId: 'session-court-2',
+      source: 'MANUAL' as const,
+      status: 'QUEUED' as const,
+      queuePosition: 1,
+      startedMatchId: null,
+      participants: [
+        { id: 'plan-player-1', sessionParticipantId: 'participant-1', teamSide: 'A' as const, teamSlot: 1 },
+      ],
+      createdAt: '2026-09-02T10:00:00Z',
+      startedAt: null,
+      cancelledAt: null,
+      updatedAt: '2026-09-02T10:00:00Z',
+      version: 0,
+    }
+    const model = composeLiveSessionModel({
+      ...input,
+      matchPlans: [
+        base,
+        { ...base, id: 'plan-2', queuePosition: 2 },
+        { ...base, id: 'plan-3', status: 'CANCELLED', queuePosition: null },
+      ],
+    })
+
+    expect(model.waitingParticipants[0]?.plannedMatchCount).toBe(2)
+    expect(model.waitingParticipants[0]?.planningLabel).toBe(
+      'Đã xếp 2 trận sắp tới',
+    )
+  })
 })

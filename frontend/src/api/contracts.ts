@@ -21,6 +21,7 @@ export type SkillLevel =
 export type MatchStatus = 'CREATED' | 'PLAYING' | 'COMPLETED' | 'CANCELLED'
 export type MatchSource = 'MANUAL' | 'RECOMMENDATION' | 'MODIFIED_RECOMMENDATION'
 export type TeamSide = 'A' | 'B'
+export type MatchPlanStatus = 'QUEUED' | 'STARTED' | 'CANCELLED'
 
 export interface SessionResponse {
   readonly id: UUID
@@ -141,6 +142,52 @@ export interface MatchResponse {
   readonly cancelledAt: ISOInstant | null
   readonly updatedAt: ISOInstant
   readonly version: number
+}
+
+export interface MatchPlanParticipantResponse {
+  readonly id: UUID
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface MatchPlanParticipantRequest {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface MatchPlanResponse {
+  readonly id: UUID
+  readonly sessionId: UUID
+  readonly sessionCourtId: UUID
+  readonly source: MatchSource
+  readonly status: MatchPlanStatus
+  readonly queuePosition: number | null
+  readonly startedMatchId: UUID | null
+  readonly participants: readonly MatchPlanParticipantResponse[]
+  readonly createdAt: ISOInstant
+  readonly startedAt: ISOInstant | null
+  readonly cancelledAt: ISOInstant | null
+  readonly updatedAt: ISOInstant
+  readonly version: number
+}
+
+export interface SaveMatchPlanRequest {
+  readonly participants: readonly MatchPlanParticipantRequest[]
+}
+
+export interface MoveMatchPlanRequest {
+  readonly targetSessionCourtId: UUID
+}
+
+export interface ReorderMatchPlanRequest {
+  readonly targetPosition: number
+}
+
+export interface StartedMatchPlanResponse {
+  readonly matchPlan: MatchPlanResponse
+  readonly match: MatchResponse
 }
 
 export type MatchmakingGenerationOutcome = 'RECOMMENDED' | 'UNAVAILABLE'
