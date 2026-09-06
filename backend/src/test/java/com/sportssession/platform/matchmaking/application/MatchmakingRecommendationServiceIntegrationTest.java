@@ -195,26 +195,27 @@ class MatchmakingRecommendationServiceIntegrationTest
         assertThat(ratingEventRepository.count()).isZero();
     }
 
-    @Test
-    void unavailableCourtFailsWithoutAnyRuntimeOrRatingWrites() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(
+            value = SessionCourtStatus.class,
+            names = {"PLAYING", "UNAVAILABLE"}
+    )
+    void nonAvailableCourtStillGeneratesWithoutRuntimeOrRatingWrites(
+            SessionCourtStatus courtStatus
+    ) {
         RuntimeFixture fixture = createRuntimeFixture(
                 SessionStatus.IN_PROGRESS,
-                SessionCourtStatus.UNAVAILABLE,
+                courtStatus,
                 false
         );
         PersistedState before = persistedState(fixture);
 
-        assertThatThrownBy(() -> recommendationService.recommend(
+        MatchmakingResult result = recommendationService.recommend(
                 fixture.sessionId(),
                 fixture.sessionCourtId()
-        )).isInstanceOfSatisfying(
-                MatchmakingRecommendationException.class,
-                exception -> assertThat(exception.reason()).isEqualTo(
-                        MatchmakingRecommendationFailureReason
-                                .SESSION_COURT_NOT_AVAILABLE
-                )
         );
 
+        assertThat(result).isInstanceOf(MatchRecommendation.class);
         assertThat(persistedState(fixture)).isEqualTo(before);
         assertThat(matchRepository.count()).isZero();
         assertThat(playerRatingRepository.count()).isZero();

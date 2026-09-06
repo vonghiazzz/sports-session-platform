@@ -24,7 +24,7 @@ public record MatchPlanResponse(
         Instant updatedAt,
         long version
 ) {
-    static MatchPlanResponse from(MatchPlanDetails details) {
+    public static MatchPlanResponse from(MatchPlanDetails details) {
         MatchPlan plan = details.plan();
         return new MatchPlanResponse(
                 plan.id(), plan.sessionId(), plan.sessionCourtId(),

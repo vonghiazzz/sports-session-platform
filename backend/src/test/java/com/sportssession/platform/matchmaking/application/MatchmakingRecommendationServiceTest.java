@@ -120,20 +120,33 @@ class MatchmakingRecommendationServiceTest {
             value = SessionCourtStatus.class,
             names = {"PLAYING", "UNAVAILABLE"}
     )
-    void nonAvailableCourtFailsBeforeRatingAndEngine(
+    void recommendationSupportsFuturePlanningOnAnyCourtStatus(
             SessionCourtStatus status
     ) {
+        List<MatchmakingSessionParticipantSnapshot> participants =
+                waitingParticipants(4);
         stubSnapshot(snapshot(
                 SessionStatus.IN_PROGRESS,
                 status,
-                waitingParticipants(4)
+                participants
         ));
+        when(ratingReader.readEffectiveRatings(
+                participants.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList(),
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).thenReturn(ratingsFor(participants));
 
-        assertRecommendationFailure(
-                MatchmakingRecommendationFailureReason
-                        .SESSION_COURT_NOT_AVAILABLE
+        MatchmakingResult result = service.recommend(
+                SESSION_ID, SESSION_COURT_ID
         );
-        verifyNoInteractions(ratingReader, engine);
+
+        assertThat(result).isInstanceOf(MatchRecommendation.class);
+        verify(ratingReader, times(1)).readEffectiveRatings(
+                any(), any(), any()
+        );
+        verify(engine, times(1)).recommend(any(MatchmakingContext.class));
     }
 
     @Test

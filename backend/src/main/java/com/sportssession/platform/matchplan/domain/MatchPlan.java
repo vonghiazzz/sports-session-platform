@@ -49,6 +49,19 @@ public record MatchPlan(
         );
     }
 
+    public static MatchPlan queueRecommendation(
+            UUID sessionId,
+            UUID sessionCourtId,
+            int queuePosition,
+            Instant now
+    ) {
+        return new MatchPlan(
+                UUID.randomUUID(), sessionId, sessionCourtId,
+                MatchSource.RECOMMENDATION, MatchPlanStatus.QUEUED,
+                queuePosition, null, null, null, 0, now, now
+        );
+    }
+
     public MatchPlan move(UUID targetSessionCourtId, int targetPosition, Instant now) {
         requireQueued("move");
         return new MatchPlan(
@@ -59,8 +72,11 @@ public record MatchPlan(
 
     public MatchPlan edit(Instant now) {
         requireQueued("edit");
+        MatchSource editedSource = source == MatchSource.RECOMMENDATION
+                ? MatchSource.MODIFIED_RECOMMENDATION
+                : source;
         return new MatchPlan(
-                id, sessionId, sessionCourtId, source, status,
+                id, sessionId, sessionCourtId, editedSource, status,
                 queuePosition, null, null, null, version, createdAt, now
         );
     }

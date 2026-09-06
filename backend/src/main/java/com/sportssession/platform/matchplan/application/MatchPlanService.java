@@ -5,6 +5,7 @@ import com.sportssession.platform.match.application.ManualMatchParticipantAssign
 import com.sportssession.platform.match.application.MatchService;
 import com.sportssession.platform.match.application.StartedMatch;
 import com.sportssession.platform.match.domain.TeamSide;
+import com.sportssession.platform.match.domain.MatchSource;
 import com.sportssession.platform.matchplan.domain.InvalidMatchPlanRequestException;
 import com.sportssession.platform.matchplan.domain.MatchPlan;
 import com.sportssession.platform.matchplan.domain.MatchPlanConflictException;
@@ -64,23 +65,51 @@ public class MatchPlanService {
 
     @Transactional
     public MatchPlanDetails create(CreateMatchPlanCommand command) {
+        return create(
+                command.sessionId(), command.sessionCourtId(),
+                command.participants(), MatchSource.MANUAL
+        );
+    }
+
+    @Transactional
+    public MatchPlanDetails createRecommended(
+            CreateRecommendedMatchPlanCommand command
+    ) {
+        return create(
+                command.sessionId(), command.sessionCourtId(),
+                command.participants(), MatchSource.RECOMMENDATION
+        );
+    }
+
+    private MatchPlanDetails create(
+            UUID sessionId,
+            UUID sessionCourtId,
+            List<MatchPlanAssignment> requestedAssignments,
+            MatchSource source
+    ) {
         List<MatchPlanAssignment> assignments = validateStructure(
-                command.participants()
+                requestedAssignments
         );
         requireInProgress(sessionRuntimeLookup.requireSessionForUpdate(
-                command.sessionId()
+                sessionId
         ));
         sessionRuntimeLookup.requireScopedSessionCourtForUpdate(
-                command.sessionId(), command.sessionCourtId()
+                sessionId, sessionCourtId
         );
-        validatePlanningParticipants(command.sessionId(), assignments);
+        validatePlanningParticipants(
+                sessionId, assignments,
+                source == MatchSource.RECOMMENDATION
+        );
 
-        List<MatchPlanEntity> queue = queueForUpdate(command.sessionCourtId());
+        List<MatchPlanEntity> queue = queueForUpdate(sessionCourtId);
         Instant now = clock.instant();
-        MatchPlan plan = MatchPlan.queueManual(
-                command.sessionId(), command.sessionCourtId(),
-                queue.size() + 1, now
-        );
+        MatchPlan plan = source == MatchSource.RECOMMENDATION
+                ? MatchPlan.queueRecommendation(
+                        sessionId, sessionCourtId, queue.size() + 1, now
+                )
+                : MatchPlan.queueManual(
+                        sessionId, sessionCourtId, queue.size() + 1, now
+                );
         MatchPlanEntity entity = planRepository.saveAndFlush(
                 MatchPlanEntity.from(plan)
         );
@@ -112,7 +141,7 @@ public class MatchPlanService {
         requireInProgress(sessionRuntimeLookup.requireSessionForUpdate(
                 plan.sessionId()
         ));
-        validatePlanningParticipants(plan.sessionId(), assignments);
+        validatePlanningParticipants(plan.sessionId(), assignments, false);
 
         participantRepository.deleteAllByMatchPlanId(plan.id());
         participantRepository.flush();
@@ -280,7 +309,8 @@ public class MatchPlanService {
 
     private void validatePlanningParticipants(
             UUID sessionId,
-            List<MatchPlanAssignment> assignments
+            List<MatchPlanAssignment> assignments,
+            boolean requireWaiting
     ) {
         List<UUID> ids = assignments.stream()
                 .map(MatchPlanAssignment::sessionParticipantId)
@@ -298,6 +328,13 @@ public class MatchPlanService {
             if (participant.status() == ParticipantStatus.LEFT) {
                 throw new MatchPlanConflictException(
                         "LEFT Session Participant cannot be planned: "
+                                + participant.id()
+                );
+            }
+            if (requireWaiting
+                    && participant.status() != ParticipantStatus.WAITING) {
+                throw new MatchPlanConflictException(
+                        "Recommended MatchPlan Participant must be WAITING: "
                                 + participant.id()
                 );
             }

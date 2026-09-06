@@ -11,6 +11,13 @@ import com.sportssession.platform.match.domain.TeamSide;
 import com.sportssession.platform.match.infrastructure.MatchParticipantRepository;
 import com.sportssession.platform.match.infrastructure.MatchRepository;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
+import com.sportssession.platform.matchplan.application.CreateMatchPlanCommand;
+import com.sportssession.platform.matchplan.application.MatchPlanAssignment;
+import com.sportssession.platform.matchplan.application.MatchPlanService;
+import com.sportssession.platform.matchplan.application.UpdateMatchPlanCommand;
+import com.sportssession.platform.matchplan.domain.MatchPlanStatus;
+import com.sportssession.platform.matchplan.infrastructure.MatchPlanParticipantRepository;
+import com.sportssession.platform.matchplan.infrastructure.MatchPlanRepository;
 import com.sportssession.platform.player.domain.Player;
 import com.sportssession.platform.player.domain.PlayerSportProfile;
 import com.sportssession.platform.player.domain.SkillLevel;
@@ -46,6 +53,8 @@ import com.sportssession.platform.venue.infrastructure.VenueEntity;
 import com.sportssession.platform.venue.infrastructure.VenueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -83,6 +92,8 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
                     + "/match-recommendations";
     private static final String ACCEPT_ENDPOINT =
             GENERATE_ENDPOINT + "/accept";
+    private static final String QUEUE_ENDPOINT =
+            GENERATE_ENDPOINT + "/queue";
     private static final Instant BASE_TIME =
             Instant.parse("2026-08-28T09:00:00Z");
     private static final Instant OPERATION_TIME =
@@ -105,6 +116,15 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
 
     @Autowired
     private MatchParticipantRepository matchParticipantRepository;
+
+    @Autowired
+    private MatchPlanRepository matchPlanRepository;
+
+    @Autowired
+    private MatchPlanParticipantRepository matchPlanParticipantRepository;
+
+    @Autowired
+    private MatchPlanService matchPlanService;
 
     @Autowired
     private SessionRepository sessionRepository;
@@ -141,6 +161,8 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     void cleanDatabase() {
         ratingEventRepository.deleteAll();
         playerRatingRepository.deleteAll();
+        matchPlanParticipantRepository.deleteAll();
+        matchPlanRepository.deleteAll();
         matchParticipantRepository.deleteAll();
         matchRepository.deleteAll();
         sessionCourtRepository.deleteAll();
@@ -292,7 +314,7 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     }
 
     @Test
-    void generateAfterAcceptUsesCurrentPlayingCourtConflict()
+    void generateAfterAcceptSupportsPlanningOnCurrentPlayingCourt()
             throws Exception {
         RuntimeFixture fixture = createFixture(1, 4);
         JsonNode recommendation = generate(fixture, 0);
@@ -304,7 +326,8 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
                         fixture.sessionId(),
                         fixture.sessionCourtIds().getFirst()
                 ))
-                .andExpect(status().isConflict());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome").value("UNAVAILABLE"));
     }
 
     @Test
@@ -343,6 +366,158 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
                 0,
                 participantFixture.participantIds()
         ));
+    }
+
+    @ParameterizedTest
+    @EnumSource(SessionCourtStatus.class)
+    void recommendationCanBeQueuedOnAnyCourtStateWithoutReservingResources(
+            SessionCourtStatus courtStatus
+    ) throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        setCourtStatus(fixture, 0, courtStatus);
+        JsonNode recommendation = generate(fixture, 0);
+
+        MvcResult queued = queue(fixture, 0, acceptBody(recommendation))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.source").value("RECOMMENDATION"))
+                .andExpect(jsonPath("$.status").value("QUEUED"))
+                .andExpect(jsonPath("$.queuePosition").value(1))
+                .andExpect(jsonPath("$.startedMatchId").isEmpty())
+                .andExpect(jsonPath("$.participants.length()").value(4))
+                .andReturn();
+
+        UUID planId = UUID.fromString(objectMapper.readTree(
+                queued.getResponse().getContentAsString()
+        ).get("id").asText());
+        assertThat(matchPlanRepository.findById(planId).orElseThrow()
+                .toDomain().source()).isEqualTo(MatchSource.RECOMMENDATION);
+        assertThat(matchPlanRepository.findById(planId).orElseThrow()
+                .getStatus()).isEqualTo(MatchPlanStatus.QUEUED);
+        assertThat(matchPlanParticipantRepository.count()).isEqualTo(4);
+        assertThat(matchRepository.count()).isZero();
+        assertThat(matchParticipantRepository.count()).isZero();
+        assertThat(sessionCourt(fixture, 0).getStatus()).isEqualTo(courtStatus);
+        assertThat(fixture.participantIds()).allSatisfy(participantId ->
+                assertThat(participantRepository.findById(participantId)
+                        .orElseThrow().getStatus())
+                        .isEqualTo(ParticipantStatus.WAITING));
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = SessionCourtStatus.class,
+            names = {"PLAYING", "UNAVAILABLE"}
+    )
+    void immediateAcceptStillRejectsNonAvailableCourt(
+            SessionCourtStatus courtStatus
+    ) throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        setCourtStatus(fixture, 0, courtStatus);
+        JsonNode recommendation = generate(fixture, 0);
+
+        accept(fixture, 0, acceptBody(recommendation))
+                .andExpect(status().isConflict());
+
+        assertNoAcceptedWrites();
+        assertThat(matchPlanRepository.count()).isZero();
+        assertThat(sessionCourt(fixture, 0).getStatus()).isEqualTo(courtStatus);
+    }
+
+    @Test
+    void staleOrMalformedRecommendationCannotEnterQueue() throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        JsonNode recommendation = generate(fixture, 0);
+        SessionParticipantEntity participant = participantRepository.findById(
+                fixture.participantIds().getFirst()
+        ).orElseThrow();
+        participant.applyRuntimeState(
+                participant.toDomain().pause(OPERATION_TIME)
+        );
+        participantRepository.saveAndFlush(participant);
+
+        queue(fixture, 0, acceptBody(recommendation))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Submitted recommendation is stale"));
+        assertThat(matchPlanRepository.count()).isZero();
+
+        List<Map<String, Object>> duplicateAssignments = new ArrayList<>(
+                assignments(recommendation)
+        );
+        duplicateAssignments.set(1, duplicateAssignments.getFirst());
+        queue(fixture, 0, Map.of(
+                "algorithmVersion", MatchmakingEngine.ALGORITHM_VERSION,
+                "assignments", duplicateAssignments
+        )).andExpect(status().isBadRequest());
+        assertThat(matchPlanRepository.count()).isZero();
+    }
+
+    @Test
+    void recommendationAppendsBehindManualPlanUsingSharedQueueLogic()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        matchPlanService.create(new CreateMatchPlanCommand(
+                fixture.sessionId(), fixture.sessionCourtIds().getFirst(),
+                planAssignments(fixture.participantIds())
+        ));
+        JsonNode recommendation = generate(fixture, 0);
+
+        queue(fixture, 0, acceptBody(recommendation))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.source").value("RECOMMENDATION"))
+                .andExpect(jsonPath("$.queuePosition").value(2));
+
+        assertThat(matchPlanRepository.findAll())
+                .extracting(entity -> entity.toDomain().source())
+                .containsExactlyInAnyOrder(
+                        MatchSource.MANUAL,
+                        MatchSource.RECOMMENDATION
+                );
+    }
+
+    @Test
+    void queuedRecommendationStartPreservesRecommendationSource()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        JsonNode recommendation = generate(fixture, 0);
+        MvcResult queued = queue(
+                fixture, 0, acceptBody(recommendation)
+        ).andExpect(status().isCreated()).andReturn();
+        UUID planId = UUID.fromString(objectMapper.readTree(
+                queued.getResponse().getContentAsString()
+        ).get("id").asText());
+
+        mockMvc.perform(post("/api/match-plans/{planId}/start", planId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matchPlan.status").value("STARTED"))
+                .andExpect(jsonPath("$.match.source")
+                        .value("RECOMMENDATION"));
+    }
+
+    @Test
+    void editingQueuedRecommendationPersistsModifiedSourceThroughStart()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        JsonNode recommendation = generate(fixture, 0);
+        MvcResult queued = queue(
+                fixture, 0, acceptBody(recommendation)
+        ).andExpect(status().isCreated()).andReturn();
+        UUID planId = UUID.fromString(objectMapper.readTree(
+                queued.getResponse().getContentAsString()
+        ).get("id").asText());
+
+        var updated = matchPlanService.update(new UpdateMatchPlanCommand(
+                planId, planAssignments(fixture.participantIds())
+        ));
+        assertThat(updated.plan().source())
+                .isEqualTo(MatchSource.MODIFIED_RECOMMENDATION);
+
+        mockMvc.perform(post("/api/match-plans/{planId}/start", planId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matchPlan.source")
+                        .value("MODIFIED_RECOMMENDATION"))
+                .andExpect(jsonPath("$.match.source")
+                        .value("MODIFIED_RECOMMENDATION"));
     }
 
     @Test
@@ -621,6 +796,20 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
                 .content(objectMapper.writeValueAsString(body)));
     }
 
+    private org.springframework.test.web.servlet.ResultActions queue(
+            RuntimeFixture fixture,
+            int courtIndex,
+            Object body
+    ) throws Exception {
+        return mockMvc.perform(post(
+                        QUEUE_ENDPOINT,
+                        fixture.sessionId(),
+                        fixture.sessionCourtIds().get(courtIndex)
+                )
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)));
+    }
+
     private Map<String, Object> acceptBody(JsonNode recommendation) {
         return Map.of(
                 "algorithmVersion",
@@ -688,6 +877,17 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
         );
     }
 
+    private List<MatchPlanAssignment> planAssignments(
+            List<UUID> participantIds
+    ) {
+        return List.of(
+                new MatchPlanAssignment(participantIds.get(0), TeamSide.A, 1),
+                new MatchPlanAssignment(participantIds.get(1), TeamSide.A, 2),
+                new MatchPlanAssignment(participantIds.get(2), TeamSide.B, 1),
+                new MatchPlanAssignment(participantIds.get(3), TeamSide.B, 2)
+        );
+    }
+
     private void createEqualPersistedRating(UUID playerId) {
         playerRatingRepository.saveAndFlush(PlayerRatingEntity.initialize(
                 playerId,
@@ -707,6 +907,22 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
         return sessionCourtRepository.findById(
                 fixture.sessionCourtIds().get(courtIndex)
         ).orElseThrow();
+    }
+
+    private void setCourtStatus(
+            RuntimeFixture fixture,
+            int courtIndex,
+            SessionCourtStatus status
+    ) {
+        if (status == SessionCourtStatus.AVAILABLE) {
+            return;
+        }
+        SessionCourtEntity entity = sessionCourt(fixture, courtIndex);
+        SessionCourt changed = status == SessionCourtStatus.PLAYING
+                ? entity.toDomain().startMatch(OPERATION_TIME)
+                : entity.toDomain().disable(OPERATION_TIME);
+        entity.applyRuntimeState(changed);
+        sessionCourtRepository.saveAndFlush(entity);
     }
 
     private void completeSession(UUID sessionId) {

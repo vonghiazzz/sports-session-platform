@@ -6,7 +6,6 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingContext;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
 import com.sportssession.platform.session.domain.ParticipantStatus;
-import com.sportssession.platform.session.domain.SessionCourtStatus;
 import com.sportssession.platform.session.domain.SessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -100,14 +99,6 @@ public class MatchmakingRecommendationService {
                             .SESSION_NOT_IN_PROGRESS,
                     "Matchmaking requires an IN_PROGRESS Session: "
                             + snapshot.sessionId()
-            );
-        }
-        if (snapshot.sessionCourtStatus() != SessionCourtStatus.AVAILABLE) {
-            throw new MatchmakingRecommendationException(
-                    MatchmakingRecommendationFailureReason
-                            .SESSION_COURT_NOT_AVAILABLE,
-                    "Matchmaking requires an AVAILABLE SessionCourt: "
-                            + snapshot.sessionCourtId()
             );
         }
     }

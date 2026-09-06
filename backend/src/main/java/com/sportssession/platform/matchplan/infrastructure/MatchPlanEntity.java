@@ -80,6 +80,7 @@ public class MatchPlanEntity {
     }
 
     public void apply(MatchPlan plan) {
+        this.source = plan.source();
         this.sessionCourtId = plan.sessionCourtId();
         this.status = plan.status();
         this.queuePosition = plan.queuePosition();

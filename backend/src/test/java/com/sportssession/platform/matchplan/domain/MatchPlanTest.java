@@ -49,4 +49,25 @@ class MatchPlanTest {
         assertThatThrownBy(() -> started.reorder(2, now.plusSeconds(2)))
                 .isInstanceOf(MatchPlanConflictException.class);
     }
+
+    @Test
+    void recommendationSourceChangesOnlyWhenCompositionIsEdited() {
+        Instant now = Instant.parse("2026-09-06T01:00:00Z");
+        MatchPlan recommendation = MatchPlan.queueRecommendation(
+                UUID.randomUUID(), UUID.randomUUID(), 1, now
+        );
+
+        assertThat(recommendation.source())
+                .isEqualTo(MatchSource.RECOMMENDATION);
+        assertThat(recommendation.edit(now.plusSeconds(1)).source())
+                .isEqualTo(MatchSource.MODIFIED_RECOMMENDATION);
+        assertThat(recommendation.move(
+                UUID.randomUUID(), 1, now.plusSeconds(1)
+        ).source()).isEqualTo(MatchSource.RECOMMENDATION);
+        assertThat(recommendation.reorder(1, now.plusSeconds(1)).source())
+                .isEqualTo(MatchSource.RECOMMENDATION);
+        assertThat(MatchPlan.queueManual(
+                UUID.randomUUID(), UUID.randomUUID(), 1, now
+        ).edit(now.plusSeconds(1)).source()).isEqualTo(MatchSource.MANUAL);
+    }
 }
