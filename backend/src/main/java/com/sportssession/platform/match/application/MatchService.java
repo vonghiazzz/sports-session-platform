@@ -169,23 +169,60 @@ public class MatchService {
                 "A Recommended Match requires exactly 4 participant assignments"
         );
 
+        return createAndStartNewMatch(
+                command.sessionId(),
+                command.sessionCourtId(),
+                MatchSource.RECOMMENDATION,
+                assignments,
+                "Recommended Match"
+        );
+    }
+
+    @Transactional
+    public StartedMatch createAndStartPlannedMatch(
+            CreateAndStartPlannedMatchCommand command
+    ) {
+        List<ValidatedAssignment> assignments = validateStructure(
+                command.participants().stream()
+                        .map(this::validatedAssignment)
+                        .toList(),
+                "A MatchPlan requires exactly 4 participant assignments"
+        );
+
+        return createAndStartNewMatch(
+                command.sessionId(),
+                command.sessionCourtId(),
+                command.source(),
+                assignments,
+                "MatchPlan"
+        );
+    }
+
+    private StartedMatch createAndStartNewMatch(
+            UUID sessionId,
+            UUID sessionCourtId,
+            MatchSource source,
+            List<ValidatedAssignment> assignments,
+            String operationName
+    ) {
+
         Session session = sessionRuntimeLookup.requireSessionForUpdate(
-                command.sessionId()
+                sessionId
         );
         if (session.status() != SessionStatus.IN_PROGRESS) {
             throw new MatchResourceConflictException(
-                    "Recommended Match can Start only while Session is IN_PROGRESS"
+                    operationName + " can Start only while Session is IN_PROGRESS"
             );
         }
 
         SessionCourt sessionCourt = sessionRuntimeLookup
                 .requireScopedSessionCourtForUpdate(
-                        command.sessionId(),
-                        command.sessionCourtId()
+                        sessionId,
+                        sessionCourtId
                 );
         if (sessionCourt.status() != SessionCourtStatus.AVAILABLE) {
             throw new MatchResourceConflictException(
-                    "Session Court must be AVAILABLE to Start Recommended Match"
+                    "Session Court must be AVAILABLE to Start " + operationName
             );
         }
 
@@ -195,7 +232,7 @@ public class MatchService {
                 .toList();
         List<SessionParticipant> participants = sessionRuntimeLookup
                 .requireSessionParticipantsForUpdate(
-                        command.sessionId(),
+                        sessionId,
                         participantIds
                 );
         Set<UUID> selectedParticipantIds = new HashSet<>(participantIds);
@@ -205,11 +242,11 @@ public class MatchService {
         if (participants.size() != 4
                 || !lockedParticipantIds.equals(selectedParticipantIds)) {
             throw new MatchResourceConflictException(
-                    "Recommended Match Participants could not be locked exactly"
+                    operationName + " Participants could not be locked exactly"
             );
         }
         for (SessionParticipant participant : participants) {
-            if (!participant.sessionId().equals(command.sessionId())) {
+            if (!participant.sessionId().equals(sessionId)) {
                 throw new MatchResourceConflictException(
                         "Session Participant belongs to a different Session: "
                                 + participant.id()
@@ -217,7 +254,8 @@ public class MatchService {
             }
             if (participant.status() != ParticipantStatus.WAITING) {
                 throw new MatchResourceConflictException(
-                        "Session Participant must be WAITING to Start Recommended Match: "
+                        "Session Participant must be WAITING to Start "
+                                + operationName + ": "
                                 + participant.id()
                 );
             }
@@ -225,9 +263,9 @@ public class MatchService {
 
         Instant startTime = clock.instant();
         Match startedMatch = Match.create(
-                command.sessionId(),
-                command.sessionCourtId(),
-                MatchSource.RECOMMENDATION,
+                sessionId,
+                sessionCourtId,
+                source,
                 startTime
         ).start(startTime);
         SessionCourt playingCourt = sessionCourt.startMatch(startTime);

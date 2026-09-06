@@ -14,7 +14,7 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesRuntimeTablesThroughRatingFoundation() {
+    void flywayCreatesRuntimeTablesThroughMatchPlanFoundation() {
         String serverVersion = jdbcTemplate.queryForObject(
                 "SHOW server_version", String.class);
         assertThat(serverVersion).startsWith("18.4");
@@ -38,7 +38,9 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 "matches",
                 "match_participants",
                 "player_ratings",
-                "rating_events");
+                "rating_events",
+                "match_plans",
+                "match_plan_participants");
         assertThat(tables).doesNotContain(
                 "match_results",
                 "ratings",
@@ -75,6 +77,42 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 WHERE version = '4' AND success = true
                 """, Integer.class);
         assertThat(ratingMigrationCount).isEqualTo(1);
+
+        Integer matchPlanMigrationCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE version = '5' AND success = true
+                """, Integer.class);
+        assertThat(matchPlanMigrationCount).isEqualTo(1);
+
+        List<String> matchPlanConstraints = jdbcTemplate.queryForList("""
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = 'public'
+                  AND table_name IN ('match_plans', 'match_plan_participants')
+                ORDER BY constraint_name
+                """, String.class);
+        assertThat(matchPlanConstraints).contains(
+                "fk_match_plans_session",
+                "fk_match_plans_session_court",
+                "fk_match_plans_started_match",
+                "uk_match_plans_started_match",
+                "chk_match_plans_state_consistency",
+                "fk_match_plan_participants_plan_session",
+                "fk_match_plan_participants_participant_session",
+                "uk_match_plan_participants_plan_participant",
+                "uk_match_plan_participants_plan_team_slot");
+
+        Integer queuedPositionIndexCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND indexname = 'uk_match_plans_queued_court_position'
+                  AND indexdef ILIKE '%UNIQUE INDEX%'
+                  AND indexdef ILIKE '%WHERE%'
+                  AND indexdef ILIKE '%QUEUED%'
+                """, Integer.class);
+        assertThat(queuedPositionIndexCount).isEqualTo(1);
 
         List<String> ratingConstraints = jdbcTemplate.queryForList("""
                 SELECT constraint_name

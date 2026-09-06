@@ -7,6 +7,9 @@ import com.sportssession.platform.match.domain.InvalidMatchResultException;
 import com.sportssession.platform.match.domain.InvalidMatchStateException;
 import com.sportssession.platform.match.domain.MatchNotFoundException;
 import com.sportssession.platform.match.domain.MatchResourceConflictException;
+import com.sportssession.platform.matchplan.domain.InvalidMatchPlanRequestException;
+import com.sportssession.platform.matchplan.domain.MatchPlanConflictException;
+import com.sportssession.platform.matchplan.domain.MatchPlanNotFoundException;
 import com.sportssession.platform.matchmaking.application.MatchmakingRatingResolutionException;
 import com.sportssession.platform.matchmaking.application.InvalidRecommendationAcceptanceRequestException;
 import com.sportssession.platform.matchmaking.application.MatchmakingRecommendationAcceptanceException;
@@ -87,6 +90,14 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(MatchPlanNotFoundException.class)
+    ResponseEntity<ApiError> handleMatchPlanNotFound(
+            MatchPlanNotFoundException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(InvalidSessionTimeRangeException.class)
     ResponseEntity<ApiError> handleInvalidSessionTimeRange(
             InvalidSessionTimeRangeException exception,
@@ -98,6 +109,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidManualMatchRequestException.class)
     ResponseEntity<ApiError> handleInvalidManualMatchRequest(
             InvalidManualMatchRequestException exception,
+            HttpServletRequest request
+    ) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidMatchPlanRequestException.class)
+    ResponseEntity<ApiError> handleInvalidMatchPlanRequest(
+            InvalidMatchPlanRequestException exception,
             HttpServletRequest request
     ) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
@@ -185,6 +204,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             MatchResourceConflictException.class,
+            MatchPlanConflictException.class,
             InvalidMatchStateException.class,
             PessimisticLockingFailureException.class
     })
