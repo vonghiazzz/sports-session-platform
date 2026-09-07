@@ -38,4 +38,32 @@ public interface MatchPlanRepository
     findAllBySessionIdOrderBySessionCourtIdAscQueuePositionAscCreatedAtAscIdAsc(
             UUID sessionId
     );
+
+        @Query("""
+            select distinct participant.sessionParticipantId
+            from MatchPlanParticipantEntity participant, MatchPlanEntity plan
+            where participant.matchPlanId = plan.id
+              and participant.sessionId = :sessionId
+              and plan.sessionId = :sessionId
+              and plan.status = :status
+            """)
+    List<UUID> findParticipantIdsBySessionAndStatus(
+            @Param("sessionId") UUID sessionId,
+            @Param("status") MatchPlanStatus status
+    );
+
+    @Query("""
+            select distinct participant.sessionParticipantId
+            from MatchPlanParticipantEntity participant, MatchPlanEntity plan
+            where participant.matchPlanId = plan.id
+              and participant.sessionId = :sessionId
+              and plan.sessionId = :sessionId
+              and plan.status = :status
+              and plan.id <> :excludedPlanId
+            """)
+    List<UUID> findParticipantIdsBySessionAndStatusExcludingPlan(
+            @Param("sessionId") UUID sessionId,
+            @Param("status") MatchPlanStatus status,
+            @Param("excludedPlanId") UUID excludedPlanId
+    );
 }

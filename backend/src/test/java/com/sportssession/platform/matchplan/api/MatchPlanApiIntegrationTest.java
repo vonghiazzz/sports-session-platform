@@ -109,29 +109,63 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
     @Test
     void createAllowsAllPlanningStatusesAndDoesNotReserveResources() {
         Fixture fixture = fixture(
-                List.of(SessionCourtStatus.AVAILABLE,
+                List.of(
+                        SessionCourtStatus.AVAILABLE,
                         SessionCourtStatus.PLAYING,
-                        SessionCourtStatus.UNAVAILABLE),
-                List.of(ParticipantStatus.REGISTERED, ParticipantStatus.WAITING,
-                        ParticipantStatus.PLAYING, ParticipantStatus.PAUSED)
-        );
-        List<ParticipantStatus> beforeParticipants = participantStatuses(
-                fixture.participantIds()
-        );
-        List<SessionCourtStatus> beforeCourts = courtStatuses(fixture.courtIds());
+                        SessionCourtStatus.UNAVAILABLE
+                ),
+                List.of(
+                        ParticipantStatus.REGISTERED,
+                        ParticipantStatus.WAITING,
+                        ParticipantStatus.PLAYING,
+                        ParticipantStatus.PAUSED,
 
-        for (UUID courtId : fixture.courtIds()) {
+                        ParticipantStatus.REGISTERED,
+                        ParticipantStatus.WAITING,
+                        ParticipantStatus.PLAYING,
+                        ParticipantStatus.PAUSED,
+
+                        ParticipantStatus.REGISTERED,
+                        ParticipantStatus.WAITING,
+                        ParticipantStatus.PLAYING,
+                        ParticipantStatus.PAUSED
+                )
+        );
+
+        List<ParticipantStatus> beforeParticipants =
+                participantStatuses(fixture.participantIds());
+
+        List<SessionCourtStatus> beforeCourts =
+                courtStatuses(fixture.courtIds());
+
+        for (int courtIndex = 0; courtIndex < fixture.courtIds().size(); courtIndex++) {
+            int participantStart = courtIndex * 4;
+
             MatchPlanDetails plan = create(
-                    fixture.sessionId(), courtId, fixture.participantIds()
+                    fixture.sessionId(),
+                    fixture.courtIds().get(courtIndex),
+                    fixture.participantIds().subList(
+                            participantStart,
+                            participantStart + 4
+                    )
             );
-            assertThat(plan.plan().status()).isEqualTo(MatchPlanStatus.QUEUED);
-            assertThat(plan.plan().source()).isEqualTo(MatchSource.MANUAL);
-            assertThat(plan.plan().queuePosition()).isEqualTo(1);
+
+            assertThat(plan.plan().status())
+                    .isEqualTo(MatchPlanStatus.QUEUED);
+
+            assertThat(plan.plan().source())
+                    .isEqualTo(MatchSource.MANUAL);
+
+            assertThat(plan.plan().queuePosition())
+                    .isEqualTo(1);
         }
 
         assertThat(participantStatuses(fixture.participantIds()))
                 .isEqualTo(beforeParticipants);
-        assertThat(courtStatuses(fixture.courtIds())).isEqualTo(beforeCourts);
+
+        assertThat(courtStatuses(fixture.courtIds()))
+                .isEqualTo(beforeCourts);
+
         assertThat(matchRepository.count()).isZero();
     }
 
@@ -158,39 +192,138 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
     }
 
     @Test
-    void queuesAppendPerCourtAndPlayerMayAppearInSeveralPlans() {
-        Fixture fixture = waitingFixture(2, 4);
-        MatchPlanDetails first = create(fixture, 0, fixture.participantIds());
-        MatchPlanDetails second = create(fixture, 0, fixture.participantIds());
-        MatchPlanDetails otherCourt = create(fixture, 1, fixture.participantIds());
+    void queuesAppendPerCourtAndQueuedParticipantCannotAppearInAnotherPlan() {
+        Fixture fixture = waitingFixture(2, 12);
+
+        MatchPlanDetails first = create(
+                fixture, 0, fixture.participantIds().subList(0, 4)
+        );
+        MatchPlanDetails second = create(
+                fixture, 0, fixture.participantIds().subList(4, 8)
+        );
+        MatchPlanDetails otherCourt = create(
+                fixture, 1, fixture.participantIds().subList(8, 12)
+        );
 
         assertThat(first.plan().queuePosition()).isEqualTo(1);
         assertThat(second.plan().queuePosition()).isEqualTo(2);
         assertThat(otherCourt.plan().queuePosition()).isEqualTo(1);
+
+        assertThatThrownBy(() -> create(
+                fixture,
+                0,
+                fixture.participantIds().subList(0, 4)
+        )).isInstanceOf(MatchPlanConflictException.class);
+
+        assertThatThrownBy(() -> create(
+                fixture,
+                1,
+                fixture.participantIds().subList(0, 4)
+        )).isInstanceOf(MatchPlanConflictException.class);
+
         assertThat(service.list(fixture.sessionId())).hasSize(3);
     }
 
     @Test
-    void queuedPlanCanReplaceCompleteCompositionWithoutMoving() {
+    void queuedPlanCanReplaceCompositionWithoutConflictingWithItself() {
         Fixture fixture = waitingFixture(1, 8);
+
         MatchPlanDetails plan = create(
                 fixture, 0, fixture.participantIds().subList(0, 4)
         );
-        MatchPlanDetails updated = service.update(new UpdateMatchPlanCommand(
-                plan.plan().id(), assignments(
-                        fixture.participantIds().subList(4, 8)
+
+        List<UUID> replacement = List.of(
+                fixture.participantIds().get(0),
+                fixture.participantIds().get(1),
+                fixture.participantIds().get(4),
+                fixture.participantIds().get(5)
+        );
+
+        MatchPlanDetails updated = service.update(
+                new UpdateMatchPlanCommand(
+                        plan.plan().id(),
+                        assignments(replacement)
                 )
-        ));
+        );
 
         assertThat(updated.plan().queuePosition()).isEqualTo(1);
         assertThat(updated.participants())
-                .extracting(participant -> participant.sessionParticipantId())
-                .containsExactlyElementsOf(fixture.participantIds().subList(4, 8));
+                .extracting(participant ->
+                        participant.sessionParticipantId())
+                .containsExactlyElementsOf(replacement);
 
         service.cancel(plan.plan().id());
-        assertThatThrownBy(() -> service.update(new UpdateMatchPlanCommand(
-                plan.plan().id(), assignments(fixture.participantIds().subList(0, 4))
-        ))).isInstanceOf(MatchPlanConflictException.class);
+
+        assertThatThrownBy(() -> service.update(
+                new UpdateMatchPlanCommand(
+                        plan.plan().id(),
+                        assignments(fixture.participantIds().subList(0, 4))
+                )
+        )).isInstanceOf(MatchPlanConflictException.class);
+    }
+
+    @Test
+    void queuedPlanEditRejectsParticipantOwnedByAnotherQueuedPlan() {
+        Fixture fixture = waitingFixture(1, 12);
+
+        MatchPlanDetails first = create(
+                fixture, 0, fixture.participantIds().subList(0, 4)
+        );
+
+        MatchPlanDetails second = create(
+                fixture, 0, fixture.participantIds().subList(4, 8)
+        );
+
+        List<UUID> invalidReplacement = List.of(
+                fixture.participantIds().get(8),
+                fixture.participantIds().get(9),
+                fixture.participantIds().get(10),
+                fixture.participantIds().get(4)
+        );
+
+        assertThatThrownBy(() -> service.update(
+                new UpdateMatchPlanCommand(
+                        first.plan().id(),
+                        assignments(invalidReplacement)
+                )
+        )).isInstanceOf(MatchPlanConflictException.class);
+
+        MatchPlanDetails persistedFirst = service.list(fixture.sessionId())
+                .stream()
+                .filter(details ->
+                        details.plan().id().equals(first.plan().id()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(persistedFirst.participants())
+                .extracting(participant ->
+                        participant.sessionParticipantId())
+                .containsExactlyElementsOf(
+                        fixture.participantIds().subList(0, 4)
+                );
+
+        assertThat(second.plan().queuePosition()).isEqualTo(2);
+    }
+
+    @Test
+    void cancelledPlanReleasesParticipantsForFutureQueueing() {
+        Fixture fixture = waitingFixture(2, 4);
+
+        MatchPlanDetails first = create(
+                fixture, 0, fixture.participantIds()
+        );
+
+        service.cancel(first.plan().id());
+
+        MatchPlanDetails second = create(
+                fixture, 1, fixture.participantIds()
+        );
+
+        assertThat(second.plan().queuePosition()).isEqualTo(1);
+        assertThat(second.participants())
+                .extracting(participant ->
+                        participant.sessionParticipantId())
+                .containsExactlyElementsOf(fixture.participantIds());
     }
 
     @Test
@@ -198,7 +331,7 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
         Fixture fixture = fixture(
                 List.of(SessionCourtStatus.AVAILABLE,
                         SessionCourtStatus.UNAVAILABLE),
-                waitingStatuses(8)
+                waitingStatuses(12)
         );
         MatchPlanDetails first = create(
                 fixture, 0, fixture.participantIds().subList(0, 4)
@@ -207,7 +340,7 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
                 fixture, 0, fixture.participantIds().subList(4, 8)
         );
         MatchPlanDetails destination = create(
-                fixture, 1, fixture.participantIds().subList(0, 4)
+                fixture, 1, fixture.participantIds().subList(8, 12)
         );
 
         MatchPlanDetails result = service.move(
@@ -222,17 +355,28 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
 
     @Test
     void reorderMaintainsCompactDeterministicPositions() {
-        Fixture fixture = waitingFixture(1, 4);
-        MatchPlanDetails one = create(fixture, 0, fixture.participantIds());
-        MatchPlanDetails two = create(fixture, 0, fixture.participantIds());
-        MatchPlanDetails three = create(fixture, 0, fixture.participantIds());
+        Fixture fixture = waitingFixture(1, 12);
+
+        MatchPlanDetails one = create(
+                fixture, 0, fixture.participantIds().subList(0, 4)
+        );
+
+        MatchPlanDetails two = create(
+                fixture, 0, fixture.participantIds().subList(4, 8)
+        );
+
+        MatchPlanDetails three = create(
+                fixture, 0, fixture.participantIds().subList(8, 12)
+        );
 
         service.reorder(three.plan().id(), 1);
+
         assertThat(plan(three).queuePosition()).isEqualTo(1);
         assertThat(plan(one).queuePosition()).isEqualTo(2);
         assertThat(plan(two).queuePosition()).isEqualTo(3);
 
         service.reorder(three.plan().id(), 3);
+
         assertThat(plan(one).queuePosition()).isEqualTo(1);
         assertThat(plan(two).queuePosition()).isEqualTo(2);
         assertThat(plan(three).queuePosition()).isEqualTo(3);
@@ -240,17 +384,34 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
 
     @Test
     void cancelCompactsQueueWithoutMutatingRuntimeResources() {
-        Fixture fixture = waitingFixture(1, 4);
-        MatchPlanDetails first = create(fixture, 0, fixture.participantIds());
-        MatchPlanDetails second = create(fixture, 0, fixture.participantIds());
+        Fixture fixture = waitingFixture(1, 8);
 
-        MatchPlanDetails cancelled = service.cancel(first.plan().id());
+        MatchPlanDetails first = create(
+                fixture, 0, fixture.participantIds().subList(0, 4)
+        );
 
-        assertThat(cancelled.plan().status()).isEqualTo(MatchPlanStatus.CANCELLED);
-        assertThat(cancelled.plan().queuePosition()).isNull();
-        assertThat(plan(second).queuePosition()).isEqualTo(1);
-        assertResources(fixture, SessionCourtStatus.AVAILABLE,
-                ParticipantStatus.WAITING);
+        MatchPlanDetails second = create(
+                fixture, 0, fixture.participantIds().subList(4, 8)
+        );
+
+        MatchPlanDetails cancelled =
+                service.cancel(first.plan().id());
+
+        assertThat(cancelled.plan().status())
+                .isEqualTo(MatchPlanStatus.CANCELLED);
+
+        assertThat(cancelled.plan().queuePosition())
+                .isNull();
+
+        assertThat(plan(second).queuePosition())
+                .isEqualTo(1);
+
+        assertResources(
+                fixture,
+                SessionCourtStatus.AVAILABLE,
+                ParticipantStatus.WAITING
+        );
+
         assertThat(matchRepository.count()).isZero();
     }
 

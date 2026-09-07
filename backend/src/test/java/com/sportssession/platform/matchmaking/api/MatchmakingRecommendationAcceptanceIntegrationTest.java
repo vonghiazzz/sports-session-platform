@@ -453,19 +453,101 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     }
 
     @Test
+    void queuedParticipantMakesPreviouslyDisplayedRecommendationStale()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(1, 8);
+
+        // Host nhìn thấy recommendation tại thời điểm T1.
+        JsonNode displayedRecommendation = generate(fixture, 0);
+        Map<String, Object> displayedBody =
+                acceptBody(displayedRecommendation);
+
+        List<UUID> displayedParticipantIds =
+                assignments(displayedRecommendation).stream()
+                        .map(assignment -> UUID.fromString(
+                                assignment.get("sessionParticipantId").toString()
+                        ))
+                        .toList();
+
+        assertThat(displayedParticipantIds).hasSize(4);
+
+        // Tìm ba người không thuộc recommendation đang hiển thị.
+        List<UUID> otherParticipantIds =
+                fixture.participantIds().stream()
+                        .filter(participantId ->
+                                !displayedParticipantIds.contains(participantId))
+                        .limit(3)
+                        .toList();
+
+        assertThat(otherParticipantIds).hasSize(3);
+
+        // Trong khoảng T1 -> T2, một MatchPlan khác lấy mất
+        // một người trong recommendation cũ.
+        List<UUID> competingPlanParticipants = new ArrayList<>();
+        competingPlanParticipants.add(
+                displayedParticipantIds.getFirst()
+        );
+        competingPlanParticipants.addAll(otherParticipantIds);
+
+        matchPlanService.create(new CreateMatchPlanCommand(
+                fixture.sessionId(),
+                fixture.sessionCourtIds().getFirst(),
+                planAssignments(competingPlanParticipants)
+        ));
+
+        assertThat(matchPlanRepository.count()).isEqualTo(1);
+        assertThat(matchPlanParticipantRepository.count())
+                .isEqualTo(4);
+
+        // Host bấm Queue bằng evidence cũ.
+        // Backend phải regenerate, phát hiện composition đã stale
+        // và không được tạo MatchPlan thứ hai.
+        queue(fixture, 0, displayedBody)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Submitted recommendation is stale"));
+
+        assertThat(matchPlanRepository.count()).isEqualTo(1);
+        assertThat(matchPlanParticipantRepository.count())
+                .isEqualTo(4);
+
+        assertThat(matchRepository.count()).isZero();
+        assertThat(matchParticipantRepository.count()).isZero();
+
+        assertThat(sessionCourt(fixture, 0).getStatus())
+                .isEqualTo(SessionCourtStatus.AVAILABLE);
+
+        assertThat(fixture.participantIds())
+                .allSatisfy(participantId ->
+                        assertThat(
+                                participantRepository.findById(participantId)
+                                        .orElseThrow()
+                                        .getStatus()
+                        ).isEqualTo(ParticipantStatus.WAITING)
+                );
+    }
+
+    @Test
     void recommendationAppendsBehindManualPlanUsingSharedQueueLogic()
             throws Exception {
-        RuntimeFixture fixture = createFixture(1, 4);
+        RuntimeFixture fixture = createFixture(1, 8);
+
         matchPlanService.create(new CreateMatchPlanCommand(
-                fixture.sessionId(), fixture.sessionCourtIds().getFirst(),
-                planAssignments(fixture.participantIds())
+                fixture.sessionId(),
+                fixture.sessionCourtIds().getFirst(),
+                planAssignments(
+                        fixture.participantIds().subList(0, 4)
+                )
         ));
+
         JsonNode recommendation = generate(fixture, 0);
 
         queue(fixture, 0, acceptBody(recommendation))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.source").value("RECOMMENDATION"))
-                .andExpect(jsonPath("$.queuePosition").value(2));
+                .andExpect(jsonPath("$.source")
+                        .value("RECOMMENDATION"))
+                .andExpect(jsonPath("$.queuePosition")
+                        .value(2));
 
         assertThat(matchPlanRepository.findAll())
                 .extracting(entity -> entity.toDomain().source())
@@ -473,6 +555,9 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
                         MatchSource.MANUAL,
                         MatchSource.RECOMMENDATION
                 );
+
+        assertThat(matchPlanParticipantRepository.count())
+                .isEqualTo(8);
     }
 
     @Test

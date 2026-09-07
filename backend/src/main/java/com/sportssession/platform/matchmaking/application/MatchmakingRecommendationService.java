@@ -6,6 +6,7 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingContext;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
 import com.sportssession.platform.session.domain.ParticipantStatus;
+import com.sportssession.platform.matchplan.application.MatchPlanPlanningLookup;
 import com.sportssession.platform.session.domain.SessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,19 +26,23 @@ public class MatchmakingRecommendationService {
     private final MatchmakingSessionSnapshotReader sessionSnapshotReader;
     private final MatchmakingRatingReader ratingReader;
     private final MatchmakingEngine matchmakingEngine;
+    private final MatchPlanPlanningLookup matchPlanPlanningLookup;
     private final Clock clock;
 
     public MatchmakingRecommendationService(
             MatchmakingSessionSnapshotReader sessionSnapshotReader,
             MatchmakingRatingReader ratingReader,
             MatchmakingEngine matchmakingEngine,
+            MatchPlanPlanningLookup matchPlanPlanningLookup,
             Clock clock
     ) {
         this.sessionSnapshotReader = sessionSnapshotReader;
         this.ratingReader = ratingReader;
         this.matchmakingEngine = matchmakingEngine;
+        this.matchPlanPlanningLookup = matchPlanPlanningLookup;
         this.clock = clock;
     }
+
 
     @Transactional(readOnly = true)
     public MatchmakingResult recommend(
@@ -48,37 +53,73 @@ public class MatchmakingRecommendationService {
         Objects.requireNonNull(sessionCourtId, "sessionCourtId is required");
 
         Instant evaluationTime = clock.instant();
+
         MatchmakingSessionSnapshot snapshot = sessionSnapshotReader.load(
                 sessionId,
                 sessionCourtId
         );
+
         validateOperationalContext(snapshot);
 
+        // 1. Lấy toàn bộ người đang WAITING.
         List<MatchmakingSessionParticipantSnapshot> waitingParticipants =
                 snapshot.participants().stream()
-                        .filter(participant -> participant.participantStatus()
-                                == ParticipantStatus.WAITING)
+                        .filter(participant ->
+                                participant.participantStatus()
+                                        == ParticipantStatus.WAITING
+                        )
                         .toList();
-        validateWaitingEvidence(waitingParticipants, evaluationTime);
+
+        // 2. Validate dữ liệu WAITING trước.
+        // Không để record WAITING lỗi bị che chỉ vì nó đang nằm trong Queue.
+        validateWaitingEvidence(
+                waitingParticipants,
+                evaluationTime
+        );
         validateUniqueWaitingIdentities(waitingParticipants);
 
-        List<UUID> waitingPlayerIds = waitingParticipants.stream()
-                .map(MatchmakingSessionParticipantSnapshot::playerId)
-                .toList();
+        // 3. Những người đã nằm trong một MatchPlan QUEUED
+        // không được đưa vào recommendation tiếp theo.
+        Set<UUID> queuedParticipantIds =
+                matchPlanPlanningLookup.queuedParticipantIds(sessionId);
+
+        List<MatchmakingSessionParticipantSnapshot>
+                eligibleWaitingParticipants =
+                waitingParticipants.stream()
+                        .filter(participant ->
+                                !queuedParticipantIds.contains(
+                                        participant.sessionParticipantId()
+                                )
+                        )
+                        .toList();
+
+        // 4. Rating chỉ đọc cho những người thực sự eligible.
+        List<UUID> eligiblePlayerIds =
+                eligibleWaitingParticipants.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList();
+
         Map<UUID, MatchmakingRatingSnapshot> ratings =
                 ratingReader.readEffectiveRatings(
-                        waitingPlayerIds,
+                        eligiblePlayerIds,
                         snapshot.sportCode(),
                         snapshot.matchFormat()
                 );
-        validateCompleteRatingBatch(waitingPlayerIds, ratings);
 
-        List<MatchmakingCandidate> candidates = waitingParticipants.stream()
-                .map(participant -> candidate(
-                        participant,
-                        ratings.get(participant.playerId())
-                ))
-                .toList();
+        validateCompleteRatingBatch(
+                eligiblePlayerIds,
+                ratings
+        );
+
+        // 5. Engine cũng chỉ nhận eligible players.
+        List<MatchmakingCandidate> candidates =
+                eligibleWaitingParticipants.stream()
+                        .map(participant -> candidate(
+                                participant,
+                                ratings.get(participant.playerId())
+                        ))
+                        .toList();
+
         MatchmakingContext context = new MatchmakingContext(
                 snapshot.sessionId(),
                 snapshot.sessionCourtId(),
@@ -87,9 +128,9 @@ public class MatchmakingRecommendationService {
                 evaluationTime,
                 candidates
         );
+
         return matchmakingEngine.recommend(context);
     }
-
     private void validateOperationalContext(
             MatchmakingSessionSnapshot snapshot
     ) {

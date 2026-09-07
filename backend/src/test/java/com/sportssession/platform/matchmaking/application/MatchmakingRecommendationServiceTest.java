@@ -9,6 +9,7 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailable;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailableReason;
 import com.sportssession.platform.matchmaking.domain.RatingBasis;
+import com.sportssession.platform.matchplan.application.MatchPlanPlanningLookup;
 import com.sportssession.platform.session.domain.ParticipantStatus;
 import com.sportssession.platform.session.domain.SessionCourtStatus;
 import com.sportssession.platform.session.domain.SessionStatus;
@@ -28,11 +29,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -56,17 +53,23 @@ class MatchmakingRecommendationServiceTest {
     private MatchmakingEngine engine;
     private CountingClock clock;
     private MatchmakingRecommendationService service;
-
+    private MatchPlanPlanningLookup matchPlanPlanningLookup;
     @BeforeEach
     void setUp() {
         sessionReader = mock(MatchmakingSessionSnapshotReader.class);
         ratingReader = mock(MatchmakingRatingReader.class);
         engine = mock(MatchmakingEngine.class);
+        matchPlanPlanningLookup = mock(MatchPlanPlanningLookup.class);
         clock = new CountingClock(EVALUATION_TIME);
+
+        when(matchPlanPlanningLookup.queuedParticipantIds(SESSION_ID))
+                .thenReturn(Set.of());
+
         service = new MatchmakingRecommendationService(
                 sessionReader,
                 ratingReader,
                 engine,
+                matchPlanPlanningLookup,
                 clock
         );
         MatchmakingEngine realEngine = new MatchmakingEngine();
@@ -95,6 +98,66 @@ class MatchmakingRecommendationServiceTest {
         );
         verify(engine, times(1)).recommend(any(MatchmakingContext.class));
     }
+
+    @Test
+    void queuedWaitingParticipantsAreExcludedFromRecommendationCandidates() {
+        List<MatchmakingSessionParticipantSnapshot> participants =
+                waitingParticipants(8);
+
+        List<MatchmakingSessionParticipantSnapshot> queued =
+                participants.subList(0, 4);
+
+        List<MatchmakingSessionParticipantSnapshot> eligible =
+                participants.subList(4, 8);
+
+        stubSnapshot(validSnapshot(participants));
+
+        when(matchPlanPlanningLookup.queuedParticipantIds(SESSION_ID))
+                .thenReturn(Set.copyOf(
+                        queued.stream()
+                                .map(MatchmakingSessionParticipantSnapshot::
+                                        sessionParticipantId)
+                                .toList()
+                ));
+
+        when(ratingReader.readEffectiveRatings(
+                eligible.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList(),
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).thenReturn(ratingsFor(eligible));
+
+        MatchmakingResult result = service.recommend(
+                SESSION_ID,
+                SESSION_COURT_ID
+        );
+
+        assertThat(result).isInstanceOf(MatchRecommendation.class);
+
+        MatchRecommendation recommendation = (MatchRecommendation) result;
+
+        assertThat(recommendation.eligiblePlayerCount()).isEqualTo(4);
+
+        verify(ratingReader).readEffectiveRatings(
+                eligible.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList(),
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        );
+
+        assertThat(capturedContext().candidates())
+                .extracting(MatchmakingCandidate::sessionParticipantId)
+                .containsExactlyElementsOf(
+                        eligible.stream()
+                                .map(MatchmakingSessionParticipantSnapshot::
+                                        sessionParticipantId)
+                                .toList()
+                );
+    }
+
+
 
     @ParameterizedTest
     @EnumSource(

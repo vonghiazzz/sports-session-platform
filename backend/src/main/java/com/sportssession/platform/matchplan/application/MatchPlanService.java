@@ -101,7 +101,14 @@ public class MatchPlanService {
                 source == MatchSource.RECOMMENDATION
         );
 
+        requireNotQueuedElsewhere(
+                sessionId,
+                assignments,
+                null
+        );
+
         List<MatchPlanEntity> queue = queueForUpdate(sessionCourtId);
+
         Instant now = clock.instant();
         MatchPlan plan = source == MatchSource.RECOMMENDATION
                 ? MatchPlan.queueRecommendation(
@@ -142,6 +149,12 @@ public class MatchPlanService {
                 plan.sessionId()
         ));
         validatePlanningParticipants(plan.sessionId(), assignments, false);
+
+        requireNotQueuedElsewhere(
+                plan.sessionId(),
+                assignments,
+                plan.id()
+        );
 
         participantRepository.deleteAllByMatchPlanId(plan.id());
         participantRepository.flush();
@@ -385,6 +398,42 @@ public class MatchPlanService {
                 .sorted(Comparator.comparing(MatchPlanAssignment::teamSide)
                         .thenComparingInt(MatchPlanAssignment::teamSlot))
                 .toList();
+    }
+
+    private void requireNotQueuedElsewhere(
+            UUID sessionId,
+            List<MatchPlanAssignment> assignments,
+            UUID excludedPlanId
+    ) {
+        Set<UUID> requestedParticipantIds = Set.copyOf(
+                assignments.stream()
+                        .map(MatchPlanAssignment::sessionParticipantId)
+                        .toList()
+        );
+
+        List<UUID> queuedParticipantIds = excludedPlanId == null
+                ? planRepository.findParticipantIdsBySessionAndStatus(
+                sessionId,
+                MatchPlanStatus.QUEUED
+        )
+                : planRepository
+                .findParticipantIdsBySessionAndStatusExcludingPlan(
+                        sessionId,
+                        MatchPlanStatus.QUEUED,
+                        excludedPlanId
+                );
+
+        queuedParticipantIds.stream()
+                .filter(requestedParticipantIds::contains)
+                .sorted()
+                .findFirst()
+                .ifPresent(participantId -> {
+                    throw new MatchPlanConflictException(
+                            "Session Participant is already assigned to "
+                                    + "another QUEUED MatchPlan: "
+                                    + participantId
+                    );
+                });
     }
 
     private void validatePersistedComposition(
