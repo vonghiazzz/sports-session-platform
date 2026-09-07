@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { PropsWithChildren } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  MatchPlanResponse,
   MatchRecommendationResponse,
   MatchResponse,
 } from '../../api/contracts'
@@ -11,17 +12,20 @@ import { HttpError } from '../../api/http'
 import {
   acceptMatchmakingRecommendation,
   generateMatchmakingRecommendation,
+  queueMatchmakingRecommendation,
 } from '../../api/matchmakingApi'
 import type { CourtView, ParticipantView } from './liveSessionModel'
 import { MatchmakingRecommendation } from './MatchmakingRecommendation'
 
 vi.mock('../../api/matchmakingApi', () => ({
   acceptMatchmakingRecommendation: vi.fn(),
+  queueMatchmakingRecommendation: vi.fn(),
   generateMatchmakingRecommendation: vi.fn(),
 }))
 
 const generateMock = vi.mocked(generateMatchmakingRecommendation)
 const acceptMock = vi.mocked(acceptMatchmakingRecommendation)
+const queueMock = vi.mocked(queueMatchmakingRecommendation)
 const queryClients: QueryClient[] = []
 
 const court: CourtView = {
@@ -117,6 +121,47 @@ const acceptedMatch: MatchResponse = {
   version: 1,
 }
 
+const queuedRecommendationPlan: MatchPlanResponse = {
+  id: 'recommended-plan-1',
+  sessionId: 'session-1',
+  sessionCourtId: court.sessionCourtId,
+  source: 'RECOMMENDATION',
+  status: 'QUEUED',
+  queuePosition: 1,
+  startedMatchId: null,
+  participants: [
+    {
+      id: 'plan-participant-1',
+      sessionParticipantId: 'participant-1',
+      teamSide: 'A',
+      teamSlot: 1,
+    },
+    {
+      id: 'plan-participant-2',
+      sessionParticipantId: 'participant-4',
+      teamSide: 'A',
+      teamSlot: 2,
+    },
+    {
+      id: 'plan-participant-3',
+      sessionParticipantId: 'participant-2',
+      teamSide: 'B',
+      teamSlot: 1,
+    },
+    {
+      id: 'plan-participant-4',
+      sessionParticipantId: 'participant-3',
+      teamSide: 'B',
+      teamSlot: 2,
+    },
+  ],
+  createdAt: '2026-09-02T10:00:00Z',
+  startedAt: null,
+  cancelledAt: null,
+  updatedAt: '2026-09-02T10:00:00Z',
+  version: 0,
+}
+
 function deferred<T>() {
   let resolvePromise: (value: T | PromiseLike<T>) => void = () => {
     throw new Error('Deferred promise resolver is unavailable')
@@ -127,8 +172,8 @@ function deferred<T>() {
   return { promise, resolve: resolvePromise }
 }
 
-function renderRecommendation() {
-  const queryClient = new QueryClient({
+function renderRecommendation(courtOverride: CourtView = court) {
+    const queryClient = new QueryClient({
     defaultOptions: {
       mutations: { retry: false },
       queries: { retry: false },
@@ -145,7 +190,7 @@ function renderRecommendation() {
   const rendered = render(
     <MatchmakingRecommendation
       sessionId="session-1"
-      court={court}
+      court={courtOverride}
       participants={participants}
     />,
     { wrapper: Wrapper },
@@ -327,7 +372,7 @@ describe('Matchmaking recommendation', () => {
     )
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Đề xuất không còn hợp lệ',
+      'Đề xuất không thể bắt đầu với trạng thái hiện tại',
     )
     expect(
       screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
@@ -379,5 +424,296 @@ describe('Matchmaking recommendation', () => {
     expect(acceptButton).toBeDisabled()
     await user.click(acceptButton)
     expect(acceptMock).toHaveBeenCalledOnce()
+  })
+  it('queues exact recommendation evidence and reconciles MatchPlans', async () => {
+    const user = userEvent.setup()
+    queueMock.mockResolvedValue(queuedRecommendationPlan)
+
+    const { queryClient } = renderRecommendation()
+    const refetch = vi.spyOn(queryClient, 'refetchQueries')
+
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+    )
+
+    await waitFor(() => expect(queueMock).toHaveBeenCalledOnce())
+
+    expect(queueMock).toHaveBeenCalledWith(
+      'session-1',
+      'session-court-2',
+      {
+        algorithmVersion: 'fairness-anchor-rating-sum-v1',
+        assignments: [
+          {
+            sessionParticipantId: 'participant-1',
+            teamSide: 'A',
+            teamSlot: 1,
+          },
+          {
+            sessionParticipantId: 'participant-4',
+            teamSide: 'A',
+            teamSlot: 2,
+          },
+          {
+            sessionParticipantId: 'participant-2',
+            teamSide: 'B',
+            teamSlot: 1,
+          },
+          {
+            sessionParticipantId: 'participant-3',
+            teamSide: 'B',
+            teamSlot: 2,
+          },
+        ],
+      },
+    )
+
+    expect(
+      queryClient
+        .getMutationCache()
+        .getAll()
+        .find(
+          (mutation) =>
+            mutation.options.mutationKey?.[0] ===
+            'queueMatchmakingRecommendation',
+        )?.options.retry,
+    ).toBe(false)
+
+    await waitFor(() =>
+      expect(refetch).toHaveBeenCalledWith(
+        {
+          queryKey: ['sessionMatchPlans', 'session-1'],
+          exact: true,
+          type: 'active',
+        },
+        { throwOnError: true },
+      ),
+    )
+
+    expect(
+      screen.queryByRole('button', { name: 'Chấp nhận & bắt đầu' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it.each(['PLAYING', 'UNAVAILABLE'] as const)(
+    'allows recommendation Queue while Court is %s but disables immediate Accept',
+    async (status) => {
+      const user = userEvent.setup()
+
+      renderRecommendation({
+        ...court,
+        status,
+      })
+
+      await generate(user)
+
+      expect(
+        screen.getByRole('button', {
+          name: 'Chấp nhận & bắt đầu',
+        }),
+      ).toBeDisabled()
+
+      expect(
+        screen.getByRole('button', {
+          name: 'Thêm vào hàng chờ',
+        }),
+      ).toBeEnabled()
+
+      expect(generateMock).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('treats a known stale Queue conflict as failed and requires a new recommendation', async () => {
+    const user = userEvent.setup()
+
+    queueMock.mockRejectedValue(
+      new HttpError(409, 'Submitted recommendation is stale'),
+    )
+
+    renderRecommendation()
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Đề xuất không còn hợp lệ để thêm vào hàng chờ',
+    )
+
+    expect(queueMock).toHaveBeenCalledOnce()
+
+    expect(
+      screen.queryByRole('button', {
+        name: 'Chấp nhận & bắt đầu',
+      }),
+    ).not.toBeInTheDocument()
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Tạo đề xuất mới',
+      }),
+    ).toBeEnabled()
+  })
+
+  it('uses a newly observed MatchPlan as authoritative truth after a lost Queue response', async () => {
+    const user = userEvent.setup()
+
+    queueMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const { queryClient } = renderRecommendation()
+
+    vi.spyOn(queryClient, 'refetchQueries').mockImplementation(
+      async (filters) => {
+        if (filters?.queryKey?.[0] === 'sessionMatchPlans') {
+          queryClient.setQueryData(
+            ['sessionMatchPlans', 'session-1'],
+            [queuedRecommendationPlan],
+          )
+        }
+      },
+    )
+
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', {
+          name: 'Chấp nhận & bắt đầu',
+        }),
+      ).not.toBeInTheDocument(),
+    )
+
+    expect(queueMock).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('blocks blind Queue retry when the server outcome cannot be determined', async () => {
+    const user = userEvent.setup()
+
+    queueMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const { queryClient } = renderRecommendation()
+
+    vi.spyOn(queryClient, 'refetchQueries').mockRejectedValue(
+      new TypeError('Failed to refresh'),
+    )
+
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Không xác định được đề xuất đã được thêm vào hàng chờ hay chưa',
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Thêm vào hàng chờ',
+      }),
+    ).toBeDisabled()
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Kiểm tra lại',
+      }),
+    ).toBeEnabled()
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Thêm vào hàng chờ',
+      }),
+    )
+
+    expect(queueMock).toHaveBeenCalledOnce()
+  })
+
+  it('clears an uncertain proposal when Check again observes the created MatchPlan', async () => {
+    const user = userEvent.setup()
+
+    queueMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const { queryClient } = renderRecommendation()
+    const refetch = vi.spyOn(queryClient, 'refetchQueries')
+
+    refetch.mockRejectedValueOnce(
+      new TypeError('Failed to refresh'),
+    )
+
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+    )
+
+    await screen.findByRole('button', { name: 'Kiểm tra lại' })
+
+    queryClient.setQueryData(
+      ['sessionMatchPlans', 'session-1'],
+      [queuedRecommendationPlan],
+    )
+
+    refetch.mockResolvedValue(undefined)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Kiểm tra lại' }),
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', {
+          name: 'Kiểm tra lại',
+        }),
+      ).not.toBeInTheDocument(),
+    )
+
+    expect(
+      screen.queryByRole('button', {
+        name: 'Chấp nhận & bắt đầu',
+      }),
+    ).not.toBeInTheDocument()
+
+    expect(queueMock).toHaveBeenCalledOnce()
+  })
+
+  it('unblocks Queue after Check again confirms no new MatchPlan exists', async () => {
+    const user = userEvent.setup()
+
+    queueMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    renderRecommendation()
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+    )
+
+    expect(
+      await screen.findByRole('button', { name: 'Kiểm tra lại' }),
+    ).toBeEnabled()
+
+    await user.click(
+      screen.getByRole('button', { name: 'Kiểm tra lại' }),
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Chưa thấy đề xuất mới trong hàng chờ',
+    )
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Thêm vào hàng chờ',
+      }),
+    ).toBeEnabled()
+
+    expect(queueMock).toHaveBeenCalledOnce()
   })
 })

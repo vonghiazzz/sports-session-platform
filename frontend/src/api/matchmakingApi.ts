@@ -1,6 +1,7 @@
 import type {
   AcceptMatchmakingRecommendationRequest,
   MatchmakingGenerationResponse,
+  MatchPlanResponse,
   MatchResponse,
 } from './contracts'
 import { postJson, postJsonWithBody } from './http'
@@ -30,6 +31,17 @@ export function acceptMatchmakingRecommendation(
 ): Promise<MatchResponse> {
   return postJsonWithBody(
     `${recommendationPath(sessionId, sessionCourtId)}/accept`,
+    request,
+  )
+}
+
+export function queueMatchmakingRecommendation(
+  sessionId: string,
+  sessionCourtId: string,
+  request: AcceptMatchmakingRecommendationRequest,
+): Promise<MatchPlanResponse> {
+  return postJsonWithBody(
+    `${recommendationPath(sessionId, sessionCourtId)}/queue`,
     request,
   )
 }

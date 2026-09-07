@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AcceptMatchmakingRecommendationRequest,
   MatchmakingGenerationResponse,
+  MatchPlanResponse,
   MatchResponse,
 } from './contracts'
 import {
   acceptMatchmakingRecommendation,
   generateMatchmakingRecommendation,
+  queueMatchmakingRecommendation,
 } from './matchmakingApi'
 
 const sessionId = 'session/one'
@@ -29,17 +31,20 @@ describe('Matchmaking recommendation API', () => {
       eligiblePlayerCount: 3,
       reason: 'INSUFFICIENT_ELIGIBLE_PLAYERS',
     } satisfies MatchmakingGenerationResponse
+
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify(response), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     )
+
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
       generateMatchmakingRecommendation(sessionId, sessionCourtId),
     ).resolves.toEqual(response)
+
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/sessions/session%2Fone/courts/court%20two/match-recommendations',
       {
@@ -60,18 +65,22 @@ describe('Matchmaking recommendation API', () => {
         { sessionParticipantId: 'p4', teamSide: 'B', teamSlot: 2 },
       ],
     }
+
     const response = { id: 'match-1' } as MatchResponse
+
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify(response), {
         status: 201,
         headers: { 'Content-Type': 'application/json' },
       }),
     )
+
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(
       acceptMatchmakingRecommendation(sessionId, sessionCourtId, request),
     ).resolves.toEqual(response)
+
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/sessions/session%2Fone/courts/court%20two/match-recommendations/accept',
       {
@@ -84,6 +93,53 @@ describe('Matchmaking recommendation API', () => {
         body: JSON.stringify(request),
       },
     )
+
     expect(request).not.toHaveProperty('source')
+  })
+
+  it('queues with exact recommendation evidence and no client-controlled Plan state', async () => {
+    const request: AcceptMatchmakingRecommendationRequest = {
+      algorithmVersion: 'fairness-anchor-rating-sum-v1',
+      assignments: [
+        { sessionParticipantId: 'p1', teamSide: 'A', teamSlot: 1 },
+        { sessionParticipantId: 'p2', teamSide: 'A', teamSlot: 2 },
+        { sessionParticipantId: 'p3', teamSide: 'B', teamSlot: 1 },
+        { sessionParticipantId: 'p4', teamSide: 'B', teamSlot: 2 },
+      ],
+    }
+
+    const response = {
+      id: 'match-plan-1',
+    } as MatchPlanResponse
+
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      queueMatchmakingRecommendation(sessionId, sessionCourtId, request),
+    ).resolves.toEqual(response)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/session%2Fone/courts/court%20two/match-recommendations/queue',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        signal: undefined,
+        body: JSON.stringify(request),
+      },
+    )
+
+    expect(request).not.toHaveProperty('source')
+    expect(request).not.toHaveProperty('status')
+    expect(request).not.toHaveProperty('queuePosition')
   })
 })

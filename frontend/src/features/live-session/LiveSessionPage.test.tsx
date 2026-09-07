@@ -359,51 +359,79 @@ describe('LiveSessionScreen', () => {
     expect(panel.getByRole('region', { name: 'Đã rời: 1 người' })).toBeVisible()
   })
 
-  it('offers only status-valid Court actions', () => {
+  it('keeps Recommendation available on all runtime Court states while preserving valid Court actions', () => {
     renderScreen(readyState())
+
     const boardHeading = screen.getByRole('heading', { name: 'Bảng sân' })
     const board = boardHeading.closest('section')
+
     expect(board).not.toBeNull()
+
     const boardQueries = within(board as HTMLElement)
 
     const playingCard = boardQueries
       .getByRole('heading', { name: 'Court One' })
       .closest('article')
+
     const availableCard = boardQueries
       .getByRole('heading', { name: 'Court Two' })
       .closest('article')
+
     const unavailableCard = boardQueries
       .getByRole('heading', { name: 'Court Three' })
       .closest('article')
+
     expect(playingCard).not.toBeNull()
     expect(availableCard).not.toBeNull()
     expect(unavailableCard).not.toBeNull()
 
+    const playing = within(playingCard as HTMLElement)
+    const available = within(availableCard as HTMLElement)
+    const unavailable = within(unavailableCard as HTMLElement)
+
+    // PLAYING Court:
+    // no manual enable/disable Court action,
+    // but Recommendation can still be prepared for the next Match.
     expect(
-      within(playingCard as HTMLElement).queryByRole('button', {
-        name: /Mở sân|Tạm khóa sân|Tạo đề xuất/,
+      playing.queryByRole('button', {
+        name: /Mở sân|Tạm khóa sân/,
       }),
     ).not.toBeInTheDocument()
+
     expect(
-      within(availableCard as HTMLElement).getByRole('button', {
+      playing.getByRole('button', {
+        name: 'Tạo đề xuất',
+      }),
+    ).toBeEnabled()
+
+    // AVAILABLE Court:
+    // can be temporarily disabled and can generate Recommendation.
+    expect(
+      available.getByRole('button', {
         name: 'Tạm khóa sân',
       }),
     ).toBeEnabled()
+
     expect(
-      within(availableCard as HTMLElement).getByRole('button', {
+      available.getByRole('button', {
         name: 'Tạo đề xuất',
       }),
     ).toBeEnabled()
+
+    // UNAVAILABLE Court:
+    // can be enabled again, while future Recommendation preparation
+    // remains available.
     expect(
-      within(unavailableCard as HTMLElement).getByRole('button', {
+      unavailable.getByRole('button', {
         name: 'Mở sân',
       }),
     ).toBeEnabled()
+
     expect(
-      within(unavailableCard as HTMLElement).queryByRole('button', {
+      unavailable.getByRole('button', {
         name: 'Tạo đề xuất',
       }),
-    ).not.toBeInTheDocument()
+    ).toBeEnabled()
   })
 
   it('shows Create and Start controls only while the Session is in progress', () => {
@@ -411,8 +439,16 @@ describe('LiveSessionScreen', () => {
 
     expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Bắt đầu trận' })).toBeEnabled()
+    const manualMatchSection = screen
+      .getByRole('heading', { name: 'Tạo trận thủ công' })
+      .closest('section')
+
+    expect(manualMatchSection).not.toBeNull()
+
     expect(
-      screen.getByText(/chưa giữ sân hoặc người chơi/i),
+      within(manualMatchSection as HTMLElement).getByText(
+        /Việc tạo trận chưa giữ sân hoặc người chơi/i,
+      ),
     ).toBeVisible()
   })
 

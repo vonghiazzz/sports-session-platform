@@ -379,7 +379,7 @@ function CourtCard({
       {court.activeMatch && (
         <PlayingMatchPanel match={court.activeMatch} sessionId={sessionId} />
       )}
-      {sessionStatus === 'IN_PROGRESS' && court.status === 'AVAILABLE' && (
+      {sessionStatus === 'IN_PROGRESS' && (
         <MatchmakingRecommendation
           sessionId={sessionId}
           court={court}

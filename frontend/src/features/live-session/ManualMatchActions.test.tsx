@@ -301,16 +301,37 @@ describe('Create Manual Match mutation', () => {
     expect(getSessionCourtsMock).toHaveBeenCalledTimes(1)
     expect(getSessionMock).toHaveBeenCalledTimes(1)
     expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(2)
-    const courtBoard = screen.getByRole('heading', { name: 'Bảng sân' }).closest('section')
+
+    const courtBoard = screen
+      .getByRole('heading', { name: 'Bảng sân' })
+      .closest('section')
+
     expect(courtBoard).not.toBeNull()
+
     const courtTwo = within(courtBoard as HTMLElement)
       .getByRole('heading', { name: 'Court Two' })
       .closest('article')
+
     expect(courtTwo).not.toBeNull()
-    expect(within(courtTwo as HTMLElement).getByText('Sẵn sàng')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
+
     expect(
-      screen.getByText(/chưa giữ sân hoặc người chơi/i),
+      within(courtTwo as HTMLElement).getByText('Sẵn sàng'),
+    ).toBeVisible()
+
+    expect(
+      screen.getByRole('heading', { name: 'Đang chờ' }).closest('section'),
+    ).toHaveTextContent('An Nguyen')
+
+    const manualMatchSection = screen
+      .getByRole('heading', { name: 'Tạo trận thủ công' })
+      .closest('section')
+
+    expect(manualMatchSection).not.toBeNull()
+
+    expect(
+      within(manualMatchSection as HTMLElement).getByText(
+        /Việc tạo trận chưa giữ sân hoặc người chơi/i,
+      ),
     ).toBeVisible()
   })
 

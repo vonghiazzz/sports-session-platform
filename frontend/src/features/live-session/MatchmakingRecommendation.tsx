@@ -102,34 +102,72 @@ export function MatchmakingRecommendation({
               </ul>
             </div>
           </div>
-          <p className="recommendation-note">
-            Ưu tiên người chờ lâu và cân bằng hai đội. Đề xuất chưa chiếm dụng
-            tài nguyên; hệ thống sẽ kiểm tra lại khi chấp nhận.
-          </p>
+
           <div className="recommendation-actions">
             <button
               className="primary-action-button"
               type="button"
-              disabled={action.isAccepting || action.acceptBlocked}
+              disabled={
+                court.status !== 'AVAILABLE' ||
+                action.isAccepting ||
+                action.isQueueing ||
+                action.acceptBlocked ||
+                action.queueBlocked
+              }
               onClick={() => void action.accept()}
             >
               {action.isAccepting
                 ? 'Đang chấp nhận…'
                 : 'Chấp nhận & bắt đầu'}
             </button>
+
             <button
               className="secondary-action-button"
               type="button"
-              disabled={action.isAccepting || action.isGenerating}
+              disabled={
+                action.isQueueing ||
+                action.isAccepting ||
+                action.queueBlocked
+              }
+              onClick={() => void action.addToQueue()}
+            >
+              {action.isQueueing
+                ? 'Đang thêm vào hàng chờ…'
+                : 'Thêm vào hàng chờ'}
+            </button>
+
+            <button
+              className="secondary-action-button"
+              type="button"
+              disabled={
+                action.isAccepting ||
+                action.isGenerating ||
+                action.isQueueing ||
+                action.queueBlocked
+              }
               onClick={action.dismiss}
             >
               Bỏ đề xuất
             </button>
-            {action.acceptBlocked && (
+
+            {action.queueBlocked && (
               <button
                 className="secondary-action-button"
                 type="button"
-                disabled={action.isGenerating}
+                disabled={action.isCheckingQueue}
+                onClick={() => void action.checkQueueOutcome()}
+              >
+                {action.isCheckingQueue
+                  ? 'Đang kiểm tra…'
+                  : 'Kiểm tra lại'}
+              </button>
+            )}
+
+            {action.acceptBlocked && !action.queueBlocked && (
+              <button
+                className="secondary-action-button"
+                type="button"
+                disabled={action.isGenerating || action.isQueueing}
                 onClick={() => void action.generate()}
               >
                 {action.isGenerating
@@ -150,6 +188,16 @@ export function MatchmakingRecommendation({
           {action.acceptError}
         </p>
       )}
+      {action.queueError && (
+        <p className="action-feedback" role="alert">
+          {action.queueError}
+        </p>
+      )}
+      <p className="recommendation-note">
+        Ưu tiên người chờ lâu và cân bằng hai đội. Đề xuất chưa giữ sân hoặc
+        người chơi; bạn có thể bắt đầu ngay khi đủ điều kiện hoặc thêm vào hàng
+        chờ để chuẩn bị trước.
+      </p>
       <p className="recommendation-fallback">
         Không phù hợp? Bạn vẫn có thể tạo trận thủ công bên dưới.
       </p>
