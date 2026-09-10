@@ -336,7 +336,7 @@ class MatchmakingRecommendationAcceptanceServiceTest {
         private UUID sessionCourtId;
 
         private RecordingRecommendationService(MatchmakingResult result) {
-            super(null,null, null, null, null);
+            super(null, null,null, null, null, null);
             this.result = result;
         }
 

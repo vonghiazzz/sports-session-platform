@@ -493,7 +493,7 @@ class MatchmakingControllerTest {
         private UUID sessionCourtId;
 
         private RecordingRecommendationService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

@@ -27,6 +27,7 @@ const generateMock = vi.mocked(generateMatchmakingRecommendation)
 const acceptMock = vi.mocked(acceptMatchmakingRecommendation)
 const queueMock = vi.mocked(queueMatchmakingRecommendation)
 const queryClients: QueryClient[] = []
+const algorithmVersion = 'fairness-anchor-level-first-rating-sum-v2'
 
 const court: CourtView = {
   sessionCourtId: 'session-court-2',
@@ -76,7 +77,7 @@ function recommendedPlayer(
 
 const recommendation: MatchRecommendationResponse = {
   outcome: 'RECOMMENDED',
-  algorithmVersion: 'fairness-anchor-rating-sum-v1',
+  algorithmVersion,
   evaluationTime: '2026-09-02T10:00:00Z',
   sessionId: 'session-1',
   sessionCourtId: court.sessionCourtId,
@@ -84,7 +85,11 @@ const recommendation: MatchRecommendationResponse = {
   matchFormat: 'DOUBLES',
   eligiblePlayerCount: 5,
   teamA: {
-    slot1: recommendedPlayer('participant-1', 'player-1', 'A', 1),
+    slot1: {
+      ...recommendedPlayer('participant-1', 'player-1', 'A', 1),
+      ratedMatches: 12,
+      ratingBasis: 'PERSISTED',
+    },
     slot2: recommendedPlayer('participant-4', 'player-4', 'A', 2),
   },
   teamB: {
@@ -222,14 +227,52 @@ describe('Matchmaking recommendation', () => {
     const proposal = screen.getByRole('region', {
       name: 'Đề xuất trận cho Sân Hai',
     })
-    expect(within(proposal).getByRole('heading', { name: 'Sân Hai' })).toBeVisible()
-    expect(within(proposal).getByRole('heading', { name: 'Đội A' })).toBeVisible()
-    expect(within(proposal).getByRole('heading', { name: 'Đội B' })).toBeVisible()
+    expect(
+      within(proposal).getByRole('heading', { name: 'Sân Hai' }),
+    ).toBeVisible()
+
+    expect(
+      within(proposal).getByRole('heading', {
+        name: 'Đội A · Tổng Rating 50,0',
+      }),
+    ).toBeVisible()
+
+    expect(
+      within(proposal).getByRole('heading', {
+        name: 'Đội B · Tổng Rating 50,0',
+      }),
+    ).toBeVisible()
+
+    expect(
+      within(proposal).getAllByText(
+        'Rating: 25,0 · Điểm khởi tạo',
+      ),
+    ).toHaveLength(3)
+
+    expect(
+      within(proposal).getByText(
+        'Rating: 25,0 · 12 trận đã tính',
+      ),
+    ).toBeVisible()
+
+    expect(
+      within(proposal).getByText(
+        /Chênh lệch Rating giữa hai đội:/,
+      ),
+    ).toBeVisible()
+
+    expect(
+      within(proposal).getByText(
+        /Matchmaking cân đội bằng Rating hiện tại/,
+      ),
+    ).toBeVisible()
     expect(within(proposal).getByText('An Nguyen')).toBeVisible()
-    expect(within(proposal).getByText('Yếu')).toBeVisible()
+    expect(
+      within(proposal).getByText('Trình độ: Yếu'),
+    ).toBeVisible()
     expect(within(proposal).getByText('Chờ 30 phút')).toBeVisible()
     expect(proposal).not.toHaveTextContent('participant-1')
-    expect(proposal).not.toHaveTextContent('fairness-anchor-rating-sum-v1')
+    expect(proposal).not.toHaveTextContent(algorithmVersion)
     expect(acceptMock).not.toHaveBeenCalled()
   })
 
@@ -317,7 +360,7 @@ describe('Matchmaking recommendation', () => {
         .map((mutation) => mutation.options.retry),
     ).toEqual([false, false])
     expect(acceptMock).toHaveBeenCalledWith('session-1', 'session-court-2', {
-      algorithmVersion: 'fairness-anchor-rating-sum-v1',
+      algorithmVersion,
       assignments: [
         { sessionParticipantId: 'participant-1', teamSide: 'A', teamSlot: 1 },
         { sessionParticipantId: 'participant-4', teamSide: 'A', teamSlot: 2 },
@@ -444,7 +487,7 @@ describe('Matchmaking recommendation', () => {
       'session-1',
       'session-court-2',
       {
-        algorithmVersion: 'fairness-anchor-rating-sum-v1',
+        algorithmVersion,
         assignments: [
           {
             sessionParticipantId: 'participant-1',

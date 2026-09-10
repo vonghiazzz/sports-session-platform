@@ -13,6 +13,7 @@ import {
 
 const sessionId = 'session/one'
 const sessionCourtId = 'court two'
+const algorithmVersion = 'fairness-anchor-level-first-rating-sum-v2'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -22,7 +23,7 @@ describe('Matchmaking recommendation API', () => {
   it('generates through the exact Court-scoped bodyless endpoint', async () => {
     const response = {
       outcome: 'UNAVAILABLE',
-      algorithmVersion: 'fairness-anchor-rating-sum-v1',
+      algorithmVersion,
       evaluationTime: '2026-09-02T10:00:00Z',
       sessionId,
       sessionCourtId,
@@ -57,7 +58,7 @@ describe('Matchmaking recommendation API', () => {
 
   it('accepts with exact recommendation evidence and no Match source', async () => {
     const request: AcceptMatchmakingRecommendationRequest = {
-      algorithmVersion: 'fairness-anchor-rating-sum-v1',
+      algorithmVersion,
       assignments: [
         { sessionParticipantId: 'p1', teamSide: 'A', teamSlot: 1 },
         { sessionParticipantId: 'p2', teamSide: 'A', teamSlot: 2 },
@@ -99,7 +100,7 @@ describe('Matchmaking recommendation API', () => {
 
   it('queues with exact recommendation evidence and no client-controlled Plan state', async () => {
     const request: AcceptMatchmakingRecommendationRequest = {
-      algorithmVersion: 'fairness-anchor-rating-sum-v1',
+      algorithmVersion,
       assignments: [
         { sessionParticipantId: 'p1', teamSide: 'A', teamSlot: 1 },
         { sessionParticipantId: 'p2', teamSide: 'A', teamSlot: 2 },

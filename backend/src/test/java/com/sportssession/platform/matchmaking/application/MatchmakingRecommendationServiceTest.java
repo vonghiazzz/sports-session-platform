@@ -10,6 +10,7 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailable;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailableReason;
 import com.sportssession.platform.matchmaking.domain.RatingBasis;
 import com.sportssession.platform.matchplan.application.MatchPlanPlanningLookup;
+import com.sportssession.platform.player.domain.SkillLevel;
 import com.sportssession.platform.session.domain.ParticipantStatus;
 import com.sportssession.platform.session.domain.SessionCourtStatus;
 import com.sportssession.platform.session.domain.SessionStatus;
@@ -33,7 +34,7 @@ import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -47,8 +48,9 @@ class MatchmakingRecommendationServiceTest {
             Instant.parse("2026-08-28T05:00:00Z");
     private static final UUID SESSION_ID = uuid(100);
     private static final UUID SESSION_COURT_ID = uuid(200);
+    private MatchmakingSkillLevelReader skillLevelReader;
 
-    private MatchmakingSessionSnapshotReader sessionReader;
+    private MatchmakingSessionSnapshotReader sessionSnapshotReader;
     private MatchmakingRatingReader ratingReader;
     private MatchmakingEngine engine;
     private CountingClock clock;
@@ -56,27 +58,46 @@ class MatchmakingRecommendationServiceTest {
     private MatchPlanPlanningLookup matchPlanPlanningLookup;
     @BeforeEach
     void setUp() {
-        sessionReader = mock(MatchmakingSessionSnapshotReader.class);
+        sessionSnapshotReader = mock(MatchmakingSessionSnapshotReader.class);
         ratingReader = mock(MatchmakingRatingReader.class);
+        skillLevelReader = mock(MatchmakingSkillLevelReader.class);
         engine = mock(MatchmakingEngine.class);
         matchPlanPlanningLookup = mock(MatchPlanPlanningLookup.class);
         clock = new CountingClock(EVALUATION_TIME);
 
-        when(matchPlanPlanningLookup.queuedParticipantIds(SESSION_ID))
+        MatchmakingEngine realEngine = new MatchmakingEngine();
+
+        when(engine.recommend(any(MatchmakingContext.class)))
+                .thenAnswer(invocation ->
+                        realEngine.recommend(invocation.getArgument(0))
+                );
+
+        when(skillLevelReader.readSkillLevels(
+                anyCollection(),
+                eq(SportCode.BADMINTON)
+        )).thenAnswer(invocation -> {
+            Collection<UUID> playerIds = invocation.getArgument(0);
+
+            Map<UUID, SkillLevel> levels = new LinkedHashMap<>();
+
+            for (UUID playerId : playerIds) {
+                levels.put(playerId, SkillLevel.INTERMEDIATE);
+            }
+
+            return Map.copyOf(levels);
+        });
+
+        when(matchPlanPlanningLookup.queuedParticipantIds(any()))
                 .thenReturn(Set.of());
 
         service = new MatchmakingRecommendationService(
-                sessionReader,
+                sessionSnapshotReader,
                 ratingReader,
+                skillLevelReader,
                 engine,
                 matchPlanPlanningLookup,
                 clock
         );
-        MatchmakingEngine realEngine = new MatchmakingEngine();
-        when(engine.recommend(any(MatchmakingContext.class)))
-                .thenAnswer(invocation -> realEngine.recommend(
-                        invocation.getArgument(0)
-                ));
     }
 
     @Test
@@ -174,7 +195,7 @@ class MatchmakingRecommendationServiceTest {
         assertRecommendationFailure(
                 MatchmakingRecommendationFailureReason.SESSION_NOT_IN_PROGRESS
         );
-        verify(sessionReader, times(1)).load(SESSION_ID, SESSION_COURT_ID);
+        verify(sessionSnapshotReader, times(1)).load(SESSION_ID, SESSION_COURT_ID);
         verifyNoInteractions(ratingReader, engine);
     }
 
@@ -378,14 +399,14 @@ class MatchmakingRecommendationServiceTest {
     }
 
     @Test
-    void sessionReaderAndClockAreEachUsedExactlyOnce() {
+    void sessionSnapshotReaderAndClockAreEachUsedExactlyOnce() {
         List<MatchmakingSessionParticipantSnapshot> participants =
                 waitingParticipants(4);
         stubValidPipeline(participants, ratingsFor(participants));
 
         service.recommend(SESSION_ID, SESSION_COURT_ID);
 
-        verify(sessionReader, times(1)).load(SESSION_ID, SESSION_COURT_ID);
+        verify(sessionSnapshotReader, times(1)).load(SESSION_ID, SESSION_COURT_ID);
         assertThat(clock.invocations()).isEqualTo(1);
     }
 
@@ -532,7 +553,7 @@ class MatchmakingRecommendationServiceTest {
                 ordered
         );
         java.util.Collections.reverse(reversed);
-        when(sessionReader.load(SESSION_ID, SESSION_COURT_ID))
+        when(sessionSnapshotReader.load(SESSION_ID, SESSION_COURT_ID))
                 .thenReturn(validSnapshot(ordered), validSnapshot(reversed));
         when(ratingReader.readEffectiveRatings(
                 org.mockito.ArgumentMatchers.<UUID>anyCollection(),
@@ -561,7 +582,7 @@ class MatchmakingRecommendationServiceTest {
                         SESSION_ID,
                         SESSION_COURT_ID
                 );
-        when(sessionReader.load(SESSION_ID, SESSION_COURT_ID))
+        when(sessionSnapshotReader.load(SESSION_ID, SESSION_COURT_ID))
                 .thenThrow(expected);
 
         assertThatThrownBy(() -> service.recommend(
@@ -580,7 +601,7 @@ class MatchmakingRecommendationServiceTest {
                         SESSION_ID,
                         SESSION_COURT_ID
                 );
-        when(sessionReader.load(SESSION_ID, SESSION_COURT_ID))
+        when(sessionSnapshotReader.load(SESSION_ID, SESSION_COURT_ID))
                 .thenThrow(expected);
 
         assertThatThrownBy(() -> service.recommend(
@@ -666,7 +687,7 @@ class MatchmakingRecommendationServiceTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("sessionId is required");
         assertThat(clock.invocations()).isZero();
-        verifyNoInteractions(sessionReader, ratingReader, engine);
+        verifyNoInteractions(sessionSnapshotReader, ratingReader, engine);
     }
 
     @Test
@@ -675,7 +696,7 @@ class MatchmakingRecommendationServiceTest {
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("sessionCourtId is required");
         assertThat(clock.invocations()).isZero();
-        verifyNoInteractions(sessionReader, ratingReader, engine);
+        verifyNoInteractions(sessionSnapshotReader, ratingReader, engine);
     }
 
     @Test
@@ -720,7 +741,7 @@ class MatchmakingRecommendationServiceTest {
     }
 
     private void stubSnapshot(MatchmakingSessionSnapshot snapshot) {
-        when(sessionReader.load(SESSION_ID, SESSION_COURT_ID))
+        when(sessionSnapshotReader.load(SESSION_ID, SESSION_COURT_ID))
                 .thenReturn(snapshot);
     }
 

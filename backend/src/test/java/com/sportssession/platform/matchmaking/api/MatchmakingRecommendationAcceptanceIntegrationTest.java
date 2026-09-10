@@ -528,6 +528,71 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     }
 
     @Test
+    void levelFirstRecommendationUsesProfilesThenQueueExcludesSelectedPlayers()
+            throws Exception {
+        List<SkillLevel> skillLevels = List.of(
+                SkillLevel.WEAK,
+                SkillLevel.WEAK,
+                SkillLevel.WEAK_PLUS,
+                SkillLevel.WEAK_PLUS,
+                SkillLevel.INTERMEDIATE_MINUS,
+                SkillLevel.INTERMEDIATE_MINUS,
+                SkillLevel.INTERMEDIATE,
+                SkillLevel.INTERMEDIATE
+        );
+        List<Double> ratings = List.of(
+                15.0, 15.0, 19.0, 20.0,
+                23.0, 24.0, 27.0, 28.0
+        );
+        RuntimeFixture fixture = createFixture(1, skillLevels);
+        for (int index = 0; index < ratings.size(); index++) {
+            createPersistedRating(
+                    fixture.playerIds().get(index),
+                    skillLevels.get(index),
+                    ratings.get(index)
+            );
+        }
+
+        JsonNode first = generate(fixture, 0);
+
+        assertThat(first.get("algorithmVersion").asText())
+                .isEqualTo(MatchmakingEngine.ALGORITHM_VERSION);
+        assertThat(recommendedParticipantIds(first))
+                .containsExactlyInAnyOrderElementsOf(
+                        fixture.participantIds().subList(0, 4)
+                );
+        assertThat(first.get("ratingDifference").decimalValue())
+                .isEqualByComparingTo("1.0");
+
+        JsonNode generatedAgain = generate(fixture, 0);
+        assertThat(recommendedParticipantIds(generatedAgain))
+                .containsExactlyInAnyOrderElementsOf(
+                        fixture.participantIds().subList(0, 4)
+                );
+        assertThat(matchPlanRepository.count()).isZero();
+        assertThat(matchPlanParticipantRepository.count()).isZero();
+
+        queue(fixture, 0, acceptBody(first))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.source").value("RECOMMENDATION"));
+
+        JsonNode second = generate(fixture, 0);
+        assertThat(recommendedParticipantIds(second))
+                .containsExactlyInAnyOrderElementsOf(
+                        fixture.participantIds().subList(4, 8)
+                );
+        assertThat(second.get("ratingDifference").decimalValue())
+                .isEqualByComparingTo("0.0");
+        assertThat(matchPlanRepository.count()).isEqualTo(1);
+        assertThat(matchPlanParticipantRepository.count()).isEqualTo(4);
+        assertThat(matchRepository.count()).isZero();
+        assertThat(fixture.participantIds()).allSatisfy(participantId ->
+                assertThat(participantRepository.findById(participantId)
+                        .orElseThrow().getStatus())
+                        .isEqualTo(ParticipantStatus.WAITING));
+    }
+
+    @Test
     void recommendationAppendsBehindManualPlanUsingSharedQueueLogic()
             throws Exception {
         RuntimeFixture fixture = createFixture(1, 8);
@@ -748,6 +813,16 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     }
 
     private RuntimeFixture createFixture(int courtCount, int playerCount) {
+        return createFixture(
+                courtCount,
+                java.util.Collections.nCopies(playerCount, SkillLevel.GOOD)
+        );
+    }
+
+    private RuntimeFixture createFixture(
+            int courtCount,
+            List<SkillLevel> skillLevels
+    ) {
         UUID venueId = createVenue();
         UUID sessionId = createSession(venueId);
         List<UUID> sessionCourtIds = new ArrayList<>();
@@ -757,8 +832,8 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
         }
         List<UUID> playerIds = new ArrayList<>();
         List<UUID> participantIds = new ArrayList<>();
-        for (int index = 0; index < playerCount; index++) {
-            UUID playerId = createPlayerWithProfile(SkillLevel.GOOD);
+        for (int index = 0; index < skillLevels.size(); index++) {
+            UUID playerId = createPlayerWithProfile(skillLevels.get(index));
             playerIds.add(playerId);
             participantIds.add(createParticipant(
                     sessionId,
@@ -913,6 +988,14 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
         );
     }
 
+    private List<UUID> recommendedParticipantIds(JsonNode recommendation) {
+        return assignments(recommendation).stream()
+                .map(assignment -> UUID.fromString(
+                        assignment.get("sessionParticipantId").toString()
+                ))
+                .toList();
+    }
+
     private Map<String, Object> assignment(JsonNode player) {
         return assignment(
                 UUID.fromString(player.get("sessionParticipantId").asText()),
@@ -974,12 +1057,20 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     }
 
     private void createEqualPersistedRating(UUID playerId) {
+        createPersistedRating(playerId, SkillLevel.GOOD, 35.0);
+    }
+
+    private void createPersistedRating(
+            UUID playerId,
+            SkillLevel skillLevel,
+            double ratingValue
+    ) {
         playerRatingRepository.saveAndFlush(PlayerRatingEntity.initialize(
                 playerId,
                 SportCode.BADMINTON,
                 MatchFormat.DOUBLES,
-                SkillLevel.GOOD,
-                new RatingState(35.0, 5.0),
+                skillLevel,
+                new RatingState(ratingValue, 5.0),
                 WengLinPlackettLuceRatingEngine.ALGORITHM_VERSION,
                 BASE_TIME
         ));

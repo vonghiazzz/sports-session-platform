@@ -2,6 +2,23 @@ import type { MatchmakingPlayerResponse } from '../../api/contracts'
 import type { CourtView, ParticipantView } from './liveSessionModel'
 import { useMatchmakingRecommendation } from './useMatchmakingRecommendation'
 
+const ratingFormatter = new Intl.NumberFormat('vi-VN', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 2,
+})
+
+function formatRating(value: number) {
+  return ratingFormatter.format(value)
+}
+
+function ratingContext(player: MatchmakingPlayerResponse) {
+  if (player.ratingBasis === 'INITIAL_PRIOR') {
+    return 'Điểm khởi tạo'
+  }
+
+  return `${player.ratedMatches} trận đã tính`
+}
+
 function RecommendationPlayer({
   player,
   participantById,
@@ -10,12 +27,21 @@ function RecommendationPlayer({
   readonly participantById: ReadonlyMap<string, ParticipantView>
 }) {
   const participant = participantById.get(player.sessionParticipantId)
+
   return (
     <li>
       <strong>
         {participant?.displayName ?? 'Không có dữ liệu người chơi'}
       </strong>
-      <span>{participant?.skillLabel ?? 'Chưa có trình độ'}</span>
+
+      <span>
+        Trình độ: {participant?.skillLabel ?? 'Chưa có trình độ'}
+      </span>
+
+      <span>
+        Rating: {formatRating(player.ratingValue)} · {ratingContext(player)}
+      </span>
+
       <span>
         {participant?.waitingDuration === null ||
         participant?.waitingDuration === undefined
@@ -39,12 +65,14 @@ export function MatchmakingRecommendation({
     sessionId,
     court.sessionCourtId,
   )
+
   const participantById = new Map(
     participants.map((participant) => [
       participant.sessionParticipantId,
       participant,
     ]),
   )
+
   const recommendation = action.recommendation
 
   return (
@@ -72,29 +100,44 @@ export function MatchmakingRecommendation({
               <p className="eyebrow">Đề xuất trận</p>
               <h4>{court.name}</h4>
             </div>
-            <span>{recommendation.eligiblePlayerCount} người đủ điều kiện</span>
+
+            <span>
+              {recommendation.eligiblePlayerCount} người đủ điều kiện
+            </span>
           </div>
+
           <div className="recommendation-teams">
             <div>
-              <h5>Đội A</h5>
+              <h5>
+                Đội A · Tổng Rating{' '}
+                {formatRating(recommendation.teamARatingTotal)}
+              </h5>
+
               <ul>
                 <RecommendationPlayer
                   player={recommendation.teamA.slot1}
                   participantById={participantById}
                 />
+
                 <RecommendationPlayer
                   player={recommendation.teamA.slot2}
                   participantById={participantById}
                 />
               </ul>
             </div>
+
             <div>
-              <h5>Đội B</h5>
+              <h5>
+                Đội B · Tổng Rating{' '}
+                {formatRating(recommendation.teamBRatingTotal)}
+              </h5>
+
               <ul>
                 <RecommendationPlayer
                   player={recommendation.teamB.slot1}
                   participantById={participantById}
                 />
+
                 <RecommendationPlayer
                   player={recommendation.teamB.slot2}
                   participantById={participantById}
@@ -102,6 +145,19 @@ export function MatchmakingRecommendation({
               </ul>
             </div>
           </div>
+
+          <p className="recommendation-note">
+            Chênh lệch Rating giữa hai đội:{' '}
+            <strong>
+              {formatRating(recommendation.ratingDifference)}
+            </strong>
+          </p>
+
+          <p className="recommendation-note">
+            Matchmaking cân đội bằng Rating hiện tại. Trình độ Yếu, TB, Khá là
+            thông tin hồ sơ ban đầu và có thể khác Rating sau khi người chơi đã
+            có lịch sử thi đấu.
+          </p>
 
           <div className="recommendation-actions">
             <button
@@ -178,26 +234,31 @@ export function MatchmakingRecommendation({
           </div>
         </div>
       )}
+
       {action.generateError && (
         <p className="action-feedback" role="alert">
           {action.generateError}
         </p>
       )}
+
       {action.acceptError && (
         <p className="action-feedback" role="alert">
           {action.acceptError}
         </p>
       )}
+
       {action.queueError && (
         <p className="action-feedback" role="alert">
           {action.queueError}
         </p>
       )}
+
       <p className="recommendation-note">
         Ưu tiên người chờ lâu và cân bằng hai đội. Đề xuất chưa giữ sân hoặc
         người chơi; bạn có thể bắt đầu ngay khi đủ điều kiện hoặc thêm vào hàng
         chờ để chuẩn bị trước.
       </p>
+
       <p className="recommendation-fallback">
         Không phù hợp? Bạn vẫn có thể tạo trận thủ công bên dưới.
       </p>

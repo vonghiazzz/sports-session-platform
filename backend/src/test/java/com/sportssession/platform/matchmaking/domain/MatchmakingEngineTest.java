@@ -1,6 +1,7 @@
 package com.sportssession.platform.matchmaking.domain;
 
 import com.sportssession.platform.match.domain.TeamSide;
+import com.sportssession.platform.player.domain.SkillLevel;
 import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.shared.domain.SportCode;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,9 @@ class MatchmakingEngineTest {
     @Test
     void exposesOneLockedAlgorithmVersion() {
         assertThat(MatchmakingEngine.ALGORITHM_VERSION)
-                .isEqualTo("fairness-anchor-rating-sum-v1");
+                .isEqualTo(
+                        "fairness-anchor-level-first-rating-sum-v2"
+                );
     }
 
     @Test
@@ -102,6 +105,52 @@ class MatchmakingEngineTest {
         assertThat(selectedPlayerIds(recommendation)).contains(uuid(1));
         assertThat(recommendation.ratingDifference())
                 .isEqualByComparingTo("0");
+    }
+
+    @Test
+    void levelProximityWinsBeforePerfectCrossLevelRatingBalance() {
+        MatchRecommendation recommendation = recommend(List.of(
+                candidate(1, 800, SkillLevel.WEAK, "15"),
+                candidate(2, 700, SkillLevel.WEAK, "15"),
+                candidate(3, 600, SkillLevel.WEAK_PLUS, "19"),
+                candidate(4, 500, SkillLevel.WEAK_PLUS, "20"),
+
+                candidate(
+                        5,
+                        400,
+                        SkillLevel.INTERMEDIATE_MINUS,
+                        "23"
+                ),
+                candidate(
+                        6,
+                        300,
+                        SkillLevel.INTERMEDIATE_MINUS,
+                        "24"
+                ),
+                candidate(
+                        7,
+                        200,
+                        SkillLevel.INTERMEDIATE,
+                        "27"
+                ),
+                candidate(
+                        8,
+                        100,
+                        SkillLevel.INTERMEDIATE,
+                        "28"
+                )
+        ));
+
+        assertThat(selectedPlayerIds(recommendation))
+                .containsExactlyInAnyOrder(
+                        uuid(1),
+                        uuid(2),
+                        uuid(3),
+                        uuid(4)
+                );
+
+        assertThat(recommendation.ratingDifference())
+                .isEqualByComparingTo("1");
     }
 
     @Test
@@ -192,6 +241,7 @@ class MatchmakingEngineTest {
                         value.sessionParticipantId(),
                         value.playerId(),
                         value.waitingSince(),
+                        value.skillLevel(),
                         value.ratingValue(),
                         value.uncertainty(),
                         value.ratedMatches(),
@@ -239,6 +289,7 @@ class MatchmakingEngineTest {
                         value.sessionParticipantId(),
                         value.playerId(),
                         value.waitingSince(),
+                        value.skillLevel(),
                         value.ratingValue(),
                         value.uncertainty(),
                         7,
@@ -271,6 +322,7 @@ class MatchmakingEngineTest {
                 uuid(999),
                 first.playerId(),
                 EVALUATION_TIME.minusSeconds(300),
+                first.skillLevel(),
                 new BigDecimal("20"),
                 new BigDecimal("8"),
                 0,
@@ -289,6 +341,7 @@ class MatchmakingEngineTest {
                 first.sessionParticipantId(),
                 uuid(999),
                 EVALUATION_TIME.minusSeconds(300),
+                first.skillLevel(),
                 new BigDecimal("20"),
                 new BigDecimal("8"),
                 0,
@@ -306,6 +359,7 @@ class MatchmakingEngineTest {
                 uuid(101),
                 uuid(1),
                 EVALUATION_TIME.plusSeconds(1),
+                SkillLevel.INTERMEDIATE,
                 new BigDecimal("25"),
                 new BigDecimal("8"),
                 0,
@@ -335,6 +389,21 @@ class MatchmakingEngineTest {
                 1, 100, "25", "8", -1, RatingBasis.PERSISTED
         )).isInstanceOf(InvalidMatchmakingInputException.class)
                 .hasMessage("ratedMatches must not be negative");
+    }
+
+    @Test
+    void missingSkillLevelIsInvalidInput() {
+        assertThatThrownBy(() -> new MatchmakingCandidate(
+                uuid(1001),
+                uuid(1),
+                EVALUATION_TIME.minusSeconds(100),
+                null,
+                new BigDecimal("25"),
+                new BigDecimal("8"),
+                0,
+                RatingBasis.PERSISTED
+        )).isInstanceOf(InvalidMatchmakingInputException.class)
+                .hasMessage("skillLevel is required");
     }
 
     @Test
@@ -528,10 +597,29 @@ class MatchmakingEngineTest {
                 uuid(1000 + id),
                 uuid(id),
                 EVALUATION_TIME.minusSeconds(waitingSeconds),
+                SkillLevel.INTERMEDIATE,
                 new BigDecimal(ratingValue),
                 new BigDecimal(uncertainty),
                 ratedMatches,
                 ratingBasis
+        );
+    }
+
+    private static MatchmakingCandidate candidate(
+            int id,
+            long waitingSeconds,
+            SkillLevel skillLevel,
+            String ratingValue
+    ) {
+        return new MatchmakingCandidate(
+                uuid(1000 + id),
+                uuid(id),
+                EVALUATION_TIME.minusSeconds(waitingSeconds),
+                skillLevel,
+                new BigDecimal(ratingValue),
+                new BigDecimal("8.333333333"),
+                0,
+                RatingBasis.PERSISTED
         );
     }
 
@@ -589,6 +677,7 @@ class MatchmakingEngineTest {
                 values.sessionParticipantId(),
                 values.playerId(),
                 values.waitingSince(),
+                SkillLevel.INTERMEDIATE,
                 values.ratingValue(),
                 values.uncertainty(),
                 0,

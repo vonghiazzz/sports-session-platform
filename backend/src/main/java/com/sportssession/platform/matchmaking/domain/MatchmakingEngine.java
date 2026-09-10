@@ -1,6 +1,7 @@
 package com.sportssession.platform.matchmaking.domain;
 
 import com.sportssession.platform.match.domain.TeamSide;
+import com.sportssession.platform.player.domain.SkillLevel;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -12,7 +13,7 @@ import java.util.List;
 public final class MatchmakingEngine {
 
     public static final String ALGORITHM_VERSION =
-            "fairness-anchor-rating-sum-v1";
+            "fairness-anchor-level-first-rating-sum-v2";
 
     private static final Comparator<MatchmakingCandidate> PLAYER_KEY_ORDER =
             Comparator.comparing(candidate -> candidate.playerId().toString());
@@ -117,6 +118,7 @@ public final class MatchmakingEngine {
         BigDecimal teamATotal = ratingTotal(teamA);
         BigDecimal teamBTotal = ratingTotal(teamB);
         BigDecimal difference = teamATotal.subtract(teamBTotal).abs();
+        int levelSpread = levelSpread(group);
         List<Instant> waitingVector = group.stream()
                 .map(MatchmakingCandidate::waitingSince)
                 .sorted()
@@ -136,11 +138,37 @@ public final class MatchmakingEngine {
                 teamB,
                 teamATotal,
                 teamBTotal,
+                levelSpread,
                 difference,
                 waitingVector,
                 selectedPlayerKey,
                 partitionKey
         );
+    }
+
+    private int levelSpread(List<MatchmakingCandidate> group) {
+        int minimum = group.stream()
+                .mapToInt(candidate -> skillRank(candidate.skillLevel()))
+                .min()
+                .orElseThrow();
+
+        int maximum = group.stream()
+                .mapToInt(candidate -> skillRank(candidate.skillLevel()))
+                .max()
+                .orElseThrow();
+
+        return maximum - minimum;
+    }
+
+    private int skillRank(SkillLevel skillLevel) {
+        return switch (skillLevel) {
+            case WEAK -> 0;
+            case WEAK_PLUS -> 1;
+            case INTERMEDIATE_MINUS -> 2;
+            case INTERMEDIATE -> 3;
+            case INTERMEDIATE_PLUS -> 4;
+            case GOOD -> 5;
+        };
     }
 
     private MatchRecommendation recommendation(
@@ -239,15 +267,33 @@ public final class MatchmakingEngine {
         return team.get(0).ratingValue().add(team.get(1).ratingValue());
     }
 
-    private int compare(PartitionEvaluation left, PartitionEvaluation right) {
-        int result = left.ratingDifference().compareTo(right.ratingDifference());
+    private int compare(
+            PartitionEvaluation left,
+            PartitionEvaluation right
+    ) {
+        int result = Integer.compare(
+                left.levelSpread(),
+                right.levelSpread()
+        );
         if (result != 0) {
             return result;
         }
-        result = compareLists(left.waitingVector(), right.waitingVector());
+
+        result = left.ratingDifference().compareTo(
+                right.ratingDifference()
+        );
         if (result != 0) {
             return result;
         }
+
+        result = compareLists(
+                left.waitingVector(),
+                right.waitingVector()
+        );
+        if (result != 0) {
+            return result;
+        }
+
         result = compareLists(
                 left.selectedPlayerKey(),
                 right.selectedPlayerKey()
@@ -255,7 +301,11 @@ public final class MatchmakingEngine {
         if (result != 0) {
             return result;
         }
-        return compareLists(left.partitionKey(), right.partitionKey());
+
+        return compareLists(
+                left.partitionKey(),
+                right.partitionKey()
+        );
     }
 
     private int comparePlayerKeys(
@@ -291,6 +341,7 @@ public final class MatchmakingEngine {
             List<MatchmakingCandidate> teamB,
             BigDecimal teamATotal,
             BigDecimal teamBTotal,
+            int levelSpread,
             BigDecimal ratingDifference,
             List<Instant> waitingVector,
             List<String> selectedPlayerKey,

@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 class MatchmakingRecommendationAcceptanceControllerTest {
 
     private static final String ENDPOINT =
@@ -94,7 +94,7 @@ class MatchmakingRecommendationAcceptanceControllerTest {
     void malformedAssignmentCountReturnsBadRequestWithoutCallingService()
             throws Exception {
         Map<String, Object> body = Map.of(
-                "algorithmVersion", "fairness-anchor-rating-sum-v1",
+                "algorithmVersion", MatchmakingEngine.ALGORITHM_VERSION,
                 "assignments", assignments().subList(0, 3)
         );
 
@@ -113,7 +113,7 @@ class MatchmakingRecommendationAcceptanceControllerTest {
         );
 
         perform(Map.of(
-                "algorithmVersion", "fairness-anchor-rating-sum-v1",
+                "algorithmVersion", MatchmakingEngine.ALGORITHM_VERSION,
                 "assignments", assignments
         )).andExpect(status().isBadRequest());
         assertThat(acceptanceService.callCount()).isZero();
@@ -130,7 +130,7 @@ class MatchmakingRecommendationAcceptanceControllerTest {
         );
 
         perform(Map.of(
-                "algorithmVersion", "fairness-anchor-rating-sum-v1",
+                "algorithmVersion", MatchmakingEngine.ALGORITHM_VERSION,
                 "assignments", assignments
         )).andExpect(status().isBadRequest());
         assertThat(acceptanceService.callCount()).isZero();
@@ -204,7 +204,7 @@ class MatchmakingRecommendationAcceptanceControllerTest {
 
     private static Map<String, Object> validBody() {
         return Map.of(
-                "algorithmVersion", "fairness-anchor-rating-sum-v1",
+                "algorithmVersion", MatchmakingEngine.ALGORITHM_VERSION,
                 "assignments", assignments()
         );
     }
@@ -273,7 +273,7 @@ class MatchmakingRecommendationAcceptanceControllerTest {
         private RecordingAcceptanceService() {
             super(
                     new MatchmakingRecommendationService(
-                            null, null, null, null, null
+                            null, null, null, null, null, null
                     ),
                     new MatchService(null, null, null, null)
             );

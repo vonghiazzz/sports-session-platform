@@ -5,8 +5,9 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingCandidate;
 import com.sportssession.platform.matchmaking.domain.MatchmakingContext;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
-import com.sportssession.platform.session.domain.ParticipantStatus;
 import com.sportssession.platform.matchplan.application.MatchPlanPlanningLookup;
+import com.sportssession.platform.player.domain.SkillLevel;
+import com.sportssession.platform.session.domain.ParticipantStatus;
 import com.sportssession.platform.session.domain.SessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class MatchmakingRecommendationService {
 
     private final MatchmakingSessionSnapshotReader sessionSnapshotReader;
     private final MatchmakingRatingReader ratingReader;
+    private final MatchmakingSkillLevelReader skillLevelReader;
     private final MatchmakingEngine matchmakingEngine;
     private final MatchPlanPlanningLookup matchPlanPlanningLookup;
     private final Clock clock;
@@ -32,17 +34,18 @@ public class MatchmakingRecommendationService {
     public MatchmakingRecommendationService(
             MatchmakingSessionSnapshotReader sessionSnapshotReader,
             MatchmakingRatingReader ratingReader,
+            MatchmakingSkillLevelReader skillLevelReader,
             MatchmakingEngine matchmakingEngine,
             MatchPlanPlanningLookup matchPlanPlanningLookup,
             Clock clock
     ) {
         this.sessionSnapshotReader = sessionSnapshotReader;
         this.ratingReader = ratingReader;
+        this.skillLevelReader = skillLevelReader;
         this.matchmakingEngine = matchmakingEngine;
         this.matchPlanPlanningLookup = matchPlanPlanningLookup;
         this.clock = clock;
     }
-
 
     @Transactional(readOnly = true)
     public MatchmakingResult recommend(
@@ -98,6 +101,16 @@ public class MatchmakingRecommendationService {
                 eligibleWaitingParticipants.stream()
                         .map(MatchmakingSessionParticipantSnapshot::playerId)
                         .toList();
+        Map<UUID, SkillLevel> skillLevels =
+                skillLevelReader.readSkillLevels(
+                        eligiblePlayerIds,
+                        snapshot.sportCode()
+                );
+
+        validateCompleteSkillLevelBatch(
+                eligiblePlayerIds,
+                skillLevels
+        );
 
         Map<UUID, MatchmakingRatingSnapshot> ratings =
                 ratingReader.readEffectiveRatings(
@@ -116,6 +129,7 @@ public class MatchmakingRecommendationService {
                 eligibleWaitingParticipants.stream()
                         .map(participant -> candidate(
                                 participant,
+                                skillLevels.get(participant.playerId()),
                                 ratings.get(participant.playerId())
                         ))
                         .toList();
@@ -131,6 +145,27 @@ public class MatchmakingRecommendationService {
 
         return matchmakingEngine.recommend(context);
     }
+
+    private void validateCompleteSkillLevelBatch(
+            List<UUID> playerIds,
+            Map<UUID, SkillLevel> skillLevels
+    ) {
+        Set<UUID> requestedPlayerIds = Set.copyOf(playerIds);
+
+        boolean complete = skillLevels != null
+                && skillLevels.keySet().equals(requestedPlayerIds)
+                && requestedPlayerIds.stream()
+                .allMatch(playerId ->
+                        skillLevels.get(playerId) != null
+                );
+
+        if (!complete) {
+            throw new InvalidMatchmakingInputException(
+                    "Skill Level batch must exactly match eligible Players"
+            );
+        }
+    }
+
     private void validateOperationalContext(
             MatchmakingSessionSnapshot snapshot
     ) {
@@ -212,12 +247,14 @@ public class MatchmakingRecommendationService {
 
     private MatchmakingCandidate candidate(
             MatchmakingSessionParticipantSnapshot participant,
+            SkillLevel skillLevel,
             MatchmakingRatingSnapshot rating
     ) {
         return new MatchmakingCandidate(
                 participant.sessionParticipantId(),
                 participant.playerId(),
                 participant.waitingSince(),
+                skillLevel,
                 rating.ratingValue(),
                 rating.uncertainty(),
                 rating.ratedMatches(),
