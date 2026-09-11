@@ -2,6 +2,7 @@ package com.sportssession.platform.shared.api;
 
 import com.sportssession.platform.player.domain.DuplicatePlayerSportProfileException;
 import com.sportssession.platform.player.domain.PlayerNotFoundException;
+import com.sportssession.platform.player.domain.PlayerSportProfileNotFoundException;
 import com.sportssession.platform.match.domain.InvalidManualMatchRequestException;
 import com.sportssession.platform.match.domain.InvalidMatchResultException;
 import com.sportssession.platform.match.domain.InvalidMatchStateException;
@@ -54,9 +55,12 @@ public class GlobalExceptionHandler {
 
     private final Clock clock = Clock.systemUTC();
 
-    @ExceptionHandler(PlayerNotFoundException.class)
+    @ExceptionHandler({
+            PlayerNotFoundException.class,
+            PlayerSportProfileNotFoundException.class
+    })
     ResponseEntity<ApiError> handlePlayerNotFound(
-            PlayerNotFoundException exception,
+            RuntimeException exception,
             HttpServletRequest request
     ) {
         return error(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());

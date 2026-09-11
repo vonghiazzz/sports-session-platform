@@ -3,11 +3,14 @@ package com.sportssession.platform.player.api;
 import com.sportssession.platform.player.application.CreatePlayerCommand;
 import com.sportssession.platform.player.application.PlayerResult;
 import com.sportssession.platform.player.application.PlayerService;
+import com.sportssession.platform.player.application.UpdatePlayerSkillLevelCommand;
+import com.sportssession.platform.shared.domain.SportCode;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,5 +57,19 @@ public class PlayerController {
                 .map(PlayerResponse::from)
                 .toList();
     }
-}
 
+    @PutMapping("/{playerId}/sports/{sportCode}/skill-level")
+    public PlayerResponse updateSkillLevel(
+            @PathVariable UUID playerId,
+            @PathVariable SportCode sportCode,
+            @Valid @RequestBody UpdatePlayerSkillLevelRequest request
+    ) {
+        return PlayerResponse.from(playerService.updateSkillLevel(
+                new UpdatePlayerSkillLevelCommand(
+                        playerId,
+                        sportCode,
+                        request.skillLevel()
+                )
+        ));
+    }
+}
