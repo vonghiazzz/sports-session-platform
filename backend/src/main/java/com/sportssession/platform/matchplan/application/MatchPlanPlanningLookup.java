@@ -29,4 +29,16 @@ public class MatchPlanPlanningLookup {
                 )
         );
     }
+
+    @Transactional(readOnly = true)
+    public Set<UUID> queuedCourtIds(UUID sessionId) {
+        Objects.requireNonNull(sessionId, "sessionId is required");
+
+        return Set.copyOf(
+                planRepository.findCourtIdsBySessionAndStatus(
+                        sessionId,
+                        MatchPlanStatus.QUEUED
+                )
+        );
+    }
 }

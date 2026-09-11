@@ -273,7 +273,7 @@ class MatchmakingRecommendationAcceptanceControllerTest {
         private RecordingAcceptanceService() {
             super(
                     new MatchmakingRecommendationService(
-                            null, null, null, null, null, null, null
+                            null, null, null, null
                     ),
                     new MatchService(null, null, null, null)
             );

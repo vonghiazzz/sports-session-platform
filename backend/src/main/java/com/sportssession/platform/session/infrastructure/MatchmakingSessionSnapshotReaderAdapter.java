@@ -1,5 +1,8 @@
 package com.sportssession.platform.session.infrastructure;
 
+import com.sportssession.platform.matchmaking.application.GlobalMatchmakingCourtSnapshot;
+import com.sportssession.platform.matchmaking.application.GlobalMatchmakingSessionSnapshot;
+import com.sportssession.platform.matchmaking.application.GlobalMatchmakingSessionSnapshotReader;
 import com.sportssession.platform.matchmaking.application.MatchmakingSessionParticipantSnapshot;
 import com.sportssession.platform.matchmaking.application.MatchmakingSessionSnapshot;
 import com.sportssession.platform.matchmaking.application.MatchmakingSessionSnapshotException;
@@ -15,7 +18,8 @@ import java.util.UUID;
 
 @Component
 public class MatchmakingSessionSnapshotReaderAdapter
-        implements MatchmakingSessionSnapshotReader {
+        implements MatchmakingSessionSnapshotReader,
+        GlobalMatchmakingSessionSnapshotReader {
 
     private final SessionRepository sessionRepository;
     private final SessionCourtRepository sessionCourtRepository;
@@ -56,17 +60,7 @@ public class MatchmakingSessionSnapshotReaderAdapter
                         sessionCourtId
                 ));
         List<MatchmakingSessionParticipantSnapshot> participants =
-                sessionParticipantRepository
-                        .findAllBySessionIdOrderByPlayerIdAscIdAsc(sessionId)
-                        .stream()
-                        .map(participant ->
-                                new MatchmakingSessionParticipantSnapshot(
-                                        participant.getId(),
-                                        participant.getPlayerId(),
-                                        participant.getStatus(),
-                                        participant.getWaitingSince()
-                                ))
-                        .toList();
+                participants(sessionId);
 
         return new MatchmakingSessionSnapshot(
                 session.id(),
@@ -77,5 +71,53 @@ public class MatchmakingSessionSnapshotReaderAdapter
                 sessionCourt.getStatus(),
                 participants
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GlobalMatchmakingSessionSnapshot load(UUID sessionId) {
+        Objects.requireNonNull(sessionId, "sessionId is required");
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new MatchmakingSessionSnapshotException(
+                        MatchmakingSessionSnapshotFailureReason.SESSION_NOT_FOUND,
+                        sessionId,
+                        null
+                ))
+                .toDomain();
+        List<GlobalMatchmakingCourtSnapshot> courts = sessionCourtRepository
+                .findAllBySessionIdOrderByAddedAtAscIdAsc(sessionId)
+                .stream()
+                .map(SessionCourtEntity::toDomain)
+                .map(court -> new GlobalMatchmakingCourtSnapshot(
+                        court.id(),
+                        court.status(),
+                        court.addedAt()
+                ))
+                .toList();
+
+        return new GlobalMatchmakingSessionSnapshot(
+                session.id(),
+                session.sportCode(),
+                session.matchFormat(),
+                session.status(),
+                courts,
+                participants(sessionId)
+        );
+    }
+
+    private List<MatchmakingSessionParticipantSnapshot> participants(
+            UUID sessionId
+    ) {
+        return sessionParticipantRepository
+                .findAllBySessionIdOrderByPlayerIdAscIdAsc(sessionId)
+                .stream()
+                .map(participant ->
+                        new MatchmakingSessionParticipantSnapshot(
+                                participant.getId(),
+                                participant.getPlayerId(),
+                                participant.getStatus(),
+                                participant.getWaitingSince()
+                        ))
+                .toList();
     }
 }

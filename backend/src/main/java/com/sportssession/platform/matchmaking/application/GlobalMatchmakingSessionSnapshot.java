@@ -1,6 +1,5 @@
 package com.sportssession.platform.matchmaking.application;
 
-import com.sportssession.platform.session.domain.SessionCourtStatus;
 import com.sportssession.platform.session.domain.SessionStatus;
 import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.shared.domain.SportCode;
@@ -9,26 +8,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-public record MatchmakingSessionSnapshot(
+public record GlobalMatchmakingSessionSnapshot(
         UUID sessionId,
         SportCode sportCode,
         MatchFormat matchFormat,
         SessionStatus sessionStatus,
-        UUID sessionCourtId,
-        SessionCourtStatus sessionCourtStatus,
+        List<GlobalMatchmakingCourtSnapshot> courts,
         List<MatchmakingSessionParticipantSnapshot> participants
 ) {
-    public MatchmakingSessionSnapshot {
+    public GlobalMatchmakingSessionSnapshot {
         Objects.requireNonNull(sessionId, "sessionId is required");
         Objects.requireNonNull(sportCode, "sportCode is required");
         Objects.requireNonNull(matchFormat, "matchFormat is required");
         Objects.requireNonNull(sessionStatus, "sessionStatus is required");
-        Objects.requireNonNull(sessionCourtId, "sessionCourtId is required");
-        Objects.requireNonNull(
-                sessionCourtStatus,
-                "sessionCourtStatus is required"
-        );
+        Objects.requireNonNull(courts, "courts are required");
         Objects.requireNonNull(participants, "participants are required");
+        courts = List.copyOf(courts);
         participants = List.copyOf(participants);
     }
 

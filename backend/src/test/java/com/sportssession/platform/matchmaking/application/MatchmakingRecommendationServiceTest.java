@@ -103,13 +103,17 @@ class MatchmakingRecommendationServiceTest {
             return Map.copyOf(counts);
         });
 
-        service = new MatchmakingRecommendationService(
-                sessionSnapshotReader,
+        MatchmakingCandidatePreparationService candidatePreparation =
+                new MatchmakingCandidatePreparationService(
                 ratingReader,
                 skillLevelReader,
                 sessionMatchCountReader,
+                matchPlanPlanningLookup
+        );
+        service = new MatchmakingRecommendationService(
+                sessionSnapshotReader,
+                candidatePreparation,
                 engine,
-                matchPlanPlanningLookup,
                 clock
         );
     }

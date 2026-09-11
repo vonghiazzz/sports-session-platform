@@ -22,6 +22,17 @@ public interface MatchRepository extends JpaRepository<MatchEntity, UUID> {
             UUID sessionId
     );
 
+    @Query("""
+            select distinct match.sessionCourtId
+            from MatchEntity match
+            where match.sessionId = :sessionId
+              and match.status = :status
+            """)
+    List<UUID> findCourtIdsBySessionIdAndStatus(
+            @Param("sessionId") UUID sessionId,
+            @Param("status") MatchStatus status
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select match from MatchEntity match where match.id = :matchId")
     Optional<MatchEntity> findByIdForUpdate(@Param("matchId") UUID matchId);

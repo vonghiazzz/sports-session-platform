@@ -39,7 +39,7 @@ public interface MatchPlanRepository
             UUID sessionId
     );
 
-        @Query("""
+    @Query("""
             select distinct participant.sessionParticipantId
             from MatchPlanParticipantEntity participant, MatchPlanEntity plan
             where participant.matchPlanId = plan.id
@@ -48,6 +48,17 @@ public interface MatchPlanRepository
               and plan.status = :status
             """)
     List<UUID> findParticipantIdsBySessionAndStatus(
+            @Param("sessionId") UUID sessionId,
+            @Param("status") MatchPlanStatus status
+    );
+
+    @Query("""
+            select distinct plan.sessionCourtId
+            from MatchPlanEntity plan
+            where plan.sessionId = :sessionId
+              and plan.status = :status
+            """)
+    List<UUID> findCourtIdsBySessionAndStatus(
             @Param("sessionId") UUID sessionId,
             @Param("status") MatchPlanStatus status
     );
