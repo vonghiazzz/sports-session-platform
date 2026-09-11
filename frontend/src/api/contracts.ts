@@ -201,6 +201,7 @@ export interface MatchmakingPlayerResponse {
   readonly teamSlot: number
   readonly waitingSince: ISOInstant
   readonly waitingSeconds: number
+  readonly sessionMatchesPlayed: number
   readonly ratingValue: number
   readonly uncertainty: number
   readonly ratedMatches: number

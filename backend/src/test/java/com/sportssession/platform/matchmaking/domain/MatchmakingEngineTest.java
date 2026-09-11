@@ -29,7 +29,7 @@ class MatchmakingEngineTest {
     void exposesOneLockedAlgorithmVersion() {
         assertThat(MatchmakingEngine.ALGORITHM_VERSION)
                 .isEqualTo(
-                        "fairness-anchor-level-first-rating-sum-v2"
+                        "fairness-anchor-level-session-count-rating-sum-v3"
                 );
     }
 
@@ -154,6 +154,65 @@ class MatchmakingEngineTest {
     }
 
     @Test
+    void fewerSessionMatchesArePreferredWhenSkillSpreadIsEqual() {
+        MatchRecommendation recommendation = recommend(List.of(
+                candidate(1, 600, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(2, 500, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(3, 400, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(4, 300, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(5, 200, SkillLevel.INTERMEDIATE, 1, "25")
+        ));
+
+        assertThat(selectedPlayerIds(recommendation))
+                .containsExactlyInAnyOrder(uuid(1), uuid(2), uuid(3), uuid(4))
+                .doesNotContain(uuid(5));
+    }
+
+    @Test
+    void oldestWaitingAnchorRemainsMandatoryDespiteHigherSessionMatchCount() {
+        MatchRecommendation recommendation = recommend(List.of(
+                candidate(1, 600, SkillLevel.INTERMEDIATE, 20, "25"),
+                candidate(2, 500, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(3, 400, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(4, 300, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(5, 200, SkillLevel.INTERMEDIATE, 0, "25")
+        ));
+
+        assertThat(selectedPlayerIds(recommendation)).contains(uuid(1));
+    }
+
+    @Test
+    void skillSpreadWinsBeforeSessionMatchFairness() {
+        MatchRecommendation recommendation = recommend(List.of(
+                candidate(1, 600, SkillLevel.INTERMEDIATE, 0, "25"),
+                candidate(2, 500, SkillLevel.INTERMEDIATE, 5, "25"),
+                candidate(3, 400, SkillLevel.INTERMEDIATE, 5, "25"),
+                candidate(4, 300, SkillLevel.INTERMEDIATE, 5, "25"),
+                candidate(5, 200, SkillLevel.WEAK, 0, "25"),
+                candidate(6, 100, SkillLevel.WEAK, 0, "25")
+        ));
+
+        assertThat(selectedPlayerIds(recommendation))
+                .containsExactlyInAnyOrder(uuid(1), uuid(2), uuid(3), uuid(4));
+    }
+
+    @Test
+    void sessionMatchFairnessWinsBeforeBetterTeamRatingDifference() {
+        MatchRecommendation recommendation = recommend(List.of(
+                candidate(1, 600, SkillLevel.INTERMEDIATE, 0, "10"),
+                candidate(2, 500, SkillLevel.INTERMEDIATE, 0, "10"),
+                candidate(3, 400, SkillLevel.INTERMEDIATE, 0, "10"),
+                candidate(4, 300, SkillLevel.INTERMEDIATE, 0, "40"),
+                candidate(5, 200, SkillLevel.INTERMEDIATE, 1, "10")
+        ));
+
+        assertThat(selectedPlayerIds(recommendation))
+                .containsExactlyInAnyOrder(uuid(1), uuid(2), uuid(3), uuid(4));
+        assertThat(recommendation.ratingDifference())
+                .isEqualByComparingTo("30");
+    }
+
+    @Test
     void equalRatingDifferencePrefersOlderSelectedWaitingVector() {
         MatchRecommendation recommendation = recommend(List.of(
                 candidate(1, 600, "25"),
@@ -242,6 +301,7 @@ class MatchmakingEngineTest {
                         value.playerId(),
                         value.waitingSince(),
                         value.skillLevel(),
+                        value.sessionMatchesPlayed(),
                         value.ratingValue(),
                         value.uncertainty(),
                         value.ratedMatches(),
@@ -290,6 +350,7 @@ class MatchmakingEngineTest {
                         value.playerId(),
                         value.waitingSince(),
                         value.skillLevel(),
+                        value.sessionMatchesPlayed(),
                         value.ratingValue(),
                         value.uncertainty(),
                         7,
@@ -323,6 +384,7 @@ class MatchmakingEngineTest {
                 first.playerId(),
                 EVALUATION_TIME.minusSeconds(300),
                 first.skillLevel(),
+                0,
                 new BigDecimal("20"),
                 new BigDecimal("8"),
                 0,
@@ -342,6 +404,7 @@ class MatchmakingEngineTest {
                 uuid(999),
                 EVALUATION_TIME.minusSeconds(300),
                 first.skillLevel(),
+                0,
                 new BigDecimal("20"),
                 new BigDecimal("8"),
                 0,
@@ -360,6 +423,7 @@ class MatchmakingEngineTest {
                 uuid(1),
                 EVALUATION_TIME.plusSeconds(1),
                 SkillLevel.INTERMEDIATE,
+                0,
                 new BigDecimal("25"),
                 new BigDecimal("8"),
                 0,
@@ -392,12 +456,29 @@ class MatchmakingEngineTest {
     }
 
     @Test
+    void negativeSessionMatchesPlayedIsInvalidInput() {
+        assertThatThrownBy(() -> new MatchmakingCandidate(
+                uuid(1001),
+                uuid(1),
+                EVALUATION_TIME.minusSeconds(100),
+                SkillLevel.INTERMEDIATE,
+                -1,
+                new BigDecimal("25"),
+                new BigDecimal("8"),
+                0,
+                RatingBasis.PERSISTED
+        )).isInstanceOf(InvalidMatchmakingInputException.class)
+                .hasMessage("sessionMatchesPlayed must not be negative");
+    }
+
+    @Test
     void missingSkillLevelIsInvalidInput() {
         assertThatThrownBy(() -> new MatchmakingCandidate(
                 uuid(1001),
                 uuid(1),
                 EVALUATION_TIME.minusSeconds(100),
                 null,
+                0,
                 new BigDecimal("25"),
                 new BigDecimal("8"),
                 0,
@@ -598,6 +679,7 @@ class MatchmakingEngineTest {
                 uuid(id),
                 EVALUATION_TIME.minusSeconds(waitingSeconds),
                 SkillLevel.INTERMEDIATE,
+                0,
                 new BigDecimal(ratingValue),
                 new BigDecimal(uncertainty),
                 ratedMatches,
@@ -616,6 +698,27 @@ class MatchmakingEngineTest {
                 uuid(id),
                 EVALUATION_TIME.minusSeconds(waitingSeconds),
                 skillLevel,
+                0,
+                new BigDecimal(ratingValue),
+                new BigDecimal("8.333333333"),
+                0,
+                RatingBasis.PERSISTED
+        );
+    }
+
+    private static MatchmakingCandidate candidate(
+            int id,
+            long waitingSeconds,
+            SkillLevel skillLevel,
+            int sessionMatchesPlayed,
+            String ratingValue
+    ) {
+        return new MatchmakingCandidate(
+                uuid(1000 + id),
+                uuid(id),
+                EVALUATION_TIME.minusSeconds(waitingSeconds),
+                skillLevel,
+                sessionMatchesPlayed,
                 new BigDecimal(ratingValue),
                 new BigDecimal("8.333333333"),
                 0,
@@ -678,6 +781,7 @@ class MatchmakingEngineTest {
                 values.playerId(),
                 values.waitingSince(),
                 SkillLevel.INTERMEDIATE,
+                0,
                 values.ratingValue(),
                 values.uncertainty(),
                 0,

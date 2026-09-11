@@ -315,6 +315,7 @@ class MatchmakingRecommendationAcceptanceServiceTest {
                 Instant.parse("2026-08-28T09:00:00Z")
                         .plusSeconds(player),
                 3600L - player,
+                0,
                 rating,
                 new BigDecimal("8.0"),
                 1,
@@ -336,7 +337,7 @@ class MatchmakingRecommendationAcceptanceServiceTest {
         private UUID sessionCourtId;
 
         private RecordingRecommendationService(MatchmakingResult result) {
-            super(null, null,null, null, null, null);
+            super(null, null, null, null, null, null, null);
             this.result = result;
         }
 

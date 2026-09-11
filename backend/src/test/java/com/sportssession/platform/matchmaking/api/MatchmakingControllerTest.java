@@ -138,6 +138,8 @@ class MatchmakingControllerTest {
                 .andExpect(jsonPath("$.teamA.slot1.waitingSince")
                         .value("2026-08-28T09:00:00Z"))
                 .andExpect(jsonPath("$.teamA.slot1.waitingSeconds").value(3600))
+                .andExpect(jsonPath("$.teamA.slot1.sessionMatchesPlayed")
+                        .value(0))
                 .andExpect(jsonPath("$.teamA.slot1.ratedMatches").value(7))
                 .andExpect(jsonPath("$.teamA.slot1.ratingBasis")
                         .value("PERSISTED"))
@@ -456,6 +458,7 @@ class MatchmakingControllerTest {
                 teamSlot,
                 Instant.parse(waitingSince),
                 waitingSeconds,
+                0,
                 decimal(ratingValue),
                 decimal(uncertainty),
                 ratedMatches,
@@ -493,7 +496,7 @@ class MatchmakingControllerTest {
         private UUID sessionCourtId;
 
         private RecordingRecommendationService() {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null);
         }
 
         @Override

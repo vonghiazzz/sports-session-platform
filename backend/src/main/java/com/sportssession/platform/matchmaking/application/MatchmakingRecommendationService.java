@@ -27,6 +27,7 @@ public class MatchmakingRecommendationService {
     private final MatchmakingSessionSnapshotReader sessionSnapshotReader;
     private final MatchmakingRatingReader ratingReader;
     private final MatchmakingSkillLevelReader skillLevelReader;
+    private final MatchmakingSessionMatchCountReader sessionMatchCountReader;
     private final MatchmakingEngine matchmakingEngine;
     private final MatchPlanPlanningLookup matchPlanPlanningLookup;
     private final Clock clock;
@@ -35,6 +36,7 @@ public class MatchmakingRecommendationService {
             MatchmakingSessionSnapshotReader sessionSnapshotReader,
             MatchmakingRatingReader ratingReader,
             MatchmakingSkillLevelReader skillLevelReader,
+            MatchmakingSessionMatchCountReader sessionMatchCountReader,
             MatchmakingEngine matchmakingEngine,
             MatchPlanPlanningLookup matchPlanPlanningLookup,
             Clock clock
@@ -42,6 +44,7 @@ public class MatchmakingRecommendationService {
         this.sessionSnapshotReader = sessionSnapshotReader;
         this.ratingReader = ratingReader;
         this.skillLevelReader = skillLevelReader;
+        this.sessionMatchCountReader = sessionMatchCountReader;
         this.matchmakingEngine = matchmakingEngine;
         this.matchPlanPlanningLookup = matchPlanPlanningLookup;
         this.clock = clock;
@@ -101,6 +104,20 @@ public class MatchmakingRecommendationService {
                 eligibleWaitingParticipants.stream()
                         .map(MatchmakingSessionParticipantSnapshot::playerId)
                         .toList();
+        List<UUID> eligibleParticipantIds =
+                eligibleWaitingParticipants.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::
+                                sessionParticipantId)
+                        .toList();
+        Map<UUID, Integer> sessionMatchCounts =
+                sessionMatchCountReader.readCompletedMatchCounts(
+                        sessionId,
+                        eligibleParticipantIds
+                );
+        validateCompleteSessionMatchCountBatch(
+                eligibleParticipantIds,
+                sessionMatchCounts
+        );
         Map<UUID, SkillLevel> skillLevels =
                 skillLevelReader.readSkillLevels(
                         eligiblePlayerIds,
@@ -129,6 +146,9 @@ public class MatchmakingRecommendationService {
                 eligibleWaitingParticipants.stream()
                         .map(participant -> candidate(
                                 participant,
+                                sessionMatchCounts.get(
+                                        participant.sessionParticipantId()
+                                ),
                                 skillLevels.get(participant.playerId()),
                                 ratings.get(participant.playerId())
                         ))
@@ -162,6 +182,25 @@ public class MatchmakingRecommendationService {
         if (!complete) {
             throw new InvalidMatchmakingInputException(
                     "Skill Level batch must exactly match eligible Players"
+            );
+        }
+    }
+
+    private void validateCompleteSessionMatchCountBatch(
+            List<UUID> participantIds,
+            Map<UUID, Integer> counts
+    ) {
+        Set<UUID> requestedIds = Set.copyOf(participantIds);
+        boolean complete = counts != null
+                && counts.keySet().equals(requestedIds)
+                && requestedIds.stream().allMatch(participantId -> {
+                    Integer count = counts.get(participantId);
+                    return count != null && count >= 0;
+                });
+        if (!complete) {
+            throw new InvalidMatchmakingInputException(
+                    "Session Match count batch must exactly match eligible "
+                            + "SessionParticipants"
             );
         }
     }
@@ -247,6 +286,7 @@ public class MatchmakingRecommendationService {
 
     private MatchmakingCandidate candidate(
             MatchmakingSessionParticipantSnapshot participant,
+            int sessionMatchesPlayed,
             SkillLevel skillLevel,
             MatchmakingRatingSnapshot rating
     ) {
@@ -255,6 +295,7 @@ public class MatchmakingRecommendationService {
                 participant.playerId(),
                 participant.waitingSince(),
                 skillLevel,
+                sessionMatchesPlayed,
                 rating.ratingValue(),
                 rating.uncertainty(),
                 rating.ratedMatches(),

@@ -1,11 +1,19 @@
 package com.sportssession.platform.matchmaking.application;
 
+import com.sportssession.platform.match.domain.Match;
+import com.sportssession.platform.match.domain.MatchParticipant;
+import com.sportssession.platform.match.domain.MatchResult;
+import com.sportssession.platform.match.domain.MatchSource;
+import com.sportssession.platform.match.domain.TeamSide;
+import com.sportssession.platform.match.infrastructure.MatchEntity;
+import com.sportssession.platform.match.infrastructure.MatchParticipantEntity;
 import com.sportssession.platform.match.infrastructure.MatchParticipantRepository;
 import com.sportssession.platform.match.infrastructure.MatchRepository;
 import com.sportssession.platform.matchmaking.domain.MatchRecommendation;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
 import com.sportssession.platform.matchmaking.domain.RatingBasis;
+import com.sportssession.platform.matchmaking.domain.RecommendedPlayer;
 import com.sportssession.platform.player.domain.Player;
 import com.sportssession.platform.player.domain.PlayerSportProfile;
 import com.sportssession.platform.player.domain.SkillLevel;
@@ -167,6 +175,51 @@ class MatchmakingRecommendationServiceIntegrationTest
         assertThat(ratingEventRepository.count()).isZero();
         assertThat(matchRepository.count()).isZero();
         assertThat(matchParticipantRepository.count()).isZero();
+    }
+
+    @Test
+    void completedSessionMatchesPreferTheLowerCountCompatiblePlayer() {
+        RuntimeFixture fixture = createRuntimeFixture(
+                SessionStatus.IN_PROGRESS,
+                SessionCourtStatus.AVAILABLE,
+                false
+        );
+        UUID fifthPlayerId = createPlayerWithProfile(5, SkillLevel.GOOD);
+        UUID fifthParticipantId = createParticipant(
+                fixture.sessionId(),
+                fifthPlayerId,
+                ParticipantStatus.WAITING,
+                5
+        );
+        saveCompletedMatch(fixture, fixture.waitingParticipantIds());
+
+        MatchRecommendation recommendation =
+                (MatchRecommendation) recommendationService.recommend(
+                        fixture.sessionId(),
+                        fixture.sessionCourtId()
+                );
+
+        List<RecommendedPlayer> recommendedPlayers = List.of(
+                recommendation.teamA().slot1(),
+                recommendation.teamA().slot2(),
+                recommendation.teamB().slot1(),
+                recommendation.teamB().slot2()
+        );
+        assertThat(recommendedPlayers)
+                .extracting(player -> player.sessionParticipantId())
+                .contains(fifthParticipantId)
+                .contains(fixture.waitingParticipantIds().getFirst());
+        assertThat(recommendedPlayers)
+                .filteredOn(player -> player.sessionParticipantId()
+                        .equals(fifthParticipantId))
+                .singleElement()
+                .satisfies(player -> assertThat(player.sessionMatchesPlayed())
+                        .isZero());
+        assertThat(recommendedPlayers)
+                .filteredOn(player -> !player.sessionParticipantId()
+                        .equals(fifthParticipantId))
+                .allSatisfy(player -> assertThat(player.sessionMatchesPlayed())
+                        .isEqualTo(1));
     }
 
     @Test
@@ -397,6 +450,33 @@ class MatchmakingRecommendationServiceIntegrationTest
                 WengLinPlackettLuceRatingEngine.ALGORITHM_VERSION,
                 BASE_TIME
         ));
+    }
+
+    private void saveCompletedMatch(
+            RuntimeFixture fixture,
+            List<UUID> participantIds
+    ) {
+        Match match = Match.create(
+                fixture.sessionId(),
+                fixture.sessionCourtId(),
+                MatchSource.MANUAL,
+                BASE_TIME.plusSeconds(100)
+        ).start(BASE_TIME.plusSeconds(101)).complete(
+                new MatchResult(TeamSide.A, 21, 18),
+                BASE_TIME.plusSeconds(102)
+        );
+        matchRepository.saveAndFlush(MatchEntity.from(match));
+        TeamSide[] sides = {TeamSide.A, TeamSide.A, TeamSide.B, TeamSide.B};
+        for (int index = 0; index < participantIds.size(); index++) {
+            matchParticipantRepository.saveAndFlush(
+                    MatchParticipantEntity.from(MatchParticipant.assign(
+                            match.id(),
+                            participantIds.get(index),
+                            sides[index],
+                            index % 2 + 1
+                    ))
+            );
+        }
     }
 
     private PersistedState persistedState(RuntimeFixture fixture) {

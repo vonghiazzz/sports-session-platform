@@ -16,7 +16,7 @@ function ratingContext(player: MatchmakingPlayerResponse) {
     return 'Điểm khởi tạo'
   }
 
-  return `${player.ratedMatches} trận đã tính`
+  return `rating từ ${player.ratedMatches} trận`
 }
 
 function RecommendationPlayer({
@@ -36,6 +36,10 @@ function RecommendationPlayer({
 
       <span>
         Trình độ: {participant?.skillLabel ?? 'Chưa có trình độ'}
+      </span>
+
+      <span>
+        Trong phiên: {player.sessionMatchesPlayed} trận hoàn tất
       </span>
 
       <span>

@@ -14,6 +14,7 @@ public record RecommendedPlayer(
         int teamSlot,
         Instant waitingSince,
         long waitingSeconds,
+        int sessionMatchesPlayed,
         BigDecimal ratingValue,
         BigDecimal uncertainty,
         int ratedMatches,
@@ -36,6 +37,10 @@ public record RecommendedPlayer(
         if (waitingSeconds < 0) {
             throw new IllegalArgumentException(
                     "waitingSeconds must not be negative");
+        }
+        if (sessionMatchesPlayed < 0) {
+            throw new IllegalArgumentException(
+                    "sessionMatchesPlayed must not be negative");
         }
         if (uncertainty.signum() <= 0) {
             throw new IllegalArgumentException(

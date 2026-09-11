@@ -13,7 +13,8 @@ import {
 
 const sessionId = 'session/one'
 const sessionCourtId = 'court two'
-const algorithmVersion = 'fairness-anchor-level-first-rating-sum-v2'
+const algorithmVersion =
+  'fairness-anchor-level-session-count-rating-sum-v3'
 
 afterEach(() => {
   vi.unstubAllGlobals()

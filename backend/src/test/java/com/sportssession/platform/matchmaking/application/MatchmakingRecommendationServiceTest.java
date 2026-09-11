@@ -49,6 +49,7 @@ class MatchmakingRecommendationServiceTest {
     private static final UUID SESSION_ID = uuid(100);
     private static final UUID SESSION_COURT_ID = uuid(200);
     private MatchmakingSkillLevelReader skillLevelReader;
+    private MatchmakingSessionMatchCountReader sessionMatchCountReader;
 
     private MatchmakingSessionSnapshotReader sessionSnapshotReader;
     private MatchmakingRatingReader ratingReader;
@@ -61,6 +62,9 @@ class MatchmakingRecommendationServiceTest {
         sessionSnapshotReader = mock(MatchmakingSessionSnapshotReader.class);
         ratingReader = mock(MatchmakingRatingReader.class);
         skillLevelReader = mock(MatchmakingSkillLevelReader.class);
+        sessionMatchCountReader = mock(
+                MatchmakingSessionMatchCountReader.class
+        );
         engine = mock(MatchmakingEngine.class);
         matchPlanPlanningLookup = mock(MatchPlanPlanningLookup.class);
         clock = new CountingClock(EVALUATION_TIME);
@@ -89,11 +93,21 @@ class MatchmakingRecommendationServiceTest {
 
         when(matchPlanPlanningLookup.queuedParticipantIds(any()))
                 .thenReturn(Set.of());
+        when(sessionMatchCountReader.readCompletedMatchCounts(
+                any(),
+                anyCollection()
+        )).thenAnswer(invocation -> {
+            Collection<UUID> participantIds = invocation.getArgument(1);
+            Map<UUID, Integer> counts = new LinkedHashMap<>();
+            participantIds.forEach(participantId -> counts.put(participantId, 0));
+            return Map.copyOf(counts);
+        });
 
         service = new MatchmakingRecommendationService(
                 sessionSnapshotReader,
                 ratingReader,
                 skillLevelReader,
+                sessionMatchCountReader,
                 engine,
                 matchPlanPlanningLookup,
                 clock
@@ -166,6 +180,13 @@ class MatchmakingRecommendationServiceTest {
                         .toList(),
                 SportCode.BADMINTON,
                 MatchFormat.DOUBLES
+        );
+        verify(sessionMatchCountReader).readCompletedMatchCounts(
+                SESSION_ID,
+                eligible.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::
+                                sessionParticipantId)
+                        .toList()
         );
 
         assertThat(capturedContext().candidates())
@@ -353,6 +374,28 @@ class MatchmakingRecommendationServiceTest {
     }
 
     @Test
+    void sessionMatchCountMapsExactlyBySessionParticipantIdentity() {
+        MatchmakingSessionParticipantSnapshot participant = waiting(1, 90);
+        stubValidPipeline(
+                List.of(participant),
+                ratingsFor(List.of(participant))
+        );
+        when(sessionMatchCountReader.readCompletedMatchCounts(
+                SESSION_ID,
+                List.of(participant.sessionParticipantId())
+        )).thenReturn(Map.of(participant.sessionParticipantId(), 3));
+
+        service.recommend(SESSION_ID, SESSION_COURT_ID);
+
+        assertThat(capturedContext().candidates().getFirst()
+                .sessionMatchesPlayed()).isEqualTo(3);
+        verify(sessionMatchCountReader, times(1)).readCompletedMatchCounts(
+                SESSION_ID,
+                List.of(participant.sessionParticipantId())
+        );
+    }
+
+    @Test
     void initialPriorMapsExactlyToCandidate() {
         MatchmakingSessionParticipantSnapshot participant = waiting(1, 90);
         MatchmakingRatingSnapshot rating = rating(
@@ -455,6 +498,69 @@ class MatchmakingRecommendationServiceTest {
     }
 
     @Test
+    void incompleteSessionMatchCountBatchFailsExplicitly() {
+        List<MatchmakingSessionParticipantSnapshot> participants =
+                waitingParticipants(4);
+        stubValidPipeline(participants, ratingsFor(participants));
+        when(sessionMatchCountReader.readCompletedMatchCounts(
+                eq(SESSION_ID),
+                anyCollection()
+        )).thenReturn(Map.of(
+                participants.getFirst().sessionParticipantId(),
+                0
+        ));
+
+        assertThatThrownBy(() -> service.recommend(
+                SESSION_ID,
+                SESSION_COURT_ID
+        )).isInstanceOf(InvalidMatchmakingInputException.class)
+                .hasMessage("Session Match count batch must exactly match "
+                        + "eligible SessionParticipants");
+        verifyNoInteractions(ratingReader, engine);
+    }
+
+    @Test
+    void extraneousSessionMatchCountBatchFailsExplicitly() {
+        MatchmakingSessionParticipantSnapshot participant = waiting(1, 10);
+        stubValidPipeline(List.of(participant), ratingsFor(List.of(participant)));
+        when(sessionMatchCountReader.readCompletedMatchCounts(
+                SESSION_ID,
+                List.of(participant.sessionParticipantId())
+        )).thenReturn(Map.of(
+                participant.sessionParticipantId(),
+                0,
+                uuid(9999),
+                0
+        ));
+
+        assertThatThrownBy(() -> service.recommend(
+                SESSION_ID,
+                SESSION_COURT_ID
+        )).isInstanceOf(InvalidMatchmakingInputException.class)
+                .hasMessage("Session Match count batch must exactly match "
+                        + "eligible SessionParticipants");
+        verifyNoInteractions(ratingReader, engine);
+    }
+
+    @Test
+    void negativeSessionMatchCountBatchFailsExplicitly() {
+        MatchmakingSessionParticipantSnapshot participant = waiting(1, 10);
+        stubValidPipeline(List.of(participant), ratingsFor(List.of(participant)));
+        when(sessionMatchCountReader.readCompletedMatchCounts(
+                SESSION_ID,
+                List.of(participant.sessionParticipantId())
+        )).thenReturn(Map.of(participant.sessionParticipantId(), -1));
+
+        assertThatThrownBy(() -> service.recommend(
+                SESSION_ID,
+                SESSION_COURT_ID
+        )).isInstanceOf(InvalidMatchmakingInputException.class)
+                .hasMessage("Session Match count batch must exactly match "
+                        + "eligible SessionParticipants");
+        verifyNoInteractions(ratingReader, engine);
+    }
+
+    @Test
     void unexpectedExtraRatingFailsAsIncompleteBatch() {
         List<MatchmakingSessionParticipantSnapshot> participants =
                 waitingParticipants(4);
@@ -518,6 +624,10 @@ class MatchmakingRecommendationServiceTest {
                 List.of(),
                 SportCode.BADMINTON,
                 MatchFormat.DOUBLES
+        );
+        verify(sessionMatchCountReader, times(1)).readCompletedMatchCounts(
+                SESSION_ID,
+                List.of()
         );
         verify(engine, times(1)).recommend(any(MatchmakingContext.class));
     }

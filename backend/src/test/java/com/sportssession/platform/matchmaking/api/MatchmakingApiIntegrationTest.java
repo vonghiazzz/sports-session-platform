@@ -189,6 +189,10 @@ class MatchmakingApiIntegrationTest extends PostgreSqlIntegrationTest {
         assertThat(players.stream()
                 .map(player -> player.get("ratingBasis").asText()))
                 .contains("PERSISTED", "INITIAL_PRIOR");
+        assertThat(players)
+                .allSatisfy(player -> assertThat(
+                        player.get("sessionMatchesPlayed").asInt()
+                ).isZero());
         assertThat(persistedState(fixture)).isEqualTo(before);
         assertThat(playerRatingRepository.findAll())
                 .singleElement()

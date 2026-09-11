@@ -11,6 +11,7 @@ public record MatchmakingCandidate(
         UUID playerId,
         Instant waitingSince,
         SkillLevel skillLevel,
+        int sessionMatchesPlayed,
         BigDecimal ratingValue,
         BigDecimal uncertainty,
         int ratedMatches,
@@ -24,6 +25,10 @@ public record MatchmakingCandidate(
         require(playerId != null, "playerId is required");
         require(waitingSince != null, "waitingSince is required");
         require(skillLevel != null, "skillLevel is required");
+        require(
+                sessionMatchesPlayed >= 0,
+                "sessionMatchesPlayed must not be negative"
+        );
         require(ratingValue != null, "ratingValue is required");
         require(uncertainty != null, "uncertainty is required");
         require(

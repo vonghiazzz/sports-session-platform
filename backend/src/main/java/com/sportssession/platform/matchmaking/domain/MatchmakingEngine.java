@@ -13,7 +13,7 @@ import java.util.List;
 public final class MatchmakingEngine {
 
     public static final String ALGORITHM_VERSION =
-            "fairness-anchor-level-first-rating-sum-v2";
+            "fairness-anchor-level-session-count-rating-sum-v3";
 
     private static final Comparator<MatchmakingCandidate> PLAYER_KEY_ORDER =
             Comparator.comparing(candidate -> candidate.playerId().toString());
@@ -119,6 +119,10 @@ public final class MatchmakingEngine {
         BigDecimal teamBTotal = ratingTotal(teamB);
         BigDecimal difference = teamATotal.subtract(teamBTotal).abs();
         int levelSpread = levelSpread(group);
+        List<Integer> sessionMatchCountFairnessVector = group.stream()
+                .map(MatchmakingCandidate::sessionMatchesPlayed)
+                .sorted(Comparator.reverseOrder())
+                .toList();
         List<Instant> waitingVector = group.stream()
                 .map(MatchmakingCandidate::waitingSince)
                 .sorted()
@@ -139,6 +143,7 @@ public final class MatchmakingEngine {
                 teamATotal,
                 teamBTotal,
                 levelSpread,
+                sessionMatchCountFairnessVector,
                 difference,
                 waitingVector,
                 selectedPlayerKey,
@@ -247,6 +252,7 @@ public final class MatchmakingEngine {
                 teamSlot,
                 candidate.waitingSince(),
                 waitingSeconds,
+                candidate.sessionMatchesPlayed(),
                 candidate.ratingValue(),
                 candidate.uncertainty(),
                 candidate.ratedMatches(),
@@ -274,6 +280,14 @@ public final class MatchmakingEngine {
         int result = Integer.compare(
                 left.levelSpread(),
                 right.levelSpread()
+        );
+        if (result != 0) {
+            return result;
+        }
+
+        result = compareLists(
+                left.sessionMatchCountFairnessVector(),
+                right.sessionMatchCountFairnessVector()
         );
         if (result != 0) {
             return result;
@@ -342,6 +356,7 @@ public final class MatchmakingEngine {
             BigDecimal teamATotal,
             BigDecimal teamBTotal,
             int levelSpread,
+            List<Integer> sessionMatchCountFairnessVector,
             BigDecimal ratingDifference,
             List<Instant> waitingVector,
             List<String> selectedPlayerKey,

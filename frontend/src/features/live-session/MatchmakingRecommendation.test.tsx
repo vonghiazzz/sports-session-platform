@@ -27,7 +27,8 @@ const generateMock = vi.mocked(generateMatchmakingRecommendation)
 const acceptMock = vi.mocked(acceptMatchmakingRecommendation)
 const queueMock = vi.mocked(queueMatchmakingRecommendation)
 const queryClients: QueryClient[] = []
-const algorithmVersion = 'fairness-anchor-level-first-rating-sum-v2'
+const algorithmVersion =
+  'fairness-anchor-level-session-count-rating-sum-v3'
 
 const court: CourtView = {
   sessionCourtId: 'session-court-2',
@@ -68,6 +69,7 @@ function recommendedPlayer(
     teamSlot,
     waitingSince: '2026-09-02T09:30:00Z',
     waitingSeconds: 1800,
+    sessionMatchesPlayed: 0,
     ratingValue: 25,
     uncertainty: 8.33,
     ratedMatches: 0,
@@ -87,6 +89,7 @@ const recommendation: MatchRecommendationResponse = {
   teamA: {
     slot1: {
       ...recommendedPlayer('participant-1', 'player-1', 'A', 1),
+      sessionMatchesPlayed: 2,
       ratedMatches: 12,
       ratingBasis: 'PERSISTED',
     },
@@ -250,8 +253,16 @@ describe('Matchmaking recommendation', () => {
     ).toHaveLength(3)
 
     expect(
+      within(proposal).getAllByText('Trong phiên: 0 trận hoàn tất'),
+    ).toHaveLength(3)
+
+    expect(
+      within(proposal).getByText('Trong phiên: 2 trận hoàn tất'),
+    ).toBeVisible()
+
+    expect(
       within(proposal).getByText(
-        'Rating: 25,0 · 12 trận đã tính',
+        'Rating: 25,0 · rating từ 12 trận',
       ),
     ).toBeVisible()
 
