@@ -369,6 +369,12 @@ describe('LiveSessionScreen', () => {
 
     const boardQueries = within(board as HTMLElement)
 
+    expect(
+      boardQueries.getByRole('button', {
+        name: 'Tạo đề xuất cho các sân sẵn sàng',
+      }),
+    ).toBeEnabled()
+
     const playingCard = boardQueries
       .getByRole('heading', { name: 'Court One' })
       .closest('article')
@@ -474,6 +480,11 @@ describe('LiveSessionScreen', () => {
       expect(screen.queryByRole('button', { name: 'Tạo trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Tạo đề xuất' })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', {
+          name: 'Tạo đề xuất cho các sân sẵn sàng',
+        }),
+      ).not.toBeInTheDocument()
       const createdMatches = screen
         .getByRole('heading', { name: 'Trận chờ bắt đầu' })
         .closest('section')

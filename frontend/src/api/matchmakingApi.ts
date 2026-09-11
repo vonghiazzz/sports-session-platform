@@ -1,5 +1,6 @@
 import type {
   AcceptMatchmakingRecommendationRequest,
+  GlobalMatchmakingGenerationResponse,
   MatchmakingGenerationResponse,
   MatchPlanResponse,
   MatchResponse,
@@ -15,6 +16,14 @@ function recommendationPath(
   sessionCourtId: string,
 ): string {
   return `/api/sessions/${segment(sessionId)}/courts/${segment(sessionCourtId)}/match-recommendations`
+}
+
+export function generateGlobalMatchmakingPreview(
+  sessionId: string,
+): Promise<GlobalMatchmakingGenerationResponse> {
+  return postJson(
+    `/api/sessions/${segment(sessionId)}/match-recommendations`,
+  )
 }
 
 export function generateMatchmakingRecommendation(

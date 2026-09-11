@@ -43,6 +43,7 @@ import type {
   SessionParticipantResponse,
 } from '../../api/contracts'
 import { MatchmakingRecommendation } from './MatchmakingRecommendation'
+import { GlobalMatchmakingRecommendation } from './GlobalMatchmakingRecommendation'
 import { MatchPlanQueue } from './MatchPlanQueue'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
@@ -1235,6 +1236,14 @@ export function LiveSessionScreen({
     )
   }
 
+  const allParticipants = [
+    ...model.waitingParticipants,
+    ...model.registeredParticipants,
+    ...model.pausedParticipants,
+    ...model.playingParticipants,
+    ...model.leftParticipants,
+  ]
+
   return (
     <main className="control-room">
       <SessionHeader
@@ -1280,6 +1289,13 @@ export function LiveSessionScreen({
           venueCourts={state.data.venueCourts}
           sessionCourts={state.data.sessionCourts}
         />
+        {model.header.status === 'IN_PROGRESS' && (
+          <GlobalMatchmakingRecommendation
+            sessionId={state.data.session.id}
+            courts={model.courts}
+            participants={allParticipants}
+          />
+        )}
         {model.courts.length === 0 ? (
           <p className="empty-panel">Chưa có sân nào trong phiên này.</p>
         ) : (
@@ -1290,13 +1306,7 @@ export function LiveSessionScreen({
                 court={court}
                 sessionId={state.data.session.id}
                 sessionStatus={model.header.status}
-                participants={[
-                  ...model.waitingParticipants,
-                  ...model.registeredParticipants,
-                  ...model.pausedParticipants,
-                  ...model.playingParticipants,
-                  ...model.leftParticipants,
-                ]}
+                participants={allParticipants}
                 courts={model.courts}
                 matchPlans={state.data.matchPlans}
               />

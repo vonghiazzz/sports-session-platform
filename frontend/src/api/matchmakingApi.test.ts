@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AcceptMatchmakingRecommendationRequest,
+  GlobalMatchmakingGenerationResponse,
   MatchmakingGenerationResponse,
   MatchPlanResponse,
   MatchResponse,
 } from './contracts'
 import {
   acceptMatchmakingRecommendation,
+  generateGlobalMatchmakingPreview,
   generateMatchmakingRecommendation,
   queueMatchmakingRecommendation,
 } from './matchmakingApi'
@@ -21,6 +23,41 @@ afterEach(() => {
 })
 
 describe('Matchmaking recommendation API', () => {
+  it('generates the global preview through the exact Session-scoped bodyless endpoint', async () => {
+    const response = {
+      outcome: 'UNAVAILABLE',
+      orchestrationVersion: 'global-greedy-available-unplanned-v1',
+      selectionAlgorithmVersion: algorithmVersion,
+      evaluationTime: '2026-09-02T10:00:00Z',
+      sessionId,
+      initialEligiblePlayerCount: 3,
+      courtResults: [],
+      reason: 'NO_ELIGIBLE_COURTS',
+    } satisfies GlobalMatchmakingGenerationResponse
+
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(generateGlobalMatchmakingPreview(sessionId)).resolves.toEqual(
+      response,
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/session%2Fone/match-recommendations',
+      {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        signal: undefined,
+      },
+    )
+  })
+
   it('generates through the exact Court-scoped bodyless endpoint', async () => {
     const response = {
       outcome: 'UNAVAILABLE',

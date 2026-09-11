@@ -295,6 +295,68 @@
   padding: clamp(1rem, 2vw, 1.5rem);
 }
 
+.global-matchmaking-preview {
+  margin-bottom: 1rem;
+  border: 1px solid #8bc7b8;
+  border-radius: 0.8rem;
+  padding: 1rem;
+  background: #f3fbf8;
+}
+
+.global-matchmaking-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+}
+
+.global-matchmaking-heading h3,
+.global-matchmaking-heading p,
+.global-recommendation-unavailable h4,
+.global-recommendation-unavailable p {
+  margin: 0;
+}
+
+.global-matchmaking-heading > span,
+.global-recommendation-unavailable > span,
+.global-matchmaking-empty {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+}
+
+.global-matchmaking-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: 0.8rem;
+}
+
+.global-recommendation-card {
+  min-width: 0;
+}
+
+.global-recommendation-unavailable {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px dashed #b7c6c1;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: #ffffff;
+}
+
+.global-recommendation-unavailable > p {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.global-matchmaking-empty {
+  margin: 0;
+  border-radius: 0.65rem;
+  padding: 0.8rem;
+  background: #ffffff;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -1073,6 +1135,14 @@
   }
 
   .court-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .global-matchmaking-heading {
+    flex-direction: column;
+  }
+
+  .global-matchmaking-results {
     grid-template-columns: 1fr;
   }
 

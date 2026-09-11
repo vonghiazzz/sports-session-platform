@@ -244,6 +244,21 @@ export type MatchmakingGenerationResponse =
   | MatchRecommendationResponse
   | MatchmakingUnavailableResponse
 
+export type GlobalMatchmakingUnavailableReason =
+  | 'NO_ELIGIBLE_COURTS'
+  | 'INSUFFICIENT_ELIGIBLE_PLAYERS'
+
+export interface GlobalMatchmakingGenerationResponse {
+  readonly outcome: MatchmakingGenerationOutcome
+  readonly orchestrationVersion: string
+  readonly selectionAlgorithmVersion: string
+  readonly evaluationTime: ISOInstant
+  readonly sessionId: UUID
+  readonly initialEligiblePlayerCount: number
+  readonly courtResults: readonly MatchmakingGenerationResponse[]
+  readonly reason: GlobalMatchmakingUnavailableReason | null
+}
+
 export interface AcceptMatchmakingAssignmentRequest {
   readonly sessionParticipantId: UUID
   readonly teamSide: TeamSide
