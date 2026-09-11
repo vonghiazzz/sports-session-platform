@@ -344,6 +344,18 @@
   background: #ffffff;
 }
 
+.global-matchmaking-stale {
+  border-color: #d8a45d;
+  background: #fff9ed;
+}
+
+.global-matchmaking-success {
+  margin: 0.7rem 0 0;
+  color: #126451;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
 .global-recommendation-unavailable > p {
   color: var(--muted-text);
   font-size: 0.78rem;

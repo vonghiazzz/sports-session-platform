@@ -1,6 +1,8 @@
 import type {
   AcceptMatchmakingRecommendationRequest,
   GlobalMatchmakingGenerationResponse,
+  GlobalMatchmakingQueueRequest,
+  GlobalMatchmakingQueueResponse,
   MatchmakingGenerationResponse,
   MatchPlanResponse,
   MatchResponse,
@@ -23,6 +25,16 @@ export function generateGlobalMatchmakingPreview(
 ): Promise<GlobalMatchmakingGenerationResponse> {
   return postJson(
     `/api/sessions/${segment(sessionId)}/match-recommendations`,
+  )
+}
+
+export function queueGlobalMatchmakingRecommendations(
+  sessionId: string,
+  request: GlobalMatchmakingQueueRequest,
+): Promise<GlobalMatchmakingQueueResponse> {
+  return postJsonWithBody(
+    `/api/sessions/${segment(sessionId)}/match-recommendations/queue`,
+    request,
   )
 }
 

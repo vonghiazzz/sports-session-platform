@@ -259,6 +259,25 @@ export interface GlobalMatchmakingGenerationResponse {
   readonly reason: GlobalMatchmakingUnavailableReason | null
 }
 
+export interface GlobalMatchmakingQueueRecommendationRequest {
+  readonly sessionCourtId: UUID
+  readonly assignments: readonly AcceptMatchmakingAssignmentRequest[]
+}
+
+export interface GlobalMatchmakingQueueRequest {
+  readonly orchestrationVersion: string
+  readonly selectionAlgorithmVersion: string
+  readonly targetCourtIds: readonly UUID[]
+  readonly recommendations: readonly GlobalMatchmakingQueueRecommendationRequest[]
+}
+
+export interface GlobalMatchmakingQueueResponse {
+  readonly sessionId: UUID
+  readonly orchestrationVersion: string
+  readonly selectionAlgorithmVersion: string
+  readonly createdPlans: readonly MatchPlanResponse[]
+}
+
 export interface AcceptMatchmakingAssignmentRequest {
   readonly sessionParticipantId: UUID
   readonly teamSide: TeamSide

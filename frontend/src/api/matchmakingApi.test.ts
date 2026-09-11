@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AcceptMatchmakingRecommendationRequest,
   GlobalMatchmakingGenerationResponse,
+  GlobalMatchmakingQueueRequest,
+  GlobalMatchmakingQueueResponse,
   MatchmakingGenerationResponse,
   MatchPlanResponse,
   MatchResponse,
@@ -10,6 +12,7 @@ import {
   acceptMatchmakingRecommendation,
   generateGlobalMatchmakingPreview,
   generateMatchmakingRecommendation,
+  queueGlobalMatchmakingRecommendations,
   queueMatchmakingRecommendation,
 } from './matchmakingApi'
 
@@ -90,6 +93,55 @@ describe('Matchmaking recommendation API', () => {
         method: 'POST',
         headers: { Accept: 'application/json' },
         signal: undefined,
+      },
+    )
+  })
+
+  it('queues a global preview through the exact Session-scoped endpoint and body', async () => {
+    const request: GlobalMatchmakingQueueRequest = {
+      orchestrationVersion: 'global-greedy-available-unplanned-v1',
+      selectionAlgorithmVersion: algorithmVersion,
+      targetCourtIds: ['court-1', 'court-unavailable'],
+      recommendations: [
+        {
+          sessionCourtId: 'court-1',
+          assignments: [
+            { sessionParticipantId: 'p1', teamSide: 'A', teamSlot: 1 },
+            { sessionParticipantId: 'p2', teamSide: 'A', teamSlot: 2 },
+            { sessionParticipantId: 'p3', teamSide: 'B', teamSlot: 1 },
+            { sessionParticipantId: 'p4', teamSide: 'B', teamSlot: 2 },
+          ],
+        },
+      ],
+    }
+    const response = {
+      sessionId,
+      orchestrationVersion: request.orchestrationVersion,
+      selectionAlgorithmVersion: request.selectionAlgorithmVersion,
+      createdPlans: [],
+    } satisfies GlobalMatchmakingQueueResponse
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      queueGlobalMatchmakingRecommendations(sessionId, request),
+    ).resolves.toEqual(response)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/session%2Fone/match-recommendations/queue',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        signal: undefined,
+        body: JSON.stringify(request),
       },
     )
   })

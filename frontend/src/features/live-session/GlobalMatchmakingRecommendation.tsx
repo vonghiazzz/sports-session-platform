@@ -34,7 +34,7 @@ export function GlobalMatchmakingRecommendation({
 
   return (
     <section
-      className="global-matchmaking-preview"
+      className={`global-matchmaking-preview${action.isStale ? ' global-matchmaking-stale' : ''}`}
       aria-labelledby="global-matchmaking-heading"
     >
       <div className="global-matchmaking-heading">
@@ -114,10 +114,23 @@ export function GlobalMatchmakingRecommendation({
           )}
 
           <div className="recommendation-actions">
+            {(action.canQueue || action.isQueueing) && (
+              <button
+                className="primary-action-button"
+                type="button"
+                disabled={!action.canQueue}
+                onClick={() => void action.queueAll()}
+              >
+                {action.isQueueing
+                  ? 'Đang thêm vào hàng chờ…'
+                  : 'Thêm tất cả vào hàng chờ'}
+              </button>
+            )}
+
             <button
-              className="primary-action-button"
+              className="secondary-action-button"
               type="button"
-              disabled={action.isGenerating}
+              disabled={!action.canRegenerate}
               onClick={() => void action.generate()}
             >
               {action.isGenerating ? 'Đang tạo lại…' : 'Tạo lại'}
@@ -126,18 +139,46 @@ export function GlobalMatchmakingRecommendation({
             <button
               className="secondary-action-button"
               type="button"
-              disabled={action.isGenerating}
+              disabled={!action.canDismiss}
               onClick={action.dismiss}
             >
               Bỏ đề xuất
             </button>
           </div>
+
+          {action.isReconciling && (
+            <p className="recommendation-note" role="status">
+              Đang kiểm tra trạng thái hàng chờ…
+            </p>
+          )}
+
+          {action.hasUnknownOutcome && (
+            <button
+              className="secondary-action-button"
+              type="button"
+              onClick={() => void action.checkQueueOutcome()}
+            >
+              Kiểm tra lại
+            </button>
+          )}
         </>
       )}
 
-      {action.errorMessage && (
+      {action.generateError && (
         <p className="action-feedback" role="alert">
-          {action.errorMessage}
+          {action.generateError}
+        </p>
+      )}
+
+      {action.queueMessage && (
+        <p className="action-feedback" role="alert">
+          {action.queueMessage}
+        </p>
+      )}
+
+      {action.successMessage && (
+        <p className="global-matchmaking-success" role="status">
+          {action.successMessage}
         </p>
       )}
 
