@@ -143,6 +143,9 @@ class MatchmakingControllerTest {
                 .andExpect(jsonPath("$.teamA.slot1.ratedMatches").value(7))
                 .andExpect(jsonPath("$.teamA.slot1.ratingBasis")
                         .value("PERSISTED"))
+                .andExpect(jsonPath("$.immediateQuartetRepeat").value(true))
+                .andExpect(jsonPath("$.teammateRepeatCount").value(2))
+                .andExpect(jsonPath("$.opponentRepeatCount").value(3))
                 .andExpect(jsonPath("$.oldestWaitingSince")
                         .value("2026-08-28T09:00:00Z"))
                 .andReturn();
@@ -435,6 +438,9 @@ class MatchmakingControllerTest {
                 teamA.ratingTotal(),
                 teamB.ratingTotal(),
                 decimal("0.000000006"),
+                true,
+                2,
+                3,
                 teamASlot1.waitingSince()
         );
     }

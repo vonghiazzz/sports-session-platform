@@ -6,6 +6,7 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingCandidate;
 import com.sportssession.platform.matchmaking.domain.MatchmakingContext;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
+import com.sportssession.platform.matchmaking.domain.MatchmakingSessionPairingHistory;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailable;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailableReason;
 import com.sportssession.platform.matchmaking.domain.RatingBasis;
@@ -50,6 +51,7 @@ class MatchmakingRecommendationServiceTest {
     private static final UUID SESSION_COURT_ID = uuid(200);
     private MatchmakingSkillLevelReader skillLevelReader;
     private MatchmakingSessionMatchCountReader sessionMatchCountReader;
+    private MatchmakingSessionPairingHistoryReader pairingHistoryReader;
 
     private MatchmakingSessionSnapshotReader sessionSnapshotReader;
     private MatchmakingRatingReader ratingReader;
@@ -64,6 +66,9 @@ class MatchmakingRecommendationServiceTest {
         skillLevelReader = mock(MatchmakingSkillLevelReader.class);
         sessionMatchCountReader = mock(
                 MatchmakingSessionMatchCountReader.class
+        );
+        pairingHistoryReader = mock(
+                MatchmakingSessionPairingHistoryReader.class
         );
         engine = mock(MatchmakingEngine.class);
         matchPlanPlanningLookup = mock(MatchPlanPlanningLookup.class);
@@ -102,12 +107,19 @@ class MatchmakingRecommendationServiceTest {
             participantIds.forEach(participantId -> counts.put(participantId, 0));
             return Map.copyOf(counts);
         });
+        when(pairingHistoryReader.readCompletedPairingHistory(any()))
+                .thenAnswer(invocation ->
+                        MatchmakingSessionPairingHistory.empty(
+                                invocation.getArgument(0)
+                        )
+                );
 
         MatchmakingCandidatePreparationService candidatePreparation =
                 new MatchmakingCandidatePreparationService(
                 ratingReader,
                 skillLevelReader,
                 sessionMatchCountReader,
+                pairingHistoryReader,
                 matchPlanPlanningLookup
         );
         service = new MatchmakingRecommendationService(
@@ -135,6 +147,10 @@ class MatchmakingRecommendationServiceTest {
         assertThat(recommendation.algorithmVersion()).isEqualTo(
                 MatchmakingEngine.ALGORITHM_VERSION
         );
+        assertThat(capturedContext().pairingHistory().sessionId())
+                .isEqualTo(SESSION_ID);
+        verify(pairingHistoryReader, times(1))
+                .readCompletedPairingHistory(SESSION_ID);
         verify(engine, times(1)).recommend(any(MatchmakingContext.class));
     }
 

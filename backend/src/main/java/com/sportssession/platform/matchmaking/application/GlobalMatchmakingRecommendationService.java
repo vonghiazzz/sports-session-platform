@@ -96,7 +96,8 @@ public class GlobalMatchmakingRecommendationService {
                             prepared.sportCode(),
                             prepared.matchFormat(),
                             prepared.evaluationTime(),
-                            remainingCandidates
+                            remainingCandidates,
+                            prepared.pairingHistory()
                     )
             );
             courtResults.add(result);

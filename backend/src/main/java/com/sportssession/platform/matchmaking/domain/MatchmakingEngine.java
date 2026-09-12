@@ -13,7 +13,7 @@ import java.util.List;
 public final class MatchmakingEngine {
 
     public static final String ALGORITHM_VERSION =
-            "fairness-anchor-level-session-count-rating-sum-v3";
+            "fairness-anchor-level-session-count-diversity-rating-sum-v4";
 
     private static final Comparator<MatchmakingCandidate> PLAYER_KEY_ORDER =
             Comparator.comparing(candidate -> candidate.playerId().toString());
@@ -75,7 +75,9 @@ public final class MatchmakingEngine {
                         for (int[] partition : PARTITIONS) {
                             PartitionEvaluation evaluated = evaluate(
                                     group,
-                                    partition
+                                    partition,
+                                    context.pairingHistory(),
+                                    oldestWaitingSince
                             );
                             if (best == null || compare(evaluated, best) < 0) {
                                 best = evaluated;
@@ -95,7 +97,9 @@ public final class MatchmakingEngine {
 
     private PartitionEvaluation evaluate(
             List<MatchmakingCandidate> group,
-            int[] partition
+            int[] partition,
+            MatchmakingSessionPairingHistory pairingHistory,
+            Instant oldestWaitingSince
     ) {
         List<MatchmakingCandidate> firstPair = canonicalPair(
                 group.get(partition[0]),
@@ -123,6 +127,29 @@ public final class MatchmakingEngine {
                 .map(MatchmakingCandidate::sessionMatchesPlayed)
                 .sorted(Comparator.reverseOrder())
                 .toList();
+        MatchmakingCandidate anchor = group.stream()
+                .filter(candidate -> candidate.waitingSince().equals(
+                        oldestWaitingSince
+                ))
+                .min(PLAYER_KEY_ORDER)
+                .orElseThrow();
+        boolean immediateQuartetRepeat =
+                pairingHistory.isImmediateQuartetRepeat(
+                        anchor.sessionParticipantId(),
+                        group.stream()
+                                .map(MatchmakingCandidate::sessionParticipantId)
+                                .toList()
+                );
+        int teammateRepeatCount = teammateRepeatCount(
+                pairingHistory,
+                teamA,
+                teamB
+        );
+        int opponentRepeatCount = opponentRepeatCount(
+                pairingHistory,
+                teamA,
+                teamB
+        );
         List<Instant> waitingVector = group.stream()
                 .map(MatchmakingCandidate::waitingSince)
                 .sorted()
@@ -144,6 +171,9 @@ public final class MatchmakingEngine {
                 teamBTotal,
                 levelSpread,
                 sessionMatchCountFairnessVector,
+                immediateQuartetRepeat,
+                teammateRepeatCount,
+                opponentRepeatCount,
                 difference,
                 waitingVector,
                 selectedPlayerKey,
@@ -207,6 +237,9 @@ public final class MatchmakingEngine {
                 evaluation.teamATotal(),
                 evaluation.teamBTotal(),
                 evaluation.ratingDifference(),
+                evaluation.immediateQuartetRepeat(),
+                evaluation.teammateRepeatCount(),
+                evaluation.opponentRepeatCount(),
                 oldestWaitingSince
         );
     }
@@ -273,6 +306,42 @@ public final class MatchmakingEngine {
         return team.get(0).ratingValue().add(team.get(1).ratingValue());
     }
 
+    private int teammateRepeatCount(
+            MatchmakingSessionPairingHistory history,
+            List<MatchmakingCandidate> teamA,
+            List<MatchmakingCandidate> teamB
+    ) {
+        int teamARepeats = history.teammateMatchCount(
+                teamA.get(0).sessionParticipantId(),
+                teamA.get(1).sessionParticipantId()
+        );
+        int teamBRepeats = history.teammateMatchCount(
+                teamB.get(0).sessionParticipantId(),
+                teamB.get(1).sessionParticipantId()
+        );
+        return Math.addExact(teamARepeats, teamBRepeats);
+    }
+
+    private int opponentRepeatCount(
+            MatchmakingSessionPairingHistory history,
+            List<MatchmakingCandidate> teamA,
+            List<MatchmakingCandidate> teamB
+    ) {
+        int repeats = 0;
+        for (MatchmakingCandidate teamAPlayer : teamA) {
+            for (MatchmakingCandidate teamBPlayer : teamB) {
+                repeats = Math.addExact(
+                        repeats,
+                        history.opponentMatchCount(
+                                teamAPlayer.sessionParticipantId(),
+                                teamBPlayer.sessionParticipantId()
+                        )
+                );
+            }
+        }
+        return repeats;
+    }
+
     private int compare(
             PartitionEvaluation left,
             PartitionEvaluation right
@@ -288,6 +357,30 @@ public final class MatchmakingEngine {
         result = compareLists(
                 left.sessionMatchCountFairnessVector(),
                 right.sessionMatchCountFairnessVector()
+        );
+        if (result != 0) {
+            return result;
+        }
+
+        result = Boolean.compare(
+                left.immediateQuartetRepeat(),
+                right.immediateQuartetRepeat()
+        );
+        if (result != 0) {
+            return result;
+        }
+
+        result = Integer.compare(
+                left.teammateRepeatCount(),
+                right.teammateRepeatCount()
+        );
+        if (result != 0) {
+            return result;
+        }
+
+        result = Integer.compare(
+                left.opponentRepeatCount(),
+                right.opponentRepeatCount()
         );
         if (result != 0) {
             return result;
@@ -357,6 +450,9 @@ public final class MatchmakingEngine {
             BigDecimal teamBTotal,
             int levelSpread,
             List<Integer> sessionMatchCountFairnessVector,
+            boolean immediateQuartetRepeat,
+            int teammateRepeatCount,
+            int opponentRepeatCount,
             BigDecimal ratingDifference,
             List<Instant> waitingVector,
             List<String> selectedPlayerKey,

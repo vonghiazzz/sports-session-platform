@@ -2,6 +2,7 @@ package com.sportssession.platform.matchmaking.application;
 
 import com.sportssession.platform.matchmaking.domain.InvalidMatchmakingInputException;
 import com.sportssession.platform.matchmaking.domain.MatchmakingCandidate;
+import com.sportssession.platform.matchmaking.domain.MatchmakingSessionPairingHistory;
 import com.sportssession.platform.matchplan.application.MatchPlanPlanningLookup;
 import com.sportssession.platform.player.domain.SkillLevel;
 import com.sportssession.platform.session.domain.ParticipantStatus;
@@ -22,17 +23,20 @@ public class MatchmakingCandidatePreparationService {
     private final MatchmakingRatingReader ratingReader;
     private final MatchmakingSkillLevelReader skillLevelReader;
     private final MatchmakingSessionMatchCountReader sessionMatchCountReader;
+    private final MatchmakingSessionPairingHistoryReader pairingHistoryReader;
     private final MatchPlanPlanningLookup matchPlanPlanningLookup;
 
     public MatchmakingCandidatePreparationService(
             MatchmakingRatingReader ratingReader,
             MatchmakingSkillLevelReader skillLevelReader,
             MatchmakingSessionMatchCountReader sessionMatchCountReader,
+            MatchmakingSessionPairingHistoryReader pairingHistoryReader,
             MatchPlanPlanningLookup matchPlanPlanningLookup
     ) {
         this.ratingReader = ratingReader;
         this.skillLevelReader = skillLevelReader;
         this.sessionMatchCountReader = sessionMatchCountReader;
+        this.pairingHistoryReader = pairingHistoryReader;
         this.matchPlanPlanningLookup = matchPlanPlanningLookup;
     }
 
@@ -75,6 +79,11 @@ public class MatchmakingCandidatePreparationService {
                         sessionParticipantId)
                 .toList();
 
+        MatchmakingSessionPairingHistory pairingHistory =
+                pairingHistoryReader.readCompletedPairingHistory(
+                        evidence.sessionId()
+                );
+
         Map<UUID, Integer> matchCounts =
                 sessionMatchCountReader.readCompletedMatchCounts(
                         evidence.sessionId(),
@@ -111,7 +120,8 @@ public class MatchmakingCandidatePreparationService {
                 evidence.sportCode(),
                 evidence.matchFormat(),
                 evaluationTime,
-                candidates
+                candidates,
+                pairingHistory
         );
     }
 

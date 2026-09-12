@@ -54,7 +54,8 @@ public class MatchmakingRecommendationService {
                 prepared.sportCode(),
                 prepared.matchFormat(),
                 prepared.evaluationTime(),
-                prepared.candidates()
+                prepared.candidates(),
+                prepared.pairingHistory()
         );
         return matchmakingEngine.recommend(context);
     }

@@ -223,6 +223,52 @@ class MatchmakingRecommendationServiceIntegrationTest
     }
 
     @Test
+    void completedPairingHistoryAvoidsImmediateQuartetWhenCountsAreEqual() {
+        RuntimeFixture fixture = createRuntimeFixture(
+                SessionStatus.IN_PROGRESS,
+                SessionCourtStatus.AVAILABLE,
+                false
+        );
+        UUID fifthPlayerId = createPlayerWithProfile(5, SkillLevel.GOOD);
+        UUID fifthParticipantId = createParticipant(
+                fixture.sessionId(),
+                fifthPlayerId,
+                ParticipantStatus.WAITING,
+                5
+        );
+        List<UUID> auxiliaryParticipantIds = new ArrayList<>();
+        for (int number = 6; number <= 8; number++) {
+            UUID playerId = createPlayerWithProfile(number, SkillLevel.GOOD);
+            auxiliaryParticipantIds.add(createParticipant(
+                    fixture.sessionId(),
+                    playerId,
+                    ParticipantStatus.LEFT,
+                    number
+            ));
+        }
+        saveCompletedMatch(fixture, fixture.waitingParticipantIds());
+        saveCompletedMatch(fixture, List.of(
+                fifthParticipantId,
+                auxiliaryParticipantIds.get(0),
+                auxiliaryParticipantIds.get(1),
+                auxiliaryParticipantIds.get(2)
+        ));
+
+        MatchRecommendation recommendation =
+                (MatchRecommendation) recommendationService.recommend(
+                        fixture.sessionId(),
+                        fixture.sessionCourtId()
+                );
+
+        assertThat(recommendedParticipantIds(recommendation))
+                .contains(
+                        fixture.waitingParticipantIds().getFirst(),
+                        fifthParticipantId
+                );
+        assertThat(recommendation.immediateQuartetRepeat()).isFalse();
+    }
+
+    @Test
     void plannedSessionFailsWithoutAnyRuntimeOrRatingWrites() {
         RuntimeFixture fixture = createRuntimeFixture(
                 SessionStatus.PLANNED,

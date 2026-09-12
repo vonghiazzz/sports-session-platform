@@ -29,7 +29,8 @@ class MatchmakingEngineTest {
     void exposesOneLockedAlgorithmVersion() {
         assertThat(MatchmakingEngine.ALGORITHM_VERSION)
                 .isEqualTo(
-                        "fairness-anchor-level-session-count-rating-sum-v3"
+                        "fairness-anchor-level-session-count-diversity-"
+                                + "rating-sum-v4"
                 );
     }
 
@@ -647,7 +648,8 @@ class MatchmakingEngineTest {
                 SportCode.BADMINTON,
                 MatchFormat.DOUBLES,
                 EVALUATION_TIME,
-                candidates
+                candidates,
+                MatchmakingSessionPairingHistory.empty(SESSION_ID)
         );
     }
 

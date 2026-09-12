@@ -5,6 +5,7 @@ import com.sportssession.platform.matchmaking.domain.MatchmakingCandidate;
 import com.sportssession.platform.matchmaking.domain.MatchmakingContext;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
+import com.sportssession.platform.matchmaking.domain.MatchmakingSessionPairingHistory;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailable;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailableReason;
 import com.sportssession.platform.matchmaking.domain.RatingBasis;
@@ -309,7 +310,8 @@ class GlobalMatchmakingRecommendationQueueServiceTest {
                         SportCode.BADMINTON,
                         MatchFormat.DOUBLES,
                         EVALUATION_TIME,
-                        candidates
+                        candidates,
+                        MatchmakingSessionPairingHistory.empty(SESSION_ID)
                 )
         );
     }

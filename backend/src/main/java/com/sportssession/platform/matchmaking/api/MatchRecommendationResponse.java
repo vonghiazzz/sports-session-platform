@@ -22,6 +22,9 @@ public record MatchRecommendationResponse(
         BigDecimal teamARatingTotal,
         BigDecimal teamBRatingTotal,
         BigDecimal ratingDifference,
+        boolean immediateQuartetRepeat,
+        int teammateRepeatCount,
+        int opponentRepeatCount,
         Instant oldestWaitingSince
 ) implements MatchmakingGenerationResponse {
     static MatchRecommendationResponse from(
@@ -41,6 +44,9 @@ public record MatchRecommendationResponse(
                 recommendation.teamARatingTotal(),
                 recommendation.teamBRatingTotal(),
                 recommendation.ratingDifference(),
+                recommendation.immediateQuartetRepeat(),
+                recommendation.teammateRepeatCount(),
+                recommendation.opponentRepeatCount(),
                 recommendation.oldestWaitingSince()
         );
     }

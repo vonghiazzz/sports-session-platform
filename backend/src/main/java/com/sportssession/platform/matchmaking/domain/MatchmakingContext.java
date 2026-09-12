@@ -16,7 +16,8 @@ public record MatchmakingContext(
         SportCode sportCode,
         MatchFormat matchFormat,
         Instant evaluationTime,
-        List<MatchmakingCandidate> candidates
+        List<MatchmakingCandidate> candidates,
+        MatchmakingSessionPairingHistory pairingHistory
 ) {
     public MatchmakingContext {
         require(sessionId != null, "sessionId is required");
@@ -25,6 +26,9 @@ public record MatchmakingContext(
         require(matchFormat != null, "matchFormat is required");
         require(evaluationTime != null, "evaluationTime is required");
         require(candidates != null, "candidates are required");
+        require(pairingHistory != null, "pairingHistory is required");
+        require(pairingHistory.sessionId().equals(sessionId),
+                "pairingHistory must belong to sessionId");
         require(sportCode == SportCode.BADMINTON,
                 "Matchmaking V1 supports only BADMINTON");
         require(matchFormat == MatchFormat.DOUBLES,

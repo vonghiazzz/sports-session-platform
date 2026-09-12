@@ -2,8 +2,11 @@ package com.sportssession.platform.matchmaking.application;
 
 import com.sportssession.platform.matchmaking.domain.MatchRecommendation;
 import com.sportssession.platform.matchmaking.domain.MatchmakingCandidate;
+import com.sportssession.platform.matchmaking.domain.MatchmakingContext;
+import com.sportssession.platform.matchmaking.domain.CompletedMatchPairing;
 import com.sportssession.platform.matchmaking.domain.MatchmakingEngine;
 import com.sportssession.platform.matchmaking.domain.MatchmakingResult;
+import com.sportssession.platform.matchmaking.domain.MatchmakingSessionPairingHistory;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailable;
 import com.sportssession.platform.matchmaking.domain.MatchmakingUnavailableReason;
 import com.sportssession.platform.matchmaking.domain.RatingBasis;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -271,6 +275,65 @@ class GlobalMatchmakingRecommendationServiceTest {
     }
 
     @Test
+    void onePreparedPairingHistoryIsReusedAcrossAllCourtEvaluations() {
+        List<MatchmakingCandidate> candidates = candidates(8);
+        GlobalMatchmakingSessionSnapshot snapshot = snapshot(courts(2));
+        MatchmakingSessionPairingHistory pairingHistory =
+                new MatchmakingSessionPairingHistory(
+                        SESSION_ID,
+                        List.of(new CompletedMatchPairing(
+                                uuid(9_001),
+                                EVALUATION_TIME.minusSeconds(60),
+                                List.of(
+                                        candidates.get(0)
+                                                .sessionParticipantId(),
+                                        candidates.get(1)
+                                                .sessionParticipantId()
+                                ),
+                                List.of(
+                                        candidates.get(2)
+                                                .sessionParticipantId(),
+                                        candidates.get(3)
+                                                .sessionParticipantId()
+                                )
+                        ))
+                );
+        stub(candidates, snapshot);
+        when(candidatePreparation.prepare(
+                eq(snapshot.sessionEvidence()),
+                eq(EVALUATION_TIME)
+        )).thenReturn(new PreparedMatchmakingCandidates(
+                SESSION_ID,
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES,
+                EVALUATION_TIME,
+                candidates,
+                pairingHistory
+        ));
+
+        GlobalMatchmakingPreview preview = service.preview(SESSION_ID);
+
+        ArgumentCaptor<MatchmakingContext> contexts =
+                ArgumentCaptor.forClass(MatchmakingContext.class);
+        verify(engine, times(2)).recommend(contexts.capture());
+        assertThat(contexts.getAllValues())
+                .extracting(MatchmakingContext::pairingHistory)
+                .allSatisfy(history -> assertThat(history)
+                        .isSameAs(pairingHistory));
+        MatchRecommendation firstRecommendation =
+                (MatchRecommendation) preview.courtResults().getFirst();
+        assertThat(firstRecommendation.immediateQuartetRepeat()).isFalse();
+        Set<UUID> selected = players(firstRecommendation).stream()
+                .map(RecommendedPlayer::sessionParticipantId)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        assertThat(selected)
+                .contains(candidates.getFirst().sessionParticipantId())
+                .isNotEqualTo(candidates.subList(0, 4).stream()
+                        .map(MatchmakingCandidate::sessionParticipantId)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet()));
+    }
+
+    @Test
     void nullSessionIdFailsBeforeReaders() {
         assertThatThrownBy(() -> service.preview(null))
                 .isInstanceOf(NullPointerException.class)
@@ -311,7 +374,8 @@ class GlobalMatchmakingRecommendationServiceTest {
                 SportCode.BADMINTON,
                 MatchFormat.DOUBLES,
                 EVALUATION_TIME,
-                candidates
+                candidates,
+                MatchmakingSessionPairingHistory.empty(SESSION_ID)
         ));
     }
 

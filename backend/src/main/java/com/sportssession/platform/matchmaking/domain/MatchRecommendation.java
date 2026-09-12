@@ -24,6 +24,9 @@ public record MatchRecommendation(
         BigDecimal teamARatingTotal,
         BigDecimal teamBRatingTotal,
         BigDecimal ratingDifference,
+        boolean immediateQuartetRepeat,
+        int teammateRepeatCount,
+        int opponentRepeatCount,
         Instant oldestWaitingSince
 ) implements MatchmakingResult {
     public MatchRecommendation {
@@ -51,6 +54,11 @@ public record MatchRecommendation(
         if (eligiblePlayerCount < 4) {
             throw new IllegalArgumentException(
                     "A recommendation requires at least four eligible Players");
+        }
+        if (teammateRepeatCount < 0 || opponentRepeatCount < 0) {
+            throw new IllegalArgumentException(
+                    "Pairing repeat counts must not be negative"
+            );
         }
         if (teamA.teamSide() != TeamSide.A || teamB.teamSide() != TeamSide.B) {
             throw new IllegalArgumentException(

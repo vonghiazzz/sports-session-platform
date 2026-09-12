@@ -296,6 +296,9 @@ class MatchmakingRecommendationAcceptanceServiceTest {
                 total,
                 total,
                 BigDecimal.ZERO,
+                false,
+                0,
+                0,
                 a1.waitingSince()
         );
     }
