@@ -12,6 +12,14 @@ import type { LiveSessionModelInput } from '../features/live-session/liveSession
 
 const createdAt = '2026-09-02T08:00:00Z'
 const updatedAt = '2026-09-02T09:00:00Z'
+const initialRatingBySkillLevel: Readonly<Record<SkillLevel, number>> = {
+  WEAK: 15,
+  WEAK_PLUS: 19,
+  INTERMEDIATE_MINUS: 23,
+  INTERMEDIATE: 27,
+  INTERMEDIATE_PLUS: 31,
+  GOOD: 35,
+}
 
 function player(id: string, displayName: string, skillLevel: SkillLevel): PlayerResponse {
   return {
@@ -22,6 +30,13 @@ function player(id: string, displayName: string, skillLevel: SkillLevel): Player
         id: `profile-${id}`,
         sport: 'BADMINTON',
         skillLevel,
+        rating: {
+          ratingValue: initialRatingBySkillLevel[skillLevel],
+          uncertainty: 8.333333333,
+          ratedMatches: 0,
+          ratingBasis: 'INITIAL_PRIOR',
+          ratingAlgorithmVersion: null,
+        },
         createdAt,
         updatedAt,
       },

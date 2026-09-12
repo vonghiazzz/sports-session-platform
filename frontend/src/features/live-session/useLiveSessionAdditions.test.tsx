@@ -36,6 +36,13 @@ const createdPlayer: PlayerResponse = {
       id: 'profile-new',
       sport: 'BADMINTON',
       skillLevel: 'GOOD',
+      rating: {
+        ratingValue: 35,
+        uncertainty: 8.333333333,
+        ratedMatches: 0,
+        ratingBasis: 'INITIAL_PRIOR',
+        ratingAlgorithmVersion: null,
+      },
       createdAt: '2026-09-01T00:00:00Z',
       updatedAt: '2026-09-01T00:00:00Z',
     },

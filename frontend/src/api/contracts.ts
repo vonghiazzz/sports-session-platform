@@ -22,6 +22,7 @@ export type MatchStatus = 'CREATED' | 'PLAYING' | 'COMPLETED' | 'CANCELLED'
 export type MatchSource = 'MANUAL' | 'RECOMMENDATION' | 'MODIFIED_RECOMMENDATION'
 export type TeamSide = 'A' | 'B'
 export type MatchPlanStatus = 'QUEUED' | 'STARTED' | 'CANCELLED'
+export type PlayerRatingBasis = 'INITIAL_PRIOR' | 'PERSISTED'
 
 export interface SessionResponse {
   readonly id: UUID
@@ -69,8 +70,17 @@ export interface PlayerSportProfileResponse {
   readonly id: UUID
   readonly sport: SportCode
   readonly skillLevel: SkillLevel
+  readonly rating: PlayerRatingResponse
   readonly createdAt: ISOInstant
   readonly updatedAt: ISOInstant
+}
+
+export interface PlayerRatingResponse {
+  readonly ratingValue: number
+  readonly uncertainty: number
+  readonly ratedMatches: number
+  readonly ratingBasis: PlayerRatingBasis
+  readonly ratingAlgorithmVersion: string | null
 }
 
 export interface PlayerResponse {
@@ -313,6 +323,10 @@ export interface CreateCourtRequest {
 export interface CreatePlayerRequest {
   readonly displayName: string
   readonly sport: SportCode
+  readonly skillLevel: SkillLevel
+}
+
+export interface UpdatePlayerSkillLevelRequest {
   readonly skillLevel: SkillLevel
 }
 

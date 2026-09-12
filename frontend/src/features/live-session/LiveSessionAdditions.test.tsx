@@ -31,6 +31,13 @@ function player(id: string, displayName: string): PlayerResponse {
         id: `profile-${id}`,
         sport: 'BADMINTON',
         skillLevel: 'INTERMEDIATE_PLUS',
+        rating: {
+          ratingValue: 31,
+          uncertainty: 8.333333333,
+          ratedMatches: 0,
+          ratingBasis: 'INITIAL_PRIOR',
+          ratingAlgorithmVersion: null,
+        },
         createdAt: '2026-09-01T00:00:00Z',
         updatedAt: '2026-09-01T00:00:00Z',
       },

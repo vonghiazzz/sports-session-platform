@@ -1,0 +1,271 @@
+.player-management {
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 1.5rem 0 4rem;
+}
+
+.player-management-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+  border-radius: 1rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  color: #ffffff;
+  background: linear-gradient(135deg, #153d35, #126451);
+  box-shadow: var(--shadow);
+}
+
+.player-management-header h1 {
+  margin: 0.3rem 0 0.6rem;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1;
+}
+
+.player-management-header p:not(.eyebrow) {
+  max-width: 44rem;
+  margin: 0;
+  color: #d8ebe5;
+}
+
+.player-management-header .eyebrow {
+  margin: 0;
+  color: #9de2d1;
+}
+
+.player-management-header nav {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1rem;
+}
+
+.player-management-header a {
+  color: #ffffff;
+  font-weight: 750;
+}
+
+.player-panel {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: clamp(1rem, 3vw, 1.6rem);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.player-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.player-panel-title {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.player-panel-title p,
+.rating-note {
+  margin: 0.25rem 0 0;
+  color: var(--muted-text);
+  font-size: 0.84rem;
+}
+
+.player-search {
+  min-width: min(100%, 23rem);
+}
+
+.player-search label,
+.skill-form label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.player-search > div,
+.skill-form {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.player-search input,
+.skill-form select {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #aebdb8;
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  background: #ffffff;
+}
+
+.player-search button,
+.skill-form button,
+.player-error button {
+  border: 1px solid var(--accent-strong);
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.9rem;
+  color: #ffffff;
+  background: var(--accent-strong);
+  font-weight: 800;
+}
+
+.player-search button:disabled,
+.skill-form button:disabled,
+.player-error button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.player-table-wrap {
+  overflow-x: auto;
+}
+
+.player-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.player-table th,
+.player-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 0.7rem;
+  vertical-align: top;
+}
+
+.player-table th {
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.player-table td span,
+.player-table td small {
+  display: block;
+}
+
+.player-table td small {
+  margin-top: 0.2rem;
+  color: var(--muted-text);
+}
+
+.player-table td a,
+.player-error a {
+  color: var(--accent-strong);
+  font-weight: 750;
+}
+
+.player-state {
+  margin: 1rem 0 0;
+  color: var(--muted-text);
+}
+
+.player-error {
+  color: var(--danger-text);
+}
+
+.player-error p {
+  margin: 0 0 0.65rem;
+}
+
+.player-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.player-details {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0;
+}
+
+.player-details > div {
+  border-radius: 0.7rem;
+  padding: 0.75rem;
+  background: var(--surface-subtle);
+}
+
+.player-details dt {
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.player-details dd {
+  margin: 0.25rem 0 0;
+  font-weight: 700;
+}
+
+.skill-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  margin-top: 1.2rem;
+}
+
+.skill-form label {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.rating-value {
+  margin: 0.6rem 0 0;
+  color: var(--accent-strong);
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 850;
+}
+
+.player-success,
+.scoped-player-error {
+  margin-top: 0.8rem;
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+  font-size: 0.84rem;
+}
+
+.player-success {
+  color: #126451;
+  background: var(--accent);
+}
+
+.scoped-player-error {
+  background: var(--danger-bg);
+}
+
+@media (max-width: 48rem) {
+  .player-management {
+    width: min(100% - 1rem, 76rem);
+    padding-top: 0.5rem;
+  }
+
+  .player-management-header,
+  .player-panel-title {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .player-management-header nav {
+    flex-wrap: wrap;
+  }
+
+  .player-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 34rem) {
+  .player-search > div,
+  .skill-form {
+    grid-template-columns: 1fr;
+  }
+
+  .player-search > div {
+    display: grid;
+  }
+}
