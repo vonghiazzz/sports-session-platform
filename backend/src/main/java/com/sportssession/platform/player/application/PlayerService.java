@@ -10,6 +10,7 @@ import com.sportssession.platform.player.infrastructure.PlayerRepository;
 import com.sportssession.platform.player.infrastructure.PlayerSportProfileEntity;
 import com.sportssession.platform.player.infrastructure.PlayerSportProfileRepository;
 import com.sportssession.platform.shared.domain.MatchFormat;
+import com.sportssession.platform.shared.domain.SportCode;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -31,15 +32,18 @@ public class PlayerService {
     private final PlayerRepository playerRepository;
     private final PlayerSportProfileRepository profileRepository;
     private final PlayerManagementRatingReader ratingReader;
+    private final PlayerManagementRatingHistoryReader ratingHistoryReader;
 
     public PlayerService(
             PlayerRepository playerRepository,
             PlayerSportProfileRepository profileRepository,
-            PlayerManagementRatingReader ratingReader
+            PlayerManagementRatingReader ratingReader,
+            PlayerManagementRatingHistoryReader ratingHistoryReader
     ) {
         this.playerRepository = playerRepository;
         this.profileRepository = profileRepository;
         this.ratingReader = ratingReader;
+        this.ratingHistoryReader = ratingHistoryReader;
     }
 
     @Transactional
@@ -148,6 +152,40 @@ public class PlayerService {
                 .map(PlayerSportProfileEntity::toDomain)
                 .toList();
         return result(player, profiles);
+    }
+
+    @Transactional(readOnly = true)
+    public PlayerManagementRatingHistoryResult getRatingHistory(
+            UUID playerId,
+            SportCode sportCode,
+            MatchFormat matchFormat
+    ) {
+        Objects.requireNonNull(playerId, "playerId is required");
+        Objects.requireNonNull(sportCode, "sportCode is required");
+        Objects.requireNonNull(matchFormat, "matchFormat is required");
+
+        if (!playerRepository.existsById(playerId)) {
+            throw new PlayerNotFoundException(playerId);
+        }
+        if (!profileRepository.existsByPlayerIdAndSportCode(
+                playerId,
+                sportCode
+        )) {
+            throw new PlayerSportProfileNotFoundException(
+                    playerId,
+                    sportCode
+            );
+        }
+        return new PlayerManagementRatingHistoryResult(
+                playerId,
+                sportCode,
+                matchFormat,
+                ratingHistoryReader.readHistory(
+                        playerId,
+                        sportCode,
+                        matchFormat
+                )
+        );
     }
 
     private PlayerResult result(

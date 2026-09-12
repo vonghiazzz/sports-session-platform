@@ -4,6 +4,7 @@ import com.sportssession.platform.player.application.CreatePlayerCommand;
 import com.sportssession.platform.player.application.PlayerResult;
 import com.sportssession.platform.player.application.PlayerService;
 import com.sportssession.platform.player.application.UpdatePlayerSkillLevelCommand;
+import com.sportssession.platform.shared.domain.MatchFormat;
 import com.sportssession.platform.shared.domain.SportCode;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -71,5 +72,22 @@ public class PlayerController {
                         request.skillLevel()
                 )
         ));
+    }
+
+    @GetMapping(
+            "/{playerId}/sports/{sportCode}/ratings/{matchFormat}/history"
+    )
+    public PlayerRatingHistoryResponse getRatingHistory(
+            @PathVariable UUID playerId,
+            @PathVariable SportCode sportCode,
+            @PathVariable MatchFormat matchFormat
+    ) {
+        return PlayerRatingHistoryResponse.from(
+                playerService.getRatingHistory(
+                        playerId,
+                        sportCode,
+                        matchFormat
+                )
+        );
     }
 }
