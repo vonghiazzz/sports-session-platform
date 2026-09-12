@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   badmintonProfile,
   formatPlayerRating,
+  formatPlayerRatingDelta,
   normalizePlayerSearch,
   PLAYER_SKILL_LEVELS,
   ratedMatchesLabel,
   ratingBasisLabel,
+  ratingOutcomeLabel,
 } from './playerManagementModel'
 
 describe('Player management presentation model', () => {
@@ -26,6 +28,17 @@ describe('Player management presentation model', () => {
 
   it('formats Rating without exposing storage precision', () => {
     expect(formatPlayerRating(28.765432109)).toBe('28,77')
+  })
+
+  it('maps Rating history outcomes to Vietnamese', () => {
+    expect(ratingOutcomeLabel('WIN')).toBe('Thắng')
+    expect(ratingOutcomeLabel('LOSS')).toBe('Thua')
+  })
+
+  it('derives and formats positive, negative, and zero Rating changes', () => {
+    expect(formatPlayerRatingDelta(27, 28.24)).toBe('+1,24')
+    expect(formatPlayerRatingDelta(28.24, 27.38)).toBe('-0,86')
+    expect(formatPlayerRatingDelta(27, 27)).toBe('0,0')
   })
 
   it('presents zero, one, and many rated matches clearly', () => {

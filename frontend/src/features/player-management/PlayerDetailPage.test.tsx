@@ -4,10 +4,15 @@ import userEvent from '@testing-library/user-event'
 import type { PropsWithChildren } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PlayerResponse } from '../../api/contracts'
+import type {
+  PlayerRatingHistoryEventResponse,
+  PlayerRatingHistoryResponse,
+  PlayerResponse,
+} from '../../api/contracts'
 import { HttpError } from '../../api/http'
 import {
   getPlayer,
+  getPlayerRatingHistory,
   updatePlayerSkillLevel,
 } from '../../api/playerApi'
 import { PlayerDetailPage } from './PlayerDetailPage'
@@ -15,6 +20,7 @@ import { PlayerDetailPage } from './PlayerDetailPage'
 vi.mock('../../api/playerApi', () => ({
   getPlayers: vi.fn(),
   getPlayer: vi.fn(),
+  getPlayerRatingHistory: vi.fn(),
   updatePlayerSkillLevel: vi.fn(),
 }))
 
@@ -62,6 +68,43 @@ const updatedMaturePlayer: PlayerResponse = {
   }],
 }
 
+const winHistoryEvent: PlayerRatingHistoryEventResponse = {
+  matchId: 'match-win',
+  matchCompletedAt: '2026-09-04T11:00:00Z',
+  outcome: 'WIN',
+  beforeRatingValue: 27,
+  beforeUncertainty: 8.333333333,
+  afterRatingValue: 28.24,
+  afterUncertainty: 8.01,
+  resultVersion: 1,
+  algorithmVersion: 'weng-lin-pl-v1',
+  createdAt: '2026-09-04T11:00:05Z',
+}
+
+const lossHistoryEvent: PlayerRatingHistoryEventResponse = {
+  matchId: 'match-loss',
+  matchCompletedAt: '2026-09-03T13:15:00Z',
+  outcome: 'LOSS',
+  beforeRatingValue: 28.24,
+  beforeUncertainty: 8.01,
+  afterRatingValue: 27.61,
+  afterUncertainty: 7.88,
+  resultVersion: 1,
+  algorithmVersion: 'weng-lin-pl-v1',
+  createdAt: '2026-09-03T13:15:04Z',
+}
+
+function ratingHistory(
+  events: readonly PlayerRatingHistoryEventResponse[],
+): PlayerRatingHistoryResponse {
+  return {
+    playerId: 'player-1',
+    sport: 'BADMINTON',
+    matchFormat: 'DOUBLES',
+    events,
+  }
+}
+
 function deferred<T>() {
   let resolvePromise!: (value: T) => void
   const promise = new Promise<T>((resolve) => {
@@ -99,7 +142,116 @@ describe('PlayerDetailPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(getPlayer).mockResolvedValue(initialPlayer)
+    vi.mocked(getPlayerRatingHistory).mockResolvedValue(ratingHistory([]))
     vi.mocked(updatePlayerSkillLevel).mockResolvedValue(initialPlayer)
+  })
+
+  it('keeps loaded Player details visible while Rating history is loading', async () => {
+    const pendingHistory = deferred<PlayerRatingHistoryResponse>()
+    vi.mocked(getPlayerRatingHistory).mockReturnValue(pendingHistory.promise)
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Nguyễn An' }))
+      .toBeInTheDocument()
+    expect(screen.getByText('27,0')).toBeInTheDocument()
+    expect(screen.getByText('Đang tải lịch sử Rating...')).toBeInTheDocument()
+  })
+
+  it('shows an expected empty state for a Player without Rating events', async () => {
+    renderPage()
+
+    expect(await screen.findByText('Chưa có trận nào được tính Rating.'))
+      .toBeInTheDocument()
+  })
+
+  it('renders a WIN event with Match time, Rating delta, and uncertainty', async () => {
+    vi.mocked(getPlayerRatingHistory).mockResolvedValue(
+      ratingHistory([winHistoryEvent]),
+    )
+    renderPage()
+
+    const historyHeading = await screen.findByRole('heading', {
+      name: 'Lịch sử Rating',
+    })
+    const historySection = historyHeading.closest('section')
+    expect(historySection).not.toBeNull()
+    const history = within(historySection!)
+    expect(await history.findByText('Thắng')).toBeInTheDocument()
+    expect(history.getByText('18:00 04/09/2026')).toBeInTheDocument()
+    expect(history.getByText('27,0 → 28,24')).toBeInTheDocument()
+    expect(history.getByText('+1,24')).toBeInTheDocument()
+    expect(history.getByText('8,33 → 8,01')).toBeInTheDocument()
+  })
+
+  it('renders a LOSS event with a negative Rating delta', async () => {
+    vi.mocked(getPlayerRatingHistory).mockResolvedValue(
+      ratingHistory([lossHistoryEvent]),
+    )
+    renderPage()
+
+    const historyList = await screen.findByRole('list', {
+      name: 'Các thay đổi Rating',
+    })
+    expect(within(historyList).getByText('Thua')).toBeInTheDocument()
+    expect(within(historyList).getByText('-0,63')).toBeInTheDocument()
+  })
+
+  it('preserves the Rating event order returned by the backend', async () => {
+    vi.mocked(getPlayerRatingHistory).mockResolvedValue(
+      ratingHistory([lossHistoryEvent, winHistoryEvent]),
+    )
+    renderPage()
+
+    const historyList = await screen.findByRole('list', {
+      name: 'Các thay đổi Rating',
+    })
+    const entries = within(historyList).getAllByRole('listitem')
+    expect(within(entries[0]).getByText('Thua')).toBeInTheDocument()
+    expect(within(entries[1]).getByText('Thắng')).toBeInTheDocument()
+  })
+
+  it('keeps Player details visible when Rating history fails', async () => {
+    vi.mocked(getPlayerRatingHistory).mockRejectedValue(
+      new HttpError(500, 'history unavailable'),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Không thể tải lịch sử Rating.',
+    )
+    expect(screen.getByRole('heading', { name: 'Nguyễn An' }))
+      .toBeInTheDocument()
+    expect(screen.getByText('27,0')).toBeInTheDocument()
+  })
+
+  it('retries only the failed Rating history query', async () => {
+    vi.mocked(getPlayerRatingHistory)
+      .mockRejectedValueOnce(new HttpError(500, 'history unavailable'))
+      .mockResolvedValueOnce(ratingHistory([]))
+    const { user } = renderPage()
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Không thể tải lịch sử Rating.',
+    )
+    await user.click(screen.getByRole('button', { name: 'Thử lại' }))
+
+    expect(await screen.findByText('Chưa có trận nào được tính Rating.'))
+      .toBeInTheDocument()
+    expect(getPlayerRatingHistory).toHaveBeenCalledTimes(2)
+    expect(getPlayer).toHaveBeenCalledOnce()
+  })
+
+  it('does not request Rating history without a BADMINTON profile', async () => {
+    vi.mocked(getPlayer).mockResolvedValue({
+      ...initialPlayer,
+      sportProfiles: [],
+    })
+    renderPage()
+
+    expect(await screen.findByText('Người chơi chưa có hồ sơ Cầu lông.'))
+      .toBeInTheDocument()
+    expect(getPlayerRatingHistory).not.toHaveBeenCalled()
   })
 
   it('renders Player identity, Skill, initial Rating, uncertainty, and basis', async () => {
@@ -266,6 +418,7 @@ describe('PlayerDetailPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Không tìm thấy người chơi.')
     expect(screen.getByRole('link', { name: 'Về danh sách người chơi' }))
       .toHaveAttribute('href', '/players')
+    expect(getPlayerRatingHistory).not.toHaveBeenCalled()
   })
 
   it('shows a retry for other detail failures', async () => {

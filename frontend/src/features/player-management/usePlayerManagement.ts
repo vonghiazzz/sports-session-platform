@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 import type {
+  MatchFormat,
   PlayerResponse,
   SkillLevel,
   SportCode,
@@ -8,6 +9,7 @@ import type {
 import { HttpError } from '../../api/http'
 import {
   getPlayer,
+  getPlayerRatingHistory,
   getPlayers,
   updatePlayerSkillLevel,
 } from '../../api/playerApi'
@@ -17,6 +19,11 @@ export const playerQueryKeys = {
   all: ['players'] as const,
   list: (search: string) => ['players', search] as const,
   detail: (playerId: string) => ['player', playerId] as const,
+  ratingHistory: (
+    playerId: string,
+    sportCode: SportCode,
+    matchFormat: MatchFormat,
+  ) => ['playerRatingHistory', playerId, sportCode, matchFormat] as const,
 }
 
 export function usePlayerList(search: string) {
@@ -32,6 +39,29 @@ export function usePlayerDetail(playerId: string) {
     queryKey: playerQueryKeys.detail(playerId),
     queryFn: ({ signal }) => getPlayer(playerId, signal),
     enabled: playerId.length > 0,
+    retry: false,
+  })
+}
+
+export function usePlayerRatingHistory(
+  playerId: string,
+  sportCode: SportCode,
+  matchFormat: MatchFormat,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: playerQueryKeys.ratingHistory(
+      playerId,
+      sportCode,
+      matchFormat,
+    ),
+    queryFn: ({ signal }) => getPlayerRatingHistory(
+      playerId,
+      sportCode,
+      matchFormat,
+      signal,
+    ),
+    enabled: enabled && playerId.length > 0,
     retry: false,
   })
 }

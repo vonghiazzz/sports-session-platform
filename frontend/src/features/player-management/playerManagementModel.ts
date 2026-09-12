@@ -1,5 +1,6 @@
 import type {
   PlayerRatingBasis,
+  PlayerRatingHistoryOutcome,
   PlayerSportProfileResponse,
   SkillLevel,
 } from '../../api/contracts'
@@ -24,6 +25,22 @@ export function normalizePlayerSearch(value: string): string {
 
 export function formatPlayerRating(value: number): string {
   return ratingFormatter.format(value)
+}
+
+export function formatPlayerRatingDelta(
+  beforeRatingValue: number,
+  afterRatingValue: number,
+): string {
+  const delta = afterRatingValue - beforeRatingValue
+  const normalizedDelta = delta === 0 ? 0 : delta
+  const prefix = normalizedDelta > 0 ? '+' : ''
+  return `${prefix}${formatPlayerRating(normalizedDelta)}`
+}
+
+export function ratingOutcomeLabel(
+  outcome: PlayerRatingHistoryOutcome,
+): string {
+  return outcome === 'WIN' ? 'Thắng' : 'Thua'
 }
 
 export function ratedMatchesLabel(ratedMatches: number): string {

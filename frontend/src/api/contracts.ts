@@ -91,6 +91,28 @@ export interface PlayerResponse {
   readonly updatedAt: ISOInstant
 }
 
+export type PlayerRatingHistoryOutcome = 'WIN' | 'LOSS'
+
+export interface PlayerRatingHistoryEventResponse {
+  readonly matchId: UUID
+  readonly matchCompletedAt: ISOInstant
+  readonly outcome: PlayerRatingHistoryOutcome
+  readonly beforeRatingValue: number
+  readonly beforeUncertainty: number
+  readonly afterRatingValue: number
+  readonly afterUncertainty: number
+  readonly resultVersion: number
+  readonly algorithmVersion: string
+  readonly createdAt: ISOInstant
+}
+
+export interface PlayerRatingHistoryResponse {
+  readonly playerId: UUID
+  readonly sport: SportCode
+  readonly matchFormat: MatchFormat
+  readonly events: readonly PlayerRatingHistoryEventResponse[]
+}
+
 export interface SessionCourtResponse {
   readonly id: UUID
   readonly sessionId: UUID

@@ -2,16 +2,23 @@ import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { SkillLevel } from '../../api/contracts'
 import { HttpError } from '../../api/http'
-import { skillLevelLabel, sportLabel } from '../../lib/presentation'
+import {
+  formatVietnamDateTime,
+  skillLevelLabel,
+  sportLabel,
+} from '../../lib/presentation'
 import {
   badmintonProfile,
   formatPlayerRating,
+  formatPlayerRatingDelta,
   PLAYER_SKILL_LEVELS,
   ratedMatchesLabel,
   ratingBasisLabel,
+  ratingOutcomeLabel,
 } from './playerManagementModel'
 import {
   usePlayerDetail,
+  usePlayerRatingHistory,
   usePlayerSkillLevelUpdate,
 } from './usePlayerManagement'
 import './PlayerManagement.css'
@@ -23,6 +30,12 @@ export function PlayerDetailPage() {
   const profile = playerQuery.data === undefined
     ? undefined
     : badmintonProfile(playerQuery.data.sportProfiles)
+  const ratingHistoryQuery = usePlayerRatingHistory(
+    playerId,
+    'BADMINTON',
+    'DOUBLES',
+    playerQuery.isSuccess && profile !== undefined,
+  )
   const [skillEdit, setSkillEdit] = useState<{
     readonly baseSkill: SkillLevel
     readonly selectedSkill: SkillLevel
@@ -180,6 +193,84 @@ export function PlayerDetailPage() {
             </p>
           </section>
         </div>
+      )}
+
+      {profile !== undefined && (
+        <section
+          className="player-panel player-rating-history"
+          aria-labelledby="rating-history-title"
+        >
+          <h2 id="rating-history-title">Lịch sử Rating</h2>
+          <p className="rating-note">
+            Lịch sử này ghi lại thay đổi Rating sau các trận đã được hệ thống
+            xử lý. Rating có thể được cập nhật sau thời điểm trận đấu kết thúc.
+          </p>
+
+          {ratingHistoryQuery.isPending ? (
+            <p className="player-state">Đang tải lịch sử Rating...</p>
+          ) : ratingHistoryQuery.isError ? (
+            <div className="player-error scoped-player-error" role="alert">
+              <p>Không thể tải lịch sử Rating.</p>
+              <button
+                type="button"
+                onClick={() => void ratingHistoryQuery.refetch()}
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : ratingHistoryQuery.data.events.length === 0 ? (
+            <p className="player-state">Chưa có trận nào được tính Rating.</p>
+          ) : (
+            <ol className="rating-history-list" aria-label="Các thay đổi Rating">
+              {ratingHistoryQuery.data.events.map((historyEvent) => (
+                <li
+                  className="rating-history-entry"
+                  key={`${historyEvent.matchId}-${historyEvent.resultVersion}`}
+                >
+                  <div className="rating-history-entry-header">
+                    <time dateTime={historyEvent.matchCompletedAt}>
+                      {formatVietnamDateTime(historyEvent.matchCompletedAt)}
+                    </time>
+                    <strong
+                      className={`rating-outcome rating-outcome-${historyEvent.outcome.toLowerCase()}`}
+                    >
+                      {ratingOutcomeLabel(historyEvent.outcome)}
+                    </strong>
+                  </div>
+                  <dl className="rating-history-details">
+                    <div>
+                      <dt>Rating</dt>
+                      <dd>
+                        {`${formatPlayerRating(historyEvent.beforeRatingValue)} → ${formatPlayerRating(historyEvent.afterRatingValue)}`}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Thay đổi Rating</dt>
+                      <dd>
+                        {formatPlayerRatingDelta(
+                          historyEvent.beforeRatingValue,
+                          historyEvent.afterRatingValue,
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Độ bất định</dt>
+                      <dd>
+                        {`${formatPlayerRating(historyEvent.beforeUncertainty)} → ${formatPlayerRating(historyEvent.afterUncertainty)}`}
+                      </dd>
+                    </div>
+                    <div className="rating-history-diagnostic">
+                      <dt>Xử lý Rating</dt>
+                      <dd>
+                        {`${historyEvent.algorithmVersion} · kết quả v${historyEvent.resultVersion}`}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       )}
     </main>
   )

@@ -1,4 +1,6 @@
 import type {
+  MatchFormat,
+  PlayerRatingHistoryResponse,
   PlayerResponse,
   SportCode,
   UpdatePlayerSkillLevelRequest,
@@ -25,6 +27,18 @@ export function getPlayer(
   signal?: AbortSignal,
 ): Promise<PlayerResponse> {
   return getJson(`/api/players/${segment(playerId)}`, signal)
+}
+
+export function getPlayerRatingHistory(
+  playerId: string,
+  sportCode: SportCode,
+  matchFormat: MatchFormat,
+  signal?: AbortSignal,
+): Promise<PlayerRatingHistoryResponse> {
+  return getJson(
+    `/api/players/${segment(playerId)}/sports/${segment(sportCode)}/ratings/${segment(matchFormat)}/history`,
+    signal,
+  )
 }
 
 export function updatePlayerSkillLevel(

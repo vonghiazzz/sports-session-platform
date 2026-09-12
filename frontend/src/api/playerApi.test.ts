@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { PlayerRatingHistoryResponse } from './contracts'
 import {
   getPlayer,
+  getPlayerRatingHistory,
   getPlayers,
   updatePlayerSkillLevel,
 } from './playerApi'
@@ -51,6 +53,31 @@ describe('Player API', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/players/player%2F1',
       expect.objectContaining({ method: 'GET' }),
+    )
+  })
+
+  it('gets Rating history from the exact contextual path and forwards AbortSignal', async () => {
+    const history: PlayerRatingHistoryResponse = {
+      playerId: 'player/1',
+      sport: 'BADMINTON',
+      matchFormat: 'DOUBLES',
+      events: [],
+    }
+    const fetchMock = vi.fn(async () => jsonResponse(history))
+    vi.stubGlobal('fetch', fetchMock)
+    const signal = new AbortController().signal
+
+    const result = await getPlayerRatingHistory(
+      'player/1',
+      'BADMINTON',
+      'DOUBLES',
+      signal,
+    )
+
+    expect(result).toEqual(history)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/players/player%2F1/sports/BADMINTON/ratings/DOUBLES/history',
+      expect.objectContaining({ method: 'GET', signal }),
     )
   })
 
