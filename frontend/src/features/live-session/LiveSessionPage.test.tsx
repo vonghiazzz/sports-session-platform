@@ -156,6 +156,59 @@ describe('LiveSessionScreen', () => {
     expect(people.getByRole('region', { name: 'Tạm nghỉ: 1 người' })).toBeVisible()
     expect(people.getByRole('region', { name: 'Đã rời: 0 người' })).toBeVisible()
     expect(people.getAllByText('An Nguyen')).toHaveLength(1)
+    expect(people.getByText('#1').closest('strong')).toHaveTextContent(
+      '#1 An Nguyen',
+    )
+  })
+
+  it('distinguishes duplicate Player names with Session-local Participant codes', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        players: currentState.data.players.map((player) =>
+          player.id === 'player-1' || player.id === 'player-2'
+            ? { ...player, displayName: 'Nguyễn An' }
+            : player,
+        ),
+      },
+    })
+
+    const waiting = screen.getByRole('region', { name: 'Đang chờ: 2 người' })
+    expect(within(waiting).getByText('#1').closest('strong')).toHaveTextContent(
+      '#1 Nguyễn An',
+    )
+    expect(within(waiting).getByText('#2').closest('strong')).toHaveTextContent(
+      '#2 Nguyễn An',
+    )
+  })
+
+  it('keeps Participant code visible with malformed Buddy data', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        participants: currentState.data.participants.map((participant) =>
+          participant.id === 'participant-1'
+            ? { ...participant, buddyPairId: 'orphan-buddy' }
+            : participant,
+        ),
+      },
+    })
+
+    const waiting = screen.getByRole('region', { name: 'Đang chờ: 2 người' })
+    expect(within(waiting).getByText('#1').closest('strong')).toHaveTextContent(
+      '#1 An Nguyen',
+    )
+    expect(within(waiting).getByText('Đã ghép bạn')).toBeVisible()
   })
 
   it('filters current Participants across groups case- and diacritic-insensitively', async () => {
@@ -227,6 +280,7 @@ describe('LiveSessionScreen', () => {
       ...participantTemplate,
       id: `scale-participant-${index}`,
       playerId: `scale-player-${index}`,
+      participantCode: index + 1,
       status,
       waitingSince:
         status === 'WAITING'
@@ -587,6 +641,7 @@ describe('LiveSessionScreen', () => {
     const people = within(peoplePanel as HTMLElement)
     expect(people.getByRole('region', { name: 'Đang chơi: 4 người' })).toBeVisible()
     expect(people.getByText('Giang Vo')).toBeVisible()
+    expect(people.getByText('#5').closest('strong')).toHaveTextContent('#5 Giang Vo')
     expect(
       people.queryByRole('button', {
         name: /Điểm danh|Tạm nghỉ|Trở lại|Rời phiên|\+ Thêm người chơi/,

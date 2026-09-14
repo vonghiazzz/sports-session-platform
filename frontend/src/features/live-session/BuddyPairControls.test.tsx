@@ -25,9 +25,11 @@ function participant(
   id: string,
   displayName: string,
   buddyPairId: string | null = null,
+  participantCode = 1,
 ): ParticipantView {
   return {
     sessionParticipantId: id,
+    participantCode,
     buddyPairId,
     displayName,
     status: 'WAITING',
@@ -121,14 +123,18 @@ describe('BuddyPairControls', () => {
     ).toBeEnabled()
   })
 
-  it('shows each paired Participant the other current display name', () => {
+  it('shows each paired Participant the other current code and display name', () => {
     renderControls([
-      participant('participant-a', 'An', 'buddy-1'),
-      participant('participant-b', 'Bình', 'buddy-1'),
+      participant('participant-a', 'An', 'buddy-1', 12),
+      participant('participant-b', 'Bình', 'buddy-1', 27),
     ])
 
-    expect(within(row('participant-a')).getByText('Đánh cùng: Bình')).toBeVisible()
-    expect(within(row('participant-b')).getByText('Đánh cùng: An')).toBeVisible()
+    expect(
+      within(row('participant-a')).getByText('Đánh cùng: #27 Bình'),
+    ).toBeVisible()
+    expect(
+      within(row('participant-b')).getByText('Đánh cùng: #12 An'),
+    ).toBeVisible()
   })
 
   it('excludes self and already-paired Participants from second-person selection', async () => {
@@ -178,9 +184,9 @@ describe('BuddyPairControls', () => {
       secondSessionParticipantId: 'participant-b',
     })
     const { queryClient } = renderControls([
-      participant('participant-a', 'Nguyễn An'),
-      participant('participant-b', 'Nguyễn An'),
-      participant('participant-c', 'Nguyễn An'),
+      participant('participant-a', 'Nguyễn An', null, 3),
+      participant('participant-b', 'Nguyễn An', null, 8),
+      participant('participant-c', 'Nguyễn An', null, 11),
     ])
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
 
@@ -292,8 +298,12 @@ describe('BuddyPairControls', () => {
     expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent(
       'Không tìm thấy cặp đánh cùng.',
     )
-    expect(within(row('participant-a')).getByText('Đánh cùng: Bình')).toBeVisible()
-    expect(within(row('participant-b')).getByText('Đánh cùng: An')).toBeVisible()
+    expect(
+      within(row('participant-a')).getByText('Đánh cùng: #1 Bình'),
+    ).toBeVisible()
+    expect(
+      within(row('participant-b')).getByText('Đánh cùng: #1 An'),
+    ).toBeVisible()
   })
 
   it.each<SessionStatus>(['COMPLETED', 'CANCELLED'])(
@@ -308,7 +318,7 @@ describe('BuddyPairControls', () => {
         sessionStatus,
       )
 
-      expect(screen.getByText('Đánh cùng: Bình')).toBeVisible()
+      expect(screen.getByText('Đánh cùng: #1 Bình')).toBeVisible()
       expect(
         screen.queryByRole('button', { name: 'Hủy đánh cùng' }),
       ).not.toBeInTheDocument()

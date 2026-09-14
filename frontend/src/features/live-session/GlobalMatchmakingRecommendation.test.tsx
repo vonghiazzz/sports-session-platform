@@ -50,6 +50,7 @@ const participants: readonly ParticipantView[] = Array.from(
   { length: 8 },
   (_, index) => ({
     sessionParticipantId: `participant-${index + 1}`,
+    participantCode: index + 1,
     buddyPairId: null,
     displayName: `Người ${index + 1}`,
     status: 'WAITING',

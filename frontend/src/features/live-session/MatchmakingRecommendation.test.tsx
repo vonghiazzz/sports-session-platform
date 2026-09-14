@@ -43,8 +43,9 @@ const participants: readonly ParticipantView[] = [
   ['participant-2', 'Bao Tran', 'WEAK_PLUS', 'Yếu+', '25 phút'],
   ['participant-3', 'Chi Le', 'INTERMEDIATE_MINUS', 'TB-', '20 phút'],
   ['participant-4', 'Dung Pham', 'INTERMEDIATE', 'TB', '15 phút'],
-].map(([sessionParticipantId, displayName, skillLevel, skillLabel, waitingDuration]) => ({
+].map(([sessionParticipantId, displayName, skillLevel, skillLabel, waitingDuration], index) => ({
   sessionParticipantId,
+  participantCode: index + 1,
   buddyPairId: null,
   displayName,
   status: 'WAITING',

@@ -21,6 +21,7 @@ import {
 
 export interface ParticipantView {
   readonly sessionParticipantId: string
+  readonly participantCode: number
   readonly buddyPairId: string | null
   readonly displayName: string
   readonly status: ParticipantStatus
@@ -244,6 +245,7 @@ export function composeLiveSessionModel({
 
     return {
       sessionParticipantId: participant.id,
+      participantCode: participant.participantCode,
       buddyPairId: participant.buddyPairId,
       displayName: player?.displayName ?? 'Không có dữ liệu người chơi',
       status: participant.status,

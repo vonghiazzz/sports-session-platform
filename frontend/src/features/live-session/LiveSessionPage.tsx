@@ -449,7 +449,10 @@ function ParticipantRow({
   return (
     <li>
       <div className="participant-identity">
-        <strong>{participant.displayName}</strong>
+        <strong>
+          <span>{`#${participant.participantCode}`}</span>{' '}
+          <span>{participant.displayName}</span>
+        </strong>
         <span>{participant.skillLabel ?? '—'}</span>
       </div>
       <div className="participant-operation">

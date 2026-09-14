@@ -54,6 +54,7 @@ export interface SessionParticipantResponse {
   readonly id: UUID
   readonly sessionId: UUID
   readonly playerId: UUID
+  readonly participantCode: number
   readonly buddyPairId: UUID | null
   readonly status: ParticipantStatus
   readonly joinedAt: ISOInstant

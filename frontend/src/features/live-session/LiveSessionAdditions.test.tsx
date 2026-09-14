@@ -52,6 +52,7 @@ function participant(playerId: string): SessionParticipantResponse {
     id: `participant-${playerId}`,
     sessionId: 'session-1',
     playerId,
+    participantCode: 1,
     buddyPairId: null,
     status: 'REGISTERED',
     joinedAt: '2026-09-01T00:00:00Z',

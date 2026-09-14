@@ -8,10 +8,10 @@ function isMutableSession(status: SessionStatus): boolean {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
 }
 
-function buddyPartnerName(
+function resolveBuddyPartner(
   participant: ParticipantView,
   participants: readonly ParticipantView[],
-): string | null {
+): ParticipantView | null {
   if (participant.buddyPairId === null) {
     return null
   }
@@ -25,7 +25,7 @@ function buddyPartnerName(
     members.find(
       (candidate) =>
         candidate.sessionParticipantId !== participant.sessionParticipantId,
-    )?.displayName ?? null
+    ) ?? null
   )
 }
 
@@ -43,7 +43,7 @@ export function BuddyPairControls({
   const [open, setOpen] = useState(false)
   const [selectedParticipantId, setSelectedParticipantId] = useState('')
   const mutable = isMutableSession(sessionStatus)
-  const partnerName = buddyPartnerName(participant, participants)
+  const partner = resolveBuddyPartner(participant, participants)
   const eligibleParticipants = useMemo(
     () =>
       participants.filter(
@@ -68,9 +68,9 @@ export function BuddyPairControls({
     return (
       <div className="buddy-pair-controls">
         <span className="buddy-pair-label">
-          {partnerName === null
+          {partner === null
             ? 'Đã ghép bạn'
-            : `Đánh cùng: ${partnerName}`}
+            : `Đánh cùng: #${partner.participantCode} ${partner.displayName}`}
         </span>
         {mutable && (
           <button
