@@ -111,6 +111,38 @@ class GlobalMatchmakingRecommendationServiceTest {
     }
 
     @Test
+    void globalPreviewKeepsBuddyPairTogetherAndRemovesBothFromRemainingPool() {
+        UUID buddyPairId = uuid(9_100);
+        List<MatchmakingCandidate> candidates = new java.util.ArrayList<>(
+                candidates(8)
+        );
+        candidates.set(0, withBuddyPair(candidates.get(0), buddyPairId));
+        candidates.set(1, withBuddyPair(candidates.get(1), buddyPairId));
+        stub(List.copyOf(candidates), courts(2));
+
+        GlobalMatchmakingPreview preview = service.preview(SESSION_ID);
+
+        List<MatchRecommendation> recommendations = preview.courtResults()
+                .stream()
+                .map(MatchRecommendation.class::cast)
+                .toList();
+        MatchRecommendation first = recommendations.getFirst();
+        MatchRecommendation second = recommendations.get(1);
+        UUID firstBuddyId = candidates.get(0).sessionParticipantId();
+        UUID secondBuddyId = candidates.get(1).sessionParticipantId();
+
+        assertThat(players(first))
+                .extracting(RecommendedPlayer::sessionParticipantId)
+                .contains(firstBuddyId, secondBuddyId);
+        assertThat(buddyMembersShareTeam(first, firstBuddyId, secondBuddyId))
+                .isTrue();
+        assertThat(players(second))
+                .extracting(RecommendedPlayer::sessionParticipantId)
+                .doesNotContain(firstBuddyId, secondBuddyId);
+        assertThat(selectedParticipantIds(preview.courtResults())).hasSize(8);
+    }
+
+    @Test
     void successiveGroupsAnchorAgainstOldestRemainingCandidate() {
         List<MatchmakingCandidate> candidates = candidates(8);
         stub(candidates, courts(2));
@@ -426,6 +458,38 @@ class GlobalMatchmakingRecommendationServiceTest {
                         RatingBasis.INITIAL_PRIOR
                 ))
                 .toList();
+    }
+
+    private static MatchmakingCandidate withBuddyPair(
+            MatchmakingCandidate candidate,
+            UUID buddyPairId
+    ) {
+        return new MatchmakingCandidate(
+                candidate.sessionParticipantId(),
+                candidate.playerId(),
+                candidate.waitingSince(),
+                candidate.skillLevel(),
+                candidate.sessionMatchesPlayed(),
+                candidate.ratingValue(),
+                candidate.uncertainty(),
+                candidate.ratedMatches(),
+                candidate.ratingBasis(),
+                buddyPairId
+        );
+    }
+
+    private static boolean buddyMembersShareTeam(
+            MatchRecommendation recommendation,
+            UUID firstBuddyId,
+            UUID secondBuddyId
+    ) {
+        return players(recommendation).stream()
+                .filter(player -> player.sessionParticipantId().equals(
+                        firstBuddyId
+                ) || player.sessionParticipantId().equals(secondBuddyId))
+                .map(RecommendedPlayer::teamSide)
+                .distinct()
+                .count() == 1;
     }
 
     private static Set<UUID> selectedParticipantIds(

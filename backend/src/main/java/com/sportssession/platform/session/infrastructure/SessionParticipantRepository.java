@@ -28,6 +28,19 @@ public interface SessionParticipantRepository
             @Param("participantIds") List<UUID> participantIds
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select participant
+            from SessionParticipantEntity participant
+            where participant.sessionId = :sessionId
+              and participant.buddyPairId = :buddyPairId
+            order by participant.id
+            """)
+    List<SessionParticipantEntity> findBuddyPairMembersForUpdate(
+            @Param("sessionId") UUID sessionId,
+            @Param("buddyPairId") UUID buddyPairId
+    );
+
     List<SessionParticipantEntity> findAllBySessionIdOrderByJoinedAtAscIdAsc(UUID sessionId);
 
     List<SessionParticipantEntity> findAllBySessionIdOrderByPlayerIdAscIdAsc(

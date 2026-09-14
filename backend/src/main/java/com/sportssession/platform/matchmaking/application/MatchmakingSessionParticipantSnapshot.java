@@ -10,8 +10,24 @@ public record MatchmakingSessionParticipantSnapshot(
         UUID sessionParticipantId,
         UUID playerId,
         ParticipantStatus participantStatus,
-        Instant waitingSince
+        Instant waitingSince,
+        UUID buddyPairId
 ) {
+    public MatchmakingSessionParticipantSnapshot(
+            UUID sessionParticipantId,
+            UUID playerId,
+            ParticipantStatus participantStatus,
+            Instant waitingSince
+    ) {
+        this(
+                sessionParticipantId,
+                playerId,
+                participantStatus,
+                waitingSince,
+                null
+        );
+    }
+
     public MatchmakingSessionParticipantSnapshot {
         Objects.requireNonNull(
                 sessionParticipantId,

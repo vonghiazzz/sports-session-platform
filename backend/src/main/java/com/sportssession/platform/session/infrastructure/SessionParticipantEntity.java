@@ -26,6 +26,9 @@ public class SessionParticipantEntity {
     @Column(name = "player_id", nullable = false)
     private UUID playerId;
 
+    @Column(name = "buddy_pair_id")
+    private UUID buddyPairId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     private ParticipantStatus status;
@@ -65,6 +68,7 @@ public class SessionParticipantEntity {
         this.id = participant.id();
         this.sessionId = participant.sessionId();
         this.playerId = participant.playerId();
+        this.buddyPairId = participant.buddyPairId();
         this.status = participant.status();
         this.joinedAt = participant.joinedAt();
         this.checkedInAt = participant.checkedInAt();
@@ -82,6 +86,7 @@ public class SessionParticipantEntity {
     }
 
     public void applyRuntimeState(SessionParticipant participant) {
+        this.buddyPairId = participant.buddyPairId();
         this.status = participant.status();
         this.checkedInAt = participant.checkedInAt();
         this.waitingSince = participant.waitingSince();
@@ -96,6 +101,7 @@ public class SessionParticipantEntity {
                 id,
                 sessionId,
                 playerId,
+                buddyPairId,
                 status,
                 joinedAt,
                 checkedInAt,
@@ -122,6 +128,10 @@ public class SessionParticipantEntity {
 
     public ParticipantStatus getStatus() {
         return status;
+    }
+
+    public UUID getBuddyPairId() {
+        return buddyPairId;
     }
 
     public Instant getWaitingSince() {

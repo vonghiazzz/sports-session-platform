@@ -6,7 +6,9 @@ import com.sportssession.platform.shared.domain.SportCode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,6 +40,7 @@ public record MatchmakingContext(
                 new ArrayList<>(candidates.size());
         Set<UUID> participantIds = new HashSet<>();
         Set<UUID> playerIds = new HashSet<>();
+        Map<UUID, Integer> buddyMemberCounts = new HashMap<>();
         for (MatchmakingCandidate candidate : candidates) {
             require(candidate != null, "candidate is required");
             defensiveCandidates.add(candidate);
@@ -47,7 +50,17 @@ public record MatchmakingContext(
                     "sessionParticipantId must be unique");
             require(playerIds.add(candidate.playerId()),
                     "playerId must be unique");
+            if (candidate.buddyPairId() != null) {
+                buddyMemberCounts.merge(
+                        candidate.buddyPairId(),
+                        1,
+                        Integer::sum
+                );
+            }
         }
+        require(buddyMemberCounts.values().stream()
+                        .allMatch(count -> count == 2),
+                "Each Buddy Pair must contain exactly two candidates");
         candidates = List.copyOf(defensiveCandidates);
     }
 

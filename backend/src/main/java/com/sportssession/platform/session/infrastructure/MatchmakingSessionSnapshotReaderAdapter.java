@@ -116,7 +116,8 @@ public class MatchmakingSessionSnapshotReaderAdapter
                                 participant.getId(),
                                 participant.getPlayerId(),
                                 participant.getStatus(),
-                                participant.getWaitingSince()
+                                participant.getWaitingSince(),
+                                participant.getBuddyPairId()
                         ))
                 .toList();
     }

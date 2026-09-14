@@ -13,7 +13,8 @@ import java.util.List;
 public final class MatchmakingEngine {
 
     public static final String ALGORITHM_VERSION =
-            "fairness-anchor-level-session-count-diversity-rating-sum-v4";
+            "fairness-anchor-buddy-level-session-count-diversity-"
+                    + "rating-sum-v5";
 
     private static final Comparator<MatchmakingCandidate> PLAYER_KEY_ORDER =
             Comparator.comparing(candidate -> candidate.playerId().toString());
@@ -72,7 +73,16 @@ public final class MatchmakingEngine {
                                         oldestWaitingSince))) {
                             continue;
                         }
+                        if (!containsCompleteBuddyPairs(group)) {
+                            continue;
+                        }
                         for (int[] partition : PARTITIONS) {
+                            if (!partitionRespectsBuddyPairs(
+                                    group,
+                                    partition
+                            )) {
+                                continue;
+                            }
                             PartitionEvaluation evaluated = evaluate(
                                     group,
                                     partition,
@@ -311,15 +321,63 @@ public final class MatchmakingEngine {
             List<MatchmakingCandidate> teamA,
             List<MatchmakingCandidate> teamB
     ) {
-        int teamARepeats = history.teammateMatchCount(
-                teamA.get(0).sessionParticipantId(),
-                teamA.get(1).sessionParticipantId()
-        );
-        int teamBRepeats = history.teammateMatchCount(
-                teamB.get(0).sessionParticipantId(),
-                teamB.get(1).sessionParticipantId()
-        );
+        int teamARepeats = isBuddyPair(teamA)
+                ? 0
+                : history.teammateMatchCount(
+                        teamA.get(0).sessionParticipantId(),
+                        teamA.get(1).sessionParticipantId()
+                );
+        int teamBRepeats = isBuddyPair(teamB)
+                ? 0
+                : history.teammateMatchCount(
+                        teamB.get(0).sessionParticipantId(),
+                        teamB.get(1).sessionParticipantId()
+                );
         return Math.addExact(teamARepeats, teamBRepeats);
+    }
+
+    private boolean containsCompleteBuddyPairs(
+            List<MatchmakingCandidate> group
+    ) {
+        return group.stream().allMatch(candidate ->
+                candidate.buddyPairId() == null
+                        || group.stream().filter(other ->
+                                candidate.buddyPairId().equals(
+                                        other.buddyPairId()
+                                )
+                        ).count() == 2
+        );
+    }
+
+    private boolean partitionRespectsBuddyPairs(
+            List<MatchmakingCandidate> group,
+            int[] partition
+    ) {
+        return pairRespectsBuddy(
+                group.get(partition[0]),
+                group.get(partition[1])
+        ) && pairRespectsBuddy(
+                group.get(partition[2]),
+                group.get(partition[3])
+        );
+    }
+
+    private boolean pairRespectsBuddy(
+            MatchmakingCandidate first,
+            MatchmakingCandidate second
+    ) {
+        if (first.buddyPairId() == null && second.buddyPairId() == null) {
+            return true;
+        }
+        return first.buddyPairId() != null
+                && first.buddyPairId().equals(second.buddyPairId());
+    }
+
+    private boolean isBuddyPair(List<MatchmakingCandidate> team) {
+        return team.get(0).buddyPairId() != null
+                && team.get(0).buddyPairId().equals(
+                        team.get(1).buddyPairId()
+                );
     }
 
     private int opponentRepeatCount(

@@ -30,6 +30,7 @@ import com.sportssession.platform.rating.domain.WengLinPlackettLuceRatingEngine;
 import com.sportssession.platform.rating.infrastructure.PlayerRatingEntity;
 import com.sportssession.platform.rating.infrastructure.PlayerRatingRepository;
 import com.sportssession.platform.rating.infrastructure.RatingEventRepository;
+import com.sportssession.platform.session.application.SessionService;
 import com.sportssession.platform.session.domain.ParticipantStatus;
 import com.sportssession.platform.session.domain.Session;
 import com.sportssession.platform.session.domain.SessionCourt;
@@ -125,6 +126,9 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
 
     @Autowired
     private MatchPlanService matchPlanService;
+
+    @Autowired
+    private SessionService sessionService;
 
     @Autowired
     private SessionRepository sessionRepository;
@@ -295,6 +299,44 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
         accept(fixture, 0, acceptBody(displayed))
                 .andExpect(status().isConflict());
         assertNoAcceptedWrites();
+    }
+
+    @Test
+    void buddyConfigurationChangeMakesDisplayedAcceptAndQueueEvidenceStale()
+            throws Exception {
+        RuntimeFixture fixture = createFixture(1, 4);
+        JsonNode displayed = generate(fixture, 0);
+        Map<String, Object> displayedBody = acceptBody(displayed);
+        UUID priorTeamAMember = UUID.fromString(displayed.at(
+                "/teamA/slot1/sessionParticipantId"
+        ).asText());
+        UUID priorTeamBMember = UUID.fromString(displayed.at(
+                "/teamB/slot1/sessionParticipantId"
+        ).asText());
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                priorTeamAMember,
+                priorTeamBMember
+        );
+
+        accept(fixture, 0, displayedBody)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Submitted recommendation is stale"));
+        queue(fixture, 0, displayedBody)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value("Submitted recommendation is stale"));
+
+        assertNoAcceptedWrites();
+        assertThat(matchPlanRepository.count()).isZero();
+        assertThat(matchPlanParticipantRepository.count()).isZero();
+        assertThat(sessionCourt(fixture, 0).getStatus())
+                .isEqualTo(SessionCourtStatus.AVAILABLE);
+        assertThat(fixture.participantIds()).allSatisfy(participantId ->
+                assertThat(participantRepository.findById(participantId)
+                        .orElseThrow().getStatus())
+                        .isEqualTo(ParticipantStatus.WAITING));
     }
 
     @Test

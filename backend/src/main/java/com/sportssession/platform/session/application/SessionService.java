@@ -4,8 +4,11 @@ import com.sportssession.platform.player.application.PlayerLookup;
 import com.sportssession.platform.player.domain.PlayerNotFoundException;
 import com.sportssession.platform.session.domain.DuplicateSessionCourtException;
 import com.sportssession.platform.session.domain.DuplicateSessionParticipantException;
+import com.sportssession.platform.session.domain.InvalidBuddyPairRequestException;
 import com.sportssession.platform.session.domain.InvalidSessionStateException;
 import com.sportssession.platform.session.domain.Session;
+import com.sportssession.platform.session.domain.SessionBuddyPair;
+import com.sportssession.platform.session.domain.SessionBuddyPairNotFoundException;
 import com.sportssession.platform.session.domain.SessionCourt;
 import com.sportssession.platform.session.domain.SessionCourtNotFoundException;
 import com.sportssession.platform.session.domain.SessionNotFoundException;
@@ -31,7 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class SessionService {
@@ -230,6 +237,103 @@ public class SessionService {
                 .stream()
                 .map(SessionParticipantEntity::toDomain)
                 .toList();
+    }
+
+    @Transactional
+    public SessionBuddyPair createBuddyPair(
+            UUID sessionId,
+            UUID firstSessionParticipantId,
+            UUID secondSessionParticipantId
+    ) {
+        Objects.requireNonNull(sessionId, "sessionId is required");
+        Objects.requireNonNull(
+                firstSessionParticipantId,
+                "firstSessionParticipantId is required"
+        );
+        Objects.requireNonNull(
+                secondSessionParticipantId,
+                "secondSessionParticipantId is required"
+        );
+        if (firstSessionParticipantId.equals(secondSessionParticipantId)) {
+            throw new InvalidBuddyPairRequestException(
+                    "Buddy Pair requires two different SessionParticipants"
+            );
+        }
+        requireBuddyMutableSession(sessionId);
+
+        List<UUID> participantIds = List.of(
+                firstSessionParticipantId,
+                secondSessionParticipantId
+        ).stream().sorted().toList();
+        List<SessionParticipantEntity> lockedParticipants =
+                participantRepository.findAllByIdForUpdateOrderById(
+                        participantIds
+                );
+        Map<UUID, SessionParticipantEntity> participantById =
+                lockedParticipants.stream().collect(Collectors.toMap(
+                        SessionParticipantEntity::getId,
+                        Function.identity()
+                ));
+        SessionParticipantEntity first = requireBuddyParticipant(
+                sessionId,
+                firstSessionParticipantId,
+                participantById
+        );
+        SessionParticipantEntity second = requireBuddyParticipant(
+                sessionId,
+                secondSessionParticipantId,
+                participantById
+        );
+        if (first.getBuddyPairId() != null || second.getBuddyPairId() != null) {
+            throw new SessionResourceConflictException(
+                    "Each SessionParticipant may belong to only one Buddy Pair"
+            );
+        }
+
+        SessionBuddyPair buddyPair = SessionBuddyPair.create(
+                sessionId,
+                firstSessionParticipantId,
+                secondSessionParticipantId
+        );
+        Instant now = clock.instant();
+        first.applyRuntimeState(first.toDomain().assignBuddyPair(
+                buddyPair.id(),
+                now
+        ));
+        second.applyRuntimeState(second.toDomain().assignBuddyPair(
+                buddyPair.id(),
+                now
+        ));
+        participantRepository.flush();
+        return buddyPair;
+    }
+
+    @Transactional
+    public void removeBuddyPair(UUID sessionId, UUID buddyPairId) {
+        Objects.requireNonNull(sessionId, "sessionId is required");
+        Objects.requireNonNull(buddyPairId, "buddyPairId is required");
+        requireBuddyMutableSession(sessionId);
+        List<SessionParticipantEntity> members =
+                participantRepository.findBuddyPairMembersForUpdate(
+                        sessionId,
+                        buddyPairId
+                );
+        if (members.isEmpty()) {
+            throw new SessionBuddyPairNotFoundException(
+                    sessionId,
+                    buddyPairId
+            );
+        }
+        if (members.size() != 2) {
+            throw new SessionResourceConflictException(
+                    "Buddy Pair must contain exactly two SessionParticipants"
+            );
+        }
+        Instant now = clock.instant();
+        members.forEach(member -> member.applyRuntimeState(
+                member.toDomain().removeBuddyPair(buddyPairId, now)
+        ));
+        participantRepository.flush();
     }
 
     @Transactional
@@ -518,6 +622,35 @@ public class SessionService {
                                 participantId
                         )
                 );
+    }
+
+    private SessionParticipantEntity requireBuddyParticipant(
+            UUID sessionId,
+            UUID participantId,
+            Map<UUID, SessionParticipantEntity> participantById
+    ) {
+        SessionParticipantEntity participant = participantById.get(
+                participantId
+        );
+        if (participant == null
+                || !participant.getSessionId().equals(sessionId)) {
+            throw new SessionParticipantNotFoundException(
+                    sessionId,
+                    participantId
+            );
+        }
+        return participant;
+    }
+
+    private Session requireBuddyMutableSession(UUID sessionId) {
+        Session session = findSessionEntityForUpdate(sessionId).toDomain();
+        if (session.isTerminal()) {
+            throw new InvalidSessionStateException(
+                    "Cannot modify Buddy Pairs while Session is "
+                            + session.status()
+            );
+        }
+        return session;
     }
 
     private SessionCourtEntity findSessionCourtEntity(

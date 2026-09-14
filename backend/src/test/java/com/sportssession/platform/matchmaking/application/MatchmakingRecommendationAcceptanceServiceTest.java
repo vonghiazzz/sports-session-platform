@@ -130,14 +130,15 @@ class MatchmakingRecommendationAcceptanceServiceTest {
     }
 
     @Test
-    void differentAlgorithmVersionIsStale() {
+    void submittedV4AlgorithmVersionIsStaleUnderBuddyAwareV5() {
         MatchRecommendation recommendation = recommendation(
                 EVALUATION_TIME,
                 "25.0"
         );
         SubmittedRecommendationEvidence evidence =
                 new SubmittedRecommendationEvidence(
-                        "old-algorithm",
+                        "fairness-anchor-level-session-count-diversity-"
+                                + "rating-sum-v4",
                         submittedEvidence(recommendation, false).assignments()
                 );
         assertStale(recommendation, evidence);

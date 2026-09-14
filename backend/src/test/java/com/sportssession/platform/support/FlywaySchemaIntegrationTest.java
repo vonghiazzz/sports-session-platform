@@ -14,7 +14,7 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesRuntimeTablesThroughMatchPlanFoundation() {
+    void flywayCreatesRuntimeTablesThroughBuddyPairFoundation() {
         String serverVersion = jdbcTemplate.queryForObject(
                 "SHOW server_version", String.class);
         assertThat(serverVersion).startsWith("18.4");
@@ -84,6 +84,35 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 WHERE version = '5' AND success = true
                 """, Integer.class);
         assertThat(matchPlanMigrationCount).isEqualTo(1);
+
+        Integer buddyPairMigrationCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE version = '6' AND success = true
+                """, Integer.class);
+        assertThat(buddyPairMigrationCount).isEqualTo(1);
+
+        List<String> buddyPairColumns = jdbcTemplate.queryForList("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'session_participants'
+                  AND column_name = 'buddy_pair_id'
+                  AND data_type = 'uuid'
+                  AND is_nullable = 'YES'
+                """, String.class);
+        assertThat(buddyPairColumns).containsExactly("buddy_pair_id");
+
+        Integer buddyPairIndexCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND indexname = 'idx_session_participants_session_buddy_pair'
+                  AND indexdef ILIKE '%session_id%'
+                  AND indexdef ILIKE '%buddy_pair_id%'
+                  AND indexdef ILIKE '%WHERE%'
+                """, Integer.class);
+        assertThat(buddyPairIndexCount).isEqualTo(1);
 
         List<String> matchPlanConstraints = jdbcTemplate.queryForList("""
                 SELECT constraint_name

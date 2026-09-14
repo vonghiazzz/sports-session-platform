@@ -15,8 +15,34 @@ public record MatchmakingCandidate(
         BigDecimal ratingValue,
         BigDecimal uncertainty,
         int ratedMatches,
-        RatingBasis ratingBasis
+        RatingBasis ratingBasis,
+        UUID buddyPairId
 ) {
+    public MatchmakingCandidate(
+            UUID sessionParticipantId,
+            UUID playerId,
+            Instant waitingSince,
+            SkillLevel skillLevel,
+            int sessionMatchesPlayed,
+            BigDecimal ratingValue,
+            BigDecimal uncertainty,
+            int ratedMatches,
+            RatingBasis ratingBasis
+    ) {
+        this(
+                sessionParticipantId,
+                playerId,
+                waitingSince,
+                skillLevel,
+                sessionMatchesPlayed,
+                ratingValue,
+                uncertainty,
+                ratedMatches,
+                ratingBasis,
+                null
+        );
+    }
+
     public MatchmakingCandidate {
         require(
                 sessionParticipantId != null,

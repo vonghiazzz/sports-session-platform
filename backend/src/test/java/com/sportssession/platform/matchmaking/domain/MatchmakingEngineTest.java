@@ -29,8 +29,8 @@ class MatchmakingEngineTest {
     void exposesOneLockedAlgorithmVersion() {
         assertThat(MatchmakingEngine.ALGORITHM_VERSION)
                 .isEqualTo(
-                        "fairness-anchor-level-session-count-diversity-"
-                                + "rating-sum-v4"
+                        "fairness-anchor-buddy-level-session-count-"
+                                + "diversity-rating-sum-v5"
                 );
     }
 

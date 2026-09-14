@@ -20,11 +20,13 @@ import com.sportssession.platform.matchmaking.application.MatchmakingSessionSnap
 import com.sportssession.platform.matchmaking.domain.InvalidMatchmakingInputException;
 import com.sportssession.platform.session.domain.DuplicateSessionCourtException;
 import com.sportssession.platform.session.domain.DuplicateSessionParticipantException;
+import com.sportssession.platform.session.domain.InvalidBuddyPairRequestException;
 import com.sportssession.platform.session.domain.InvalidParticipantStateException;
 import com.sportssession.platform.session.domain.InvalidSessionCourtStateException;
 import com.sportssession.platform.session.domain.InvalidSessionStateException;
 import com.sportssession.platform.session.domain.InvalidSessionTimeRangeException;
 import com.sportssession.platform.session.domain.SessionCourtNotFoundException;
+import com.sportssession.platform.session.domain.SessionBuddyPairNotFoundException;
 import com.sportssession.platform.session.domain.SessionNotFoundException;
 import com.sportssession.platform.session.domain.SessionParticipantNotFoundException;
 import com.sportssession.platform.session.domain.SessionResourceConflictException;
@@ -76,6 +78,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             SessionNotFoundException.class,
+            SessionBuddyPairNotFoundException.class,
             SessionParticipantNotFoundException.class,
             SessionCourtNotFoundException.class
     })
@@ -108,6 +111,19 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidBuddyPairRequestException.class)
+    ResponseEntity<ApiError> handleInvalidBuddyPairRequest(
+            InvalidBuddyPairRequestException exception,
+            HttpServletRequest request
+    ) {
+        return error(
+                HttpStatus.BAD_REQUEST,
+                exception.getMessage(),
+                request,
+                Map.of()
+        );
     }
 
     @ExceptionHandler(InvalidManualMatchRequestException.class)

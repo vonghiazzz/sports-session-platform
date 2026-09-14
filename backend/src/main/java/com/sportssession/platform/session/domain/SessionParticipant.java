@@ -9,6 +9,7 @@ public record SessionParticipant(
         UUID id,
         UUID sessionId,
         UUID playerId,
+        UUID buddyPairId,
         ParticipantStatus status,
         Instant joinedAt,
         Instant checkedInAt,
@@ -20,6 +21,39 @@ public record SessionParticipant(
         Instant createdAt,
         Instant updatedAt
 ) {
+    public SessionParticipant(
+            UUID id,
+            UUID sessionId,
+            UUID playerId,
+            ParticipantStatus status,
+            Instant joinedAt,
+            Instant checkedInAt,
+            Instant waitingSince,
+            Instant pausedAt,
+            long totalPausedSeconds,
+            Instant leftAt,
+            long version,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        this(
+                id,
+                sessionId,
+                playerId,
+                null,
+                status,
+                joinedAt,
+                checkedInAt,
+                waitingSince,
+                pausedAt,
+                totalPausedSeconds,
+                leftAt,
+                version,
+                createdAt,
+                updatedAt
+        );
+    }
+
     public SessionParticipant {
         Objects.requireNonNull(id, "id is required");
         Objects.requireNonNull(sessionId, "sessionId is required");
@@ -42,6 +76,7 @@ public record SessionParticipant(
                 UUID.randomUUID(),
                 sessionId,
                 playerId,
+                null,
                 ParticipantStatus.REGISTERED,
                 now,
                 null,
@@ -52,6 +87,40 @@ public record SessionParticipant(
                 0,
                 now,
                 now);
+    }
+
+    public SessionParticipant assignBuddyPair(
+            UUID assignedBuddyPairId,
+            Instant now
+    ) {
+        Objects.requireNonNull(
+                assignedBuddyPairId,
+                "buddyPairId is required"
+        );
+        Objects.requireNonNull(now, "now is required");
+        if (buddyPairId != null) {
+            throw new SessionResourceConflictException(
+                    "SessionParticipant already belongs to Buddy Pair: " + id
+            );
+        }
+        return copyBuddyPair(assignedBuddyPairId, now);
+    }
+
+    public SessionParticipant removeBuddyPair(
+            UUID expectedBuddyPairId,
+            Instant now
+    ) {
+        Objects.requireNonNull(
+                expectedBuddyPairId,
+                "buddyPairId is required"
+        );
+        Objects.requireNonNull(now, "now is required");
+        if (!expectedBuddyPairId.equals(buddyPairId)) {
+            throw new SessionResourceConflictException(
+                    "SessionParticipant does not belong to Buddy Pair: " + id
+            );
+        }
+        return copyBuddyPair(null, now);
     }
 
     public SessionParticipant checkIn(Instant now) {
@@ -152,6 +221,7 @@ public record SessionParticipant(
                 id,
                 sessionId,
                 playerId,
+                buddyPairId,
                 newStatus,
                 joinedAt,
                 newCheckedInAt,
@@ -162,6 +232,28 @@ public record SessionParticipant(
                 version,
                 createdAt,
                 newUpdatedAt);
+    }
+
+    private SessionParticipant copyBuddyPair(
+            UUID newBuddyPairId,
+            Instant newUpdatedAt
+    ) {
+        return new SessionParticipant(
+                id,
+                sessionId,
+                playerId,
+                newBuddyPairId,
+                status,
+                joinedAt,
+                checkedInAt,
+                waitingSince,
+                pausedAt,
+                totalPausedSeconds,
+                leftAt,
+                version,
+                createdAt,
+                newUpdatedAt
+        );
     }
 
     private static void validateStateTimestamps(

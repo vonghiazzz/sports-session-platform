@@ -5,10 +5,12 @@ import com.sportssession.platform.session.application.AddSessionCourtCommand;
 import com.sportssession.platform.session.application.CreateSessionCommand;
 import com.sportssession.platform.session.application.SessionService;
 import com.sportssession.platform.session.domain.Session;
+import com.sportssession.platform.session.domain.SessionBuddyPair;
 import com.sportssession.platform.session.domain.SessionCourt;
 import com.sportssession.platform.session.domain.SessionParticipant;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -91,6 +93,33 @@ public class SessionController {
         return sessionService.listParticipants(sessionId).stream()
                 .map(SessionParticipantResponse::from)
                 .toList();
+    }
+
+    @PostMapping("/{sessionId}/buddy-pairs")
+    public ResponseEntity<BuddyPairResponse> createBuddyPair(
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody CreateBuddyPairRequest request
+    ) {
+        SessionBuddyPair created = sessionService.createBuddyPair(
+                sessionId,
+                request.firstSessionParticipantId(),
+                request.secondSessionParticipantId()
+        );
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{buddyPairId}")
+                .buildAndExpand(created.id())
+                .toUri();
+        return ResponseEntity.created(location)
+                .body(BuddyPairResponse.from(created));
+    }
+
+    @DeleteMapping("/{sessionId}/buddy-pairs/{buddyPairId}")
+    public ResponseEntity<Void> removeBuddyPair(
+            @PathVariable UUID sessionId,
+            @PathVariable UUID buddyPairId
+    ) {
+        sessionService.removeBuddyPair(sessionId, buddyPairId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{sessionId}/participants/{participantId}/check-in")

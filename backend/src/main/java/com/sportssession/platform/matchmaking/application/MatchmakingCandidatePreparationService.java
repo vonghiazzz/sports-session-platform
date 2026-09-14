@@ -10,6 +10,8 @@ import com.sportssession.platform.session.domain.SessionStatus;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,12 +59,16 @@ public class MatchmakingCandidatePreparationService {
                         .toList();
         validateWaitingEvidence(waitingParticipants, evaluationTime);
         validateUniqueWaitingIdentities(waitingParticipants);
+        Map<UUID, List<UUID>> buddyMembers = validateBuddyEvidence(
+                evidence.participants()
+        );
 
         Set<UUID> queuedParticipantIds =
                 matchPlanPlanningLookup.queuedParticipantIds(
                         evidence.sessionId()
                 );
-        List<MatchmakingSessionParticipantSnapshot> eligibleParticipants =
+        List<MatchmakingSessionParticipantSnapshot>
+                independentlyEligibleParticipants =
                 waitingParticipants.stream()
                         .filter(participant ->
                                 !queuedParticipantIds.contains(
@@ -70,6 +76,11 @@ public class MatchmakingCandidatePreparationService {
                                 )
                         )
                         .toList();
+        List<MatchmakingSessionParticipantSnapshot> eligibleParticipants =
+                applyStrictBuddyEligibility(
+                        independentlyEligibleParticipants,
+                        buddyMembers
+                );
 
         List<UUID> playerIds = eligibleParticipants.stream()
                 .map(MatchmakingSessionParticipantSnapshot::playerId)
@@ -253,7 +264,56 @@ public class MatchmakingCandidatePreparationService {
                 rating.ratingValue(),
                 rating.uncertainty(),
                 rating.ratedMatches(),
-                rating.ratingBasis()
+                rating.ratingBasis(),
+                participant.buddyPairId()
         );
+    }
+
+    private Map<UUID, List<UUID>> validateBuddyEvidence(
+            List<MatchmakingSessionParticipantSnapshot> participants
+    ) {
+        Map<UUID, List<UUID>> mutableMembers = new HashMap<>();
+        for (MatchmakingSessionParticipantSnapshot participant : participants) {
+            if (participant.buddyPairId() != null) {
+                mutableMembers.computeIfAbsent(
+                        participant.buddyPairId(),
+                        ignored -> new ArrayList<>()
+                ).add(participant.sessionParticipantId());
+            }
+        }
+        mutableMembers.forEach((buddyPairId, members) -> {
+            if (members.size() != 2
+                    || new HashSet<>(members).size() != 2) {
+                throw new InvalidMatchmakingInputException(
+                        "Buddy Pair must contain exactly two unique "
+                                + "SessionParticipants: " + buddyPairId
+                );
+            }
+        });
+        return mutableMembers.entrySet().stream().collect(
+                java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey,
+                        entry -> List.copyOf(entry.getValue())
+                )
+        );
+    }
+
+    private List<MatchmakingSessionParticipantSnapshot>
+            applyStrictBuddyEligibility(
+            List<MatchmakingSessionParticipantSnapshot>
+                    independentlyEligibleParticipants,
+            Map<UUID, List<UUID>> buddyMembers
+    ) {
+        Set<UUID> independentlyEligibleIds =
+                independentlyEligibleParticipants.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::
+                                sessionParticipantId)
+                        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return independentlyEligibleParticipants.stream()
+                .filter(participant -> participant.buddyPairId() == null
+                        || independentlyEligibleIds.containsAll(
+                                buddyMembers.get(participant.buddyPairId())
+                        ))
+                .toList();
     }
 }

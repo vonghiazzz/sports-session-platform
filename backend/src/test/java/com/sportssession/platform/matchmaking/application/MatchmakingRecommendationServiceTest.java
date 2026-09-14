@@ -219,7 +219,167 @@ class MatchmakingRecommendationServiceTest {
                 );
     }
 
+    @Test
+    void bothWaitingBuddyMembersRemainEligibleAndAreTeammates() {
+        UUID buddyPairId = uuid(8_001);
+        List<MatchmakingSessionParticipantSnapshot> participants = List.of(
+                buddyParticipant(
+                        1,
+                        ParticipantStatus.WAITING,
+                        secondsBefore(100),
+                        buddyPairId
+                ),
+                buddyParticipant(
+                        2,
+                        ParticipantStatus.WAITING,
+                        secondsBefore(90),
+                        buddyPairId
+                ),
+                waiting(3, 80),
+                waiting(4, 70)
+        );
+        stubValidPipeline(participants, ratingsFor(participants));
 
+        MatchRecommendation recommendation =
+                (MatchRecommendation) service.recommend(
+                        SESSION_ID,
+                        SESSION_COURT_ID
+                );
+
+        assertThat(recommendedPlayerIds(recommendation))
+                .contains(uuid(1), uuid(2));
+        assertThat(List.of(
+                recommendation.teamA().slot1().playerId(),
+                recommendation.teamA().slot2().playerId()
+        )).containsExactlyInAnyOrder(uuid(1), uuid(2));
+        assertThat(capturedContext().candidates())
+                .filteredOn(candidate -> candidate.buddyPairId() != null)
+                .extracting(MatchmakingCandidate::buddyPairId)
+                .containsExactly(buddyPairId, buddyPairId);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = ParticipantStatus.class,
+            names = {"PLAYING", "PAUSED", "LEFT"}
+    )
+    void unavailableBuddyMemberExcludesBothFromCandidates(
+            ParticipantStatus buddyStatus
+    ) {
+        UUID buddyPairId = uuid(8_002);
+        List<MatchmakingSessionParticipantSnapshot> eligible = List.of(
+                waiting(3, 80),
+                waiting(4, 70),
+                waiting(5, 60),
+                waiting(6, 50)
+        );
+        List<MatchmakingSessionParticipantSnapshot> participants =
+                new ArrayList<>(eligible);
+        participants.add(buddyParticipant(
+                1,
+                ParticipantStatus.WAITING,
+                secondsBefore(100),
+                buddyPairId
+        ));
+        participants.add(buddyParticipant(
+                2,
+                buddyStatus,
+                null,
+                buddyPairId
+        ));
+        stubSnapshot(validSnapshot(participants));
+        when(ratingReader.readEffectiveRatings(
+                eligible.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList(),
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).thenReturn(ratingsFor(eligible));
+
+        MatchRecommendation recommendation =
+                (MatchRecommendation) service.recommend(
+                        SESSION_ID,
+                        SESSION_COURT_ID
+                );
+
+        assertThat(recommendedPlayerIds(recommendation))
+                .doesNotContain(uuid(1), uuid(2));
+        assertThat(recommendation.eligiblePlayerCount()).isEqualTo(4);
+    }
+
+    @Test
+    void queuedBuddyMemberExcludesBothFromCandidates() {
+        UUID buddyPairId = uuid(8_003);
+        List<MatchmakingSessionParticipantSnapshot> eligible = List.of(
+                waiting(3, 80),
+                waiting(4, 70),
+                waiting(5, 60),
+                waiting(6, 50)
+        );
+        List<MatchmakingSessionParticipantSnapshot> participants =
+                new ArrayList<>(eligible);
+        participants.add(buddyParticipant(
+                1,
+                ParticipantStatus.WAITING,
+                secondsBefore(100),
+                buddyPairId
+        ));
+        participants.add(buddyParticipant(
+                2,
+                ParticipantStatus.WAITING,
+                secondsBefore(90),
+                buddyPairId
+        ));
+        stubSnapshot(validSnapshot(participants));
+        when(matchPlanPlanningLookup.queuedParticipantIds(SESSION_ID))
+                .thenReturn(Set.of(uuid(1_002)));
+        when(ratingReader.readEffectiveRatings(
+                eligible.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList(),
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).thenReturn(ratingsFor(eligible));
+
+        MatchRecommendation recommendation =
+                (MatchRecommendation) service.recommend(
+                        SESSION_ID,
+                        SESSION_COURT_ID
+                );
+
+        assertThat(recommendedPlayerIds(recommendation))
+                .doesNotContain(uuid(1), uuid(2));
+        assertThat(recommendation.eligiblePlayerCount()).isEqualTo(4);
+    }
+
+    @Test
+    void removingBuddyConfigurationRestoresIndependentEligibility() {
+        List<MatchmakingSessionParticipantSnapshot> eligible = List.of(
+                waiting(1, 100),
+                waiting(3, 80),
+                waiting(4, 70),
+                waiting(5, 60)
+        );
+        List<MatchmakingSessionParticipantSnapshot> participants =
+                new ArrayList<>(eligible);
+        participants.add(participant(2, ParticipantStatus.PLAYING, null));
+        stubSnapshot(validSnapshot(participants));
+        when(ratingReader.readEffectiveRatings(
+                eligible.stream()
+                        .map(MatchmakingSessionParticipantSnapshot::playerId)
+                        .toList(),
+                SportCode.BADMINTON,
+                MatchFormat.DOUBLES
+        )).thenReturn(ratingsFor(eligible));
+
+        MatchRecommendation recommendation =
+                (MatchRecommendation) service.recommend(
+                        SESSION_ID,
+                        SESSION_COURT_ID
+                );
+
+        assertThat(recommendedPlayerIds(recommendation)).contains(uuid(1));
+    }
 
     @ParameterizedTest
     @EnumSource(
@@ -933,6 +1093,21 @@ class MatchmakingRecommendationServiceTest {
                 uuid(number),
                 status,
                 waitingSince
+        );
+    }
+
+    private MatchmakingSessionParticipantSnapshot buddyParticipant(
+            int number,
+            ParticipantStatus status,
+            Instant waitingSince,
+            UUID buddyPairId
+    ) {
+        return new MatchmakingSessionParticipantSnapshot(
+                uuid(1000 + number),
+                uuid(number),
+                status,
+                waitingSince,
+                buddyPairId
         );
     }
 

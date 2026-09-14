@@ -26,6 +26,7 @@ import com.sportssession.platform.rating.domain.RatingState;
 import com.sportssession.platform.rating.infrastructure.PlayerRatingEntity;
 import com.sportssession.platform.rating.infrastructure.PlayerRatingRepository;
 import com.sportssession.platform.rating.infrastructure.RatingEventRepository;
+import com.sportssession.platform.session.application.SessionService;
 import com.sportssession.platform.session.domain.ParticipantStatus;
 import com.sportssession.platform.session.domain.Session;
 import com.sportssession.platform.session.domain.SessionCourt;
@@ -79,6 +80,9 @@ class MatchmakingRecommendationServiceIntegrationTest
 
     @Autowired
     private MatchmakingRecommendationService recommendationService;
+
+    @Autowired
+    private SessionService sessionService;
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -175,6 +179,44 @@ class MatchmakingRecommendationServiceIntegrationTest
         assertThat(ratingEventRepository.count()).isZero();
         assertThat(matchRepository.count()).isZero();
         assertThat(matchParticipantRepository.count()).isZero();
+    }
+
+    @Test
+    void realPipelineReadsPersistedBuddyPairAndKeepsMembersOnSameTeam() {
+        RuntimeFixture fixture = createRuntimeFixture(
+                SessionStatus.IN_PROGRESS,
+                SessionCourtStatus.AVAILABLE,
+                false
+        );
+        UUID firstBuddyId = fixture.waitingParticipantIds().get(0);
+        UUID secondBuddyId = fixture.waitingParticipantIds().get(1);
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                firstBuddyId,
+                secondBuddyId
+        );
+
+        MatchRecommendation recommendation =
+                (MatchRecommendation) recommendationService.recommend(
+                        fixture.sessionId(),
+                        fixture.sessionCourtId()
+                );
+
+        List<RecommendedPlayer> buddies = recommendedPlayers(recommendation)
+                .stream()
+                .filter(player -> player.sessionParticipantId().equals(
+                        firstBuddyId
+                ) || player.sessionParticipantId().equals(secondBuddyId))
+                .toList();
+        assertThat(buddies)
+                .extracting(RecommendedPlayer::sessionParticipantId)
+                .containsExactlyInAnyOrder(firstBuddyId, secondBuddyId);
+        assertThat(buddies)
+                .extracting(RecommendedPlayer::teamSide)
+                .containsOnly(buddies.getFirst().teamSide());
+        assertThat(recommendation.algorithmVersion()).isEqualTo(
+                MatchmakingEngine.ALGORITHM_VERSION
+        );
     }
 
     @Test
@@ -571,11 +613,19 @@ class MatchmakingRecommendationServiceIntegrationTest
     private List<UUID> recommendedParticipantIds(
             MatchRecommendation recommendation
     ) {
+        return recommendedPlayers(recommendation).stream()
+                .map(RecommendedPlayer::sessionParticipantId)
+                .toList();
+    }
+
+    private List<RecommendedPlayer> recommendedPlayers(
+            MatchRecommendation recommendation
+    ) {
         return List.of(
-                recommendation.teamA().slot1().sessionParticipantId(),
-                recommendation.teamA().slot2().sessionParticipantId(),
-                recommendation.teamB().slot1().sessionParticipantId(),
-                recommendation.teamB().slot2().sessionParticipantId()
+                recommendation.teamA().slot1(),
+                recommendation.teamA().slot2(),
+                recommendation.teamB().slot1(),
+                recommendation.teamB().slot2()
         );
     }
 
