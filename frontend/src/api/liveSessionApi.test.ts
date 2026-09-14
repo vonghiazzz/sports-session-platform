@@ -6,11 +6,13 @@ import {
   checkInParticipant,
   completeSession,
   completeMatch,
+  createBuddyPair,
   createManualMatch,
   disableSessionCourt,
   enableSessionCourt,
   leaveParticipant,
   pauseParticipant,
+  removeBuddyPair,
   resumeParticipant,
   startMatch,
 } from './liveSessionApi'
@@ -202,5 +204,56 @@ describe('live Session action API', () => {
       headers: { Accept: 'application/json' },
       signal: undefined,
     })
+  })
+
+  it('creates a Buddy Pair with the exact Session Participant UUIDs', async () => {
+    const response = {
+      buddyPairId: 'buddy-pair-1',
+      sessionId,
+      firstSessionParticipantId: 'participant-1',
+      secondSessionParticipantId: 'participant-2',
+    }
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      createBuddyPair(sessionId, 'participant-1', 'participant-2'),
+    ).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/sessions/${sessionId}/buddy-pairs`,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        signal: undefined,
+        body: JSON.stringify({
+          firstSessionParticipantId: 'participant-1',
+          secondSessionParticipantId: 'participant-2',
+        }),
+      },
+    )
+  })
+
+  it('removes a Buddy Pair with one bodyless DELETE', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(removeBuddyPair(sessionId, 'buddy-pair-1')).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/sessions/${sessionId}/buddy-pairs/buddy-pair-1`,
+      {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+        signal: undefined,
+      },
+    )
   })
 })

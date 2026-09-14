@@ -56,6 +56,7 @@ function participant(
     id,
     sessionId: 'session-1',
     playerId,
+    buddyPairId: null,
     status,
     joinedAt: createdAt,
     checkedInAt: status === 'REGISTERED' ? null : createdAt,

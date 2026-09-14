@@ -1,6 +1,8 @@
 import type {
+  BuddyPairResponse,
   CompleteMatchRequest,
   CourtResponse,
+  CreateBuddyPairRequest,
   CreateManualMatchRequest,
   MatchResponse,
   PlayerResponse,
@@ -9,7 +11,12 @@ import type {
   SessionResponse,
   VenueResponse,
 } from './contracts'
-import { getJson, postJson, postJsonWithBody } from './http'
+import {
+  deleteWithoutResponse,
+  getJson,
+  postJson,
+  postJsonWithBody,
+} from './http'
 
 function segment(value: string): string {
   return encodeURIComponent(value)
@@ -48,6 +55,30 @@ export function getSessionParticipants(
   signal?: AbortSignal,
 ): Promise<readonly SessionParticipantResponse[]> {
   return getJson(`/api/sessions/${segment(sessionId)}/participants`, signal)
+}
+
+export function createBuddyPair(
+  sessionId: string,
+  firstSessionParticipantId: string,
+  secondSessionParticipantId: string,
+): Promise<BuddyPairResponse> {
+  const request: CreateBuddyPairRequest = {
+    firstSessionParticipantId,
+    secondSessionParticipantId,
+  }
+  return postJsonWithBody(
+    `/api/sessions/${segment(sessionId)}/buddy-pairs`,
+    request,
+  )
+}
+
+export function removeBuddyPair(
+  sessionId: string,
+  buddyPairId: string,
+): Promise<void> {
+  return deleteWithoutResponse(
+    `/api/sessions/${segment(sessionId)}/buddy-pairs/${segment(buddyPairId)}`,
+  )
 }
 
 export function getPlayers(

@@ -45,6 +45,11 @@ import type {
 import { MatchmakingRecommendation } from './MatchmakingRecommendation'
 import { GlobalMatchmakingRecommendation } from './GlobalMatchmakingRecommendation'
 import { MatchPlanQueue } from './MatchPlanQueue'
+import { BuddyPairControls } from './BuddyPairControls'
+import {
+  useBuddyPairActions,
+  type BuddyPairActions,
+} from './useBuddyPairActions'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -420,14 +425,18 @@ function CourtCard({
 
 function ParticipantRow({
   participant,
+  allParticipants,
   sessionId,
   sessionStatus,
   showWaiting,
+  buddyPairActions,
 }: {
   readonly participant: ParticipantView
+  readonly allParticipants: readonly ParticipantView[]
   readonly sessionId: string
   readonly sessionStatus: LiveSessionModel['header']['status']
   readonly showWaiting: boolean
+  readonly buddyPairActions: BuddyPairActions
 }) {
   const actionState = useParticipantAction(
     sessionId,
@@ -462,6 +471,13 @@ function ParticipantRow({
             {participant.planningLabel}
           </span>
         )}
+        <BuddyPairControls
+          key={participant.buddyPairId ?? 'unpaired'}
+          participant={participant}
+          participants={allParticipants}
+          sessionStatus={sessionStatus}
+          actions={buddyPairActions}
+        />
         {actions.length > 0 && (
           <div className="action-area participant-actions">
             {actions.map((action) => (
@@ -497,21 +513,25 @@ function ParticipantRow({
 function ParticipantList({
   title,
   participants,
+  allParticipants,
   sessionId,
   sessionStatus,
   showWaiting = false,
   emptyMessage,
   priority = false,
   subdued = false,
+  buddyPairActions,
 }: {
   readonly title: string
   readonly participants: readonly ParticipantView[]
+  readonly allParticipants: readonly ParticipantView[]
   readonly sessionId: string
   readonly sessionStatus: LiveSessionModel['header']['status']
   readonly showWaiting?: boolean
   readonly emptyMessage: string
   readonly priority?: boolean
   readonly subdued?: boolean
+  readonly buddyPairActions: BuddyPairActions
 }) {
   return (
     <section
@@ -530,9 +550,11 @@ function ParticipantList({
             <ParticipantRow
               key={participant.sessionParticipantId}
               participant={participant}
+              allParticipants={allParticipants}
               sessionId={sessionId}
               sessionStatus={sessionStatus}
               showWaiting={showWaiting}
+              buddyPairActions={buddyPairActions}
             />
           ))}
         </ul>
@@ -553,6 +575,17 @@ function PeoplePanel({
   readonly participants: readonly SessionParticipantResponse[]
 }) {
   const [search, setSearch] = useState('')
+  const buddyPairActions = useBuddyPairActions(sessionId)
+  const allParticipants = useMemo(
+    () => [
+      ...model.waitingParticipants,
+      ...model.playingParticipants,
+      ...model.registeredParticipants,
+      ...model.pausedParticipants,
+      ...model.leftParticipants,
+    ],
+    [model],
+  )
   const groups = [
     {
       title: 'Đang chờ',
@@ -638,12 +671,14 @@ function PeoplePanel({
                 key={group.title}
                 title={group.title}
                 participants={group.participants}
+                allParticipants={allParticipants}
                 sessionId={sessionId}
                 sessionStatus={model.header.status}
                 showWaiting={group.showWaiting}
                 emptyMessage={group.emptyMessage}
                 priority={group.priority}
                 subdued={group.subdued}
+                buddyPairActions={buddyPairActions}
               />
             ))}
         </div>

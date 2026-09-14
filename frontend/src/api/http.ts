@@ -73,6 +73,27 @@ async function requestJson<T>(
   return (await response.json()) as T
 }
 
+async function requestWithoutResponse(
+  path: string,
+  method: 'DELETE',
+  signal?: AbortSignal,
+): Promise<void> {
+  const response = await fetch(path, {
+    method,
+    headers: { Accept: 'application/json' },
+    signal,
+  })
+
+  if (!response.ok) {
+    const apiError = await parseApiError(response)
+    throw new HttpError(
+      response.status,
+      apiError?.message ?? `Request failed with status ${response.status}`,
+      apiError,
+    )
+  }
+}
+
 export function getJson<T>(
   path: string,
   signal?: AbortSignal,
@@ -101,4 +122,11 @@ export function putJsonWithBody<TResponse, TBody>(
   signal?: AbortSignal,
 ): Promise<TResponse> {
   return requestJson(path, 'PUT', signal, body)
+}
+
+export function deleteWithoutResponse(
+  path: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return requestWithoutResponse(path, 'DELETE', signal)
 }

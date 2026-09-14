@@ -54,6 +54,7 @@ export interface SessionParticipantResponse {
   readonly id: UUID
   readonly sessionId: UUID
   readonly playerId: UUID
+  readonly buddyPairId: UUID | null
   readonly status: ParticipantStatus
   readonly joinedAt: ISOInstant
   readonly checkedInAt: ISOInstant | null
@@ -64,6 +65,18 @@ export interface SessionParticipantResponse {
   readonly version: number
   readonly createdAt: ISOInstant
   readonly updatedAt: ISOInstant
+}
+
+export interface CreateBuddyPairRequest {
+  readonly firstSessionParticipantId: UUID
+  readonly secondSessionParticipantId: UUID
+}
+
+export interface BuddyPairResponse {
+  readonly buddyPairId: UUID
+  readonly sessionId: UUID
+  readonly firstSessionParticipantId: UUID
+  readonly secondSessionParticipantId: UUID
 }
 
 export interface PlayerSportProfileResponse {

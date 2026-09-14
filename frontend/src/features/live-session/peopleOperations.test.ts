@@ -8,6 +8,7 @@ import {
 function participant(displayName: string): ParticipantView {
   return {
     sessionParticipantId: displayName,
+    buddyPairId: null,
     displayName,
     status: 'WAITING',
     skillLevel: 'INTERMEDIATE',
