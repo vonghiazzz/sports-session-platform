@@ -106,7 +106,9 @@ class SessionBuddyPairApiIntegrationTest extends PostgreSqlIntegrationTest {
                 .andExpect(jsonPath("$[0].buddyPairId")
                         .value(buddyPairId.toString()))
                 .andExpect(jsonPath("$[1].buddyPairId")
-                        .value(buddyPairId.toString()));
+                        .value(buddyPairId.toString()))
+                .andExpect(jsonPath("$[*].participantCode")
+                        .value(org.hamcrest.Matchers.contains(1, 2)));
     }
 
     @Test
@@ -118,12 +120,19 @@ class SessionBuddyPairApiIntegrationTest extends PostgreSqlIntegrationTest {
                 fixture.participantIds().get(1)
         ).andExpect(status().isCreated()).andReturn());
 
+        assertThat(participantRepository.findAll())
+                .extracting(SessionParticipantEntity::getParticipantCode)
+                .containsExactlyInAnyOrder(1, 2);
+
         removeBuddyPair(fixture.sessionId(), buddyPairId)
                 .andExpect(status().isNoContent());
 
         assertThat(participantRepository.findAll())
                 .extracting(SessionParticipantEntity::getBuddyPairId)
                 .containsOnlyNulls();
+        assertThat(participantRepository.findAll())
+                .extracting(SessionParticipantEntity::getParticipantCode)
+                .containsExactlyInAnyOrder(1, 2);
     }
 
     @Test
@@ -349,6 +358,7 @@ class SessionBuddyPairApiIntegrationTest extends PostgreSqlIntegrationTest {
         SessionParticipant participant = SessionParticipant.register(
                 sessionId,
                 playerId,
+                index + 1,
                 NOW.plusSeconds(10L + index)
         );
         return participantRepository.saveAndFlush(

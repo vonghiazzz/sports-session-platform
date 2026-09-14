@@ -174,7 +174,7 @@ public class SessionService {
 
     @Transactional
     public SessionParticipant addParticipant(AddParticipantCommand command) {
-        Session session = findSessionEntity(command.sessionId()).toDomain();
+        Session session = findSessionEntityForUpdate(command.sessionId()).toDomain();
 
         requireSessionOpenForAllocation(
                 session,
@@ -196,11 +196,18 @@ public class SessionService {
         }
 
         Instant now = clock.instant();
+        int participantCode = Math.addExact(
+                participantRepository
+                        .findMaxParticipantCodeBySessionId(command.sessionId())
+                        .orElse(0),
+                1
+        );
 
         SessionParticipant participant =
                 SessionParticipant.register(
                         command.sessionId(),
                         command.playerId(),
+                        participantCode,
                         now
                 );
 

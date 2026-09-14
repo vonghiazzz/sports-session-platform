@@ -723,13 +723,14 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
         }
 
         List<UUID> participantIds = new ArrayList<>();
-        for (ParticipantStatus status : participantStatuses) {
+        for (int index = 0; index < participantStatuses.size(); index++) {
+            ParticipantStatus status = participantStatuses.get(index);
             Player player = Player.create("Player " + UUID.randomUUID(), now);
             UUID playerId = playerRepository.saveAndFlush(
                     PlayerEntity.from(player)
             ).getId();
             SessionParticipant participant = SessionParticipant.register(
-                    sessionId, playerId, now
+                    sessionId, playerId, index + 1, now
             );
             participant = switch (status) {
                 case REGISTERED -> participant;

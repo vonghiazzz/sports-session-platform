@@ -26,6 +26,9 @@ public class SessionParticipantEntity {
     @Column(name = "player_id", nullable = false)
     private UUID playerId;
 
+    @Column(name = "participant_code", nullable = false)
+    private int participantCode;
+
     @Column(name = "buddy_pair_id")
     private UUID buddyPairId;
 
@@ -68,6 +71,7 @@ public class SessionParticipantEntity {
         this.id = participant.id();
         this.sessionId = participant.sessionId();
         this.playerId = participant.playerId();
+        this.participantCode = participant.participantCode();
         this.buddyPairId = participant.buddyPairId();
         this.status = participant.status();
         this.joinedAt = participant.joinedAt();
@@ -101,6 +105,7 @@ public class SessionParticipantEntity {
                 id,
                 sessionId,
                 playerId,
+                participantCode,
                 buddyPairId,
                 status,
                 joinedAt,
@@ -124,6 +129,10 @@ public class SessionParticipantEntity {
 
     public UUID getPlayerId() {
         return playerId;
+    }
+
+    public int getParticipantCode() {
+        return participantCode;
     }
 
     public ParticipantStatus getStatus() {

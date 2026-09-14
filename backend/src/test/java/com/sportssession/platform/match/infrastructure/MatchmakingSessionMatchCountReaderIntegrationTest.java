@@ -283,6 +283,7 @@ class MatchmakingSessionMatchCountReaderIntegrationTest
         SessionParticipant participant = SessionParticipant.register(
                 sessionId,
                 playerId,
+                number,
                 NOW.plusSeconds(1)
         ).checkIn(NOW.plusSeconds(2));
         return participantRepository.saveAndFlush(

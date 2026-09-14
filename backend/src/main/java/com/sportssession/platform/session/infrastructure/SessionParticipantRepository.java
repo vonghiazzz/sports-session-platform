@@ -15,6 +15,15 @@ public interface SessionParticipantRepository
 
     boolean existsBySessionIdAndPlayerId(UUID sessionId, UUID playerId);
 
+    @Query("""
+            select max(participant.participantCode)
+            from SessionParticipantEntity participant
+            where participant.sessionId = :sessionId
+            """)
+    Optional<Integer> findMaxParticipantCodeBySessionId(
+            @Param("sessionId") UUID sessionId
+    );
+
     Optional<SessionParticipantEntity> findByIdAndSessionId(UUID id, UUID sessionId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

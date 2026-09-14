@@ -90,7 +90,9 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
     void duplicateSessionParticipantInOneMatchIsRejected() {
         RuntimeFixture fixture = createRuntimeFixture();
         UUID matchId = createMatch(fixture, false);
-        UUID sessionParticipantId = createSessionParticipant(fixture.sessionId());
+        UUID sessionParticipantId = createSessionParticipant(
+                fixture.sessionId(), 1
+        );
 
         saveMatchParticipant(
                 matchId, sessionParticipantId, TeamSide.A, 1
@@ -113,14 +115,14 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
 
         saveMatchParticipant(
                 matchId,
-                createSessionParticipant(fixture.sessionId()),
+                createSessionParticipant(fixture.sessionId(), 1),
                 TeamSide.A,
                 1
         );
 
         assertThatThrownBy(() -> saveMatchParticipant(
                 matchId,
-                createSessionParticipant(fixture.sessionId()),
+                createSessionParticipant(fixture.sessionId(), 2),
                 TeamSide.A,
                 1
         ))
@@ -133,7 +135,9 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
     void invalidTeamSideIsRejected() {
         RuntimeFixture fixture = createRuntimeFixture();
         UUID matchId = createMatch(fixture, false);
-        UUID sessionParticipantId = createSessionParticipant(fixture.sessionId());
+        UUID sessionParticipantId = createSessionParticipant(
+                fixture.sessionId(), 1
+        );
 
         assertThatThrownBy(() -> jdbcTemplate.update("""
                 INSERT INTO match_participants (
@@ -148,7 +152,9 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
     void invalidTeamSlotIsRejected() {
         RuntimeFixture fixture = createRuntimeFixture();
         UUID matchId = createMatch(fixture, false);
-        UUID sessionParticipantId = createSessionParticipant(fixture.sessionId());
+        UUID sessionParticipantId = createSessionParticipant(
+                fixture.sessionId(), 1
+        );
 
         assertThatThrownBy(() -> jdbcTemplate.update("""
                 INSERT INTO match_participants (
@@ -324,7 +330,7 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
         return new RuntimeFixture(sessionId, sessionCourtId);
     }
 
-    private UUID createSessionParticipant(UUID sessionId) {
+    private UUID createSessionParticipant(UUID sessionId, int participantCode) {
         Instant now = Instant.now();
         Player player = Player.create("Player " + UUID.randomUUID(), now);
         UUID playerId = playerRepository
@@ -334,6 +340,7 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
         SessionParticipant participant = SessionParticipant.register(
                 sessionId,
                 playerId,
+                participantCode,
                 now
         );
         return sessionParticipantRepository

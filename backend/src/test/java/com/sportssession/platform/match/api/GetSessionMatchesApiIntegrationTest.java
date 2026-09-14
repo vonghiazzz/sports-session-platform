@@ -435,6 +435,7 @@ class GetSessionMatchesApiIntegrationTest extends PostgreSqlIntegrationTest {
             SessionParticipant participant = SessionParticipant.register(
                     sessionId,
                     playerId,
+                    index + 1,
                     now.plusSeconds(10 + index)
             ).checkIn(now.plusSeconds(20 + index));
             participantIds.add(sessionParticipantRepository

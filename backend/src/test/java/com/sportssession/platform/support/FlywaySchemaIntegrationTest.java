@@ -6,6 +6,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
+import org.flywaydb.core.Flyway;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
@@ -14,7 +20,7 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesRuntimeTablesThroughBuddyPairFoundation() {
+    void flywayCreatesRuntimeTablesThroughParticipantCodeFoundation() {
         String serverVersion = jdbcTemplate.queryForObject(
                 "SHOW server_version", String.class);
         assertThat(serverVersion).startsWith("18.4");
@@ -91,6 +97,40 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 WHERE version = '6' AND success = true
                 """, Integer.class);
         assertThat(buddyPairMigrationCount).isEqualTo(1);
+
+        Integer participantCodeMigrationCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE version = '7' AND success = true
+                """, Integer.class);
+        assertThat(participantCodeMigrationCount).isEqualTo(1);
+
+        Integer participantCodeColumnCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'session_participants'
+                  AND column_name = 'participant_code'
+                  AND data_type = 'integer'
+                  AND is_nullable = 'NO'
+                """, Integer.class);
+        assertThat(participantCodeColumnCount).isEqualTo(1);
+
+        List<String> participantCodeConstraints = jdbcTemplate.queryForList("""
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = 'public'
+                  AND table_name = 'session_participants'
+                  AND constraint_name IN (
+                    'ck_session_participants_code_positive',
+                    'uk_session_participants_session_code'
+                  )
+                ORDER BY constraint_name
+                """, String.class);
+        assertThat(participantCodeConstraints).containsExactly(
+                "ck_session_participants_code_positive",
+                "uk_session_participants_session_code"
+        );
 
         List<String> buddyPairColumns = jdbcTemplate.queryForList("""
                 SELECT column_name
@@ -177,4 +217,380 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 "idx_matches_completed_at_id_result_version",
                 "idx_rating_events_player_rating_id_created_at_id");
     }
+
+    @Test
+void participantCodeMigrationBackfillsExistingParticipantsDeterministically() {
+    String schemaName =
+            "participant_code_backfill_"
+                    + UUID.randomUUID()
+                    .toString()
+                    .replace("-", "");
+
+    UUID venueId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000100");
+
+    UUID firstSessionId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000200");
+    UUID secondSessionId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000201");
+
+    UUID firstPlayerId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000301");
+    UUID secondPlayerId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000302");
+    UUID thirdPlayerId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000303");
+    UUID fourthPlayerId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000304");
+
+    UUID lowerParticipantId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000001");
+    UUID higherParticipantId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000002");
+    UUID laterParticipantId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000003");
+    UUID otherSessionParticipantId = UUID.fromString(
+            "00000000-0000-0000-0000-000000000004");
+
+    Instant baseTime = Instant.parse("2026-01-01T00:00:00Z");
+    Instant sameJoinedAt = Instant.parse("2026-01-01T08:00:00Z");
+    Instant laterJoinedAt = Instant.parse("2026-01-01T09:00:00Z");
+
+    try {
+        Flyway.configure()
+                .dataSource(
+                        POSTGRESQL.getJdbcUrl(),
+                        POSTGRESQL.getUsername(),
+                        POSTGRESQL.getPassword()
+                )
+                .locations("classpath:db/migration")
+                .schemas(schemaName)
+                .defaultSchema(schemaName)
+                .target("6")
+                .load()
+                .migrate();
+
+        assertThat(participantCodeColumnCount(schemaName))
+                .isZero();
+
+        insertLegacyVenue(
+                schemaName,
+                venueId,
+                baseTime
+        );
+
+        insertLegacyPlayer(
+                schemaName,
+                firstPlayerId,
+                "Player 1",
+                baseTime
+        );
+        insertLegacyPlayer(
+                schemaName,
+                secondPlayerId,
+                "Player 2",
+                baseTime
+        );
+        insertLegacyPlayer(
+                schemaName,
+                thirdPlayerId,
+                "Player 3",
+                baseTime
+        );
+        insertLegacyPlayer(
+                schemaName,
+                fourthPlayerId,
+                "Player 4",
+                baseTime
+        );
+
+        insertLegacySession(
+                schemaName,
+                firstSessionId,
+                venueId,
+                "Session A",
+                baseTime
+        );
+        insertLegacySession(
+                schemaName,
+                secondSessionId,
+                venueId,
+                "Session B",
+                baseTime
+        );
+
+        /*
+         * Insert the higher UUID first on purpose.
+         *
+         * Both rows have the same joined_at, so V7 must use id ASC
+         * instead of insertion order to choose participant codes.
+         */
+        insertLegacyParticipant(
+                schemaName,
+                higherParticipantId,
+                firstSessionId,
+                secondPlayerId,
+                sameJoinedAt
+        );
+
+        insertLegacyParticipant(
+                schemaName,
+                lowerParticipantId,
+                firstSessionId,
+                firstPlayerId,
+                sameJoinedAt
+        );
+
+        insertLegacyParticipant(
+                schemaName,
+                laterParticipantId,
+                firstSessionId,
+                thirdPlayerId,
+                laterJoinedAt
+        );
+
+        insertLegacyParticipant(
+                schemaName,
+                otherSessionParticipantId,
+                secondSessionId,
+                fourthPlayerId,
+                laterJoinedAt
+        );
+
+        Flyway.configure()
+                .dataSource(
+                        POSTGRESQL.getJdbcUrl(),
+                        POSTGRESQL.getUsername(),
+                        POSTGRESQL.getPassword()
+                )
+                .locations("classpath:db/migration")
+                .schemas(schemaName)
+                .defaultSchema(schemaName)
+                .target("7")
+                .load()
+                .migrate();
+
+        assertThat(participantCodeColumnCount(schemaName))
+                .isEqualTo(1);
+
+        assertThat(participantCode(
+                schemaName,
+                lowerParticipantId
+        )).isEqualTo(1);
+
+        assertThat(participantCode(
+                schemaName,
+                higherParticipantId
+        )).isEqualTo(2);
+
+        assertThat(participantCode(
+                schemaName,
+                laterParticipantId
+        )).isEqualTo(3);
+
+        assertThat(participantCode(
+                schemaName,
+                otherSessionParticipantId
+        )).isEqualTo(1);
+
+        Integer nullCodeCount = jdbcTemplate.queryForObject(
+                """
+                SELECT count(*)
+                FROM %s.session_participants
+                WHERE participant_code IS NULL
+                """.formatted(schemaName),
+                Integer.class
+        );
+
+        assertThat(nullCodeCount).isZero();
+
+    } finally {
+        jdbcTemplate.execute(
+                "DROP SCHEMA IF EXISTS "
+                        + schemaName
+                        + " CASCADE"
+        );
+    }
+}
+
+ private int participantCodeColumnCount(String schemaName) {
+    Integer count = jdbcTemplate.queryForObject(
+            """
+            SELECT count(*)
+            FROM information_schema.columns
+            WHERE table_schema = ?
+              AND table_name = 'session_participants'
+              AND column_name = 'participant_code'
+            """,
+            Integer.class,
+            schemaName
+    );
+
+    return count == null ? 0 : count;
+}
+
+private int participantCode(
+        String schemaName,
+        UUID participantId
+) {
+    Integer participantCode = jdbcTemplate.queryForObject(
+            """
+            SELECT participant_code
+            FROM %s.session_participants
+            WHERE id = ?
+            """.formatted(schemaName),
+            Integer.class,
+            participantId
+    );
+
+    return participantCode;
+}
+
+private void insertLegacyPlayer(
+        String schemaName,
+        UUID playerId,
+        String displayName,
+        Instant now
+) {
+    jdbcTemplate.update(
+            """
+            INSERT INTO %s.players (
+                id,
+                display_name,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?)
+            """.formatted(schemaName),
+            playerId,
+            displayName,
+            Timestamp.from(now),
+            Timestamp.from(now)
+    );
+}
+
+private void insertLegacyVenue(
+        String schemaName,
+        UUID venueId,
+        Instant now
+) {
+    jdbcTemplate.update(
+            """
+            INSERT INTO %s.venues (
+                id,
+                name,
+                location_text,
+                active,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, NULL, TRUE, ?, ?)
+            """.formatted(schemaName),
+            venueId,
+            "Migration Test Venue",
+            Timestamp.from(now),
+            Timestamp.from(now)
+    );
+}
+
+private void insertLegacySession(
+        String schemaName,
+        UUID sessionId,
+        UUID venueId,
+        String title,
+        Instant now
+) {
+    jdbcTemplate.update(
+            """
+            INSERT INTO %s.sessions (
+                id,
+                venue_id,
+                title,
+                sport_code,
+                match_format,
+                planned_start_at,
+                planned_end_at,
+                status,
+                started_at,
+                completed_at,
+                cancelled_at,
+                version,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?,
+                ?,
+                ?,
+                'BADMINTON',
+                'DOUBLES',
+                ?,
+                ?,
+                'PLANNED',
+                NULL,
+                NULL,
+                NULL,
+                0,
+                ?,
+                ?
+            )
+            """.formatted(schemaName),
+            sessionId,
+            venueId,
+            title,
+            Timestamp.from(now.plusSeconds(3600)),
+            Timestamp.from(now.plusSeconds(7200)),
+            Timestamp.from(now),
+            Timestamp.from(now)
+    );
+}
+
+private void insertLegacyParticipant(
+        String schemaName,
+        UUID participantId,
+        UUID sessionId,
+        UUID playerId,
+        Instant joinedAt
+) {
+    jdbcTemplate.update(
+            """
+            INSERT INTO %s.session_participants (
+                id,
+                session_id,
+                player_id,
+                status,
+                joined_at,
+                checked_in_at,
+                waiting_since,
+                paused_at,
+                total_paused_seconds,
+                left_at,
+                version,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?,
+                ?,
+                ?,
+                'REGISTERED',
+                ?,
+                NULL,
+                NULL,
+                NULL,
+                0,
+                NULL,
+                0,
+                ?,
+                ?
+            )
+            """.formatted(schemaName),
+            participantId,
+            sessionId,
+            playerId,
+            Timestamp.from(joinedAt),
+            Timestamp.from(joinedAt),
+            Timestamp.from(joinedAt)
+    );
+}
 }

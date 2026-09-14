@@ -74,12 +74,65 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
         Instant now = Instant.now();
 
         participantRepository.saveAndFlush(SessionParticipantEntity.from(
-                SessionParticipant.register(sessionId, playerId, now)));
+                SessionParticipant.register(sessionId, playerId, 1, now)));
 
         assertThatThrownBy(() -> participantRepository.saveAndFlush(
                 SessionParticipantEntity.from(
-                        SessionParticipant.register(sessionId, playerId, now))))
+                        SessionParticipant.register(sessionId, playerId, 2, now))))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void uniqueSessionAndParticipantCodeConstraintIsEnforced() {
+        UUID sessionId = createSession(createVenue());
+        UUID firstPlayerId = createPlayer("Player A");
+        UUID secondPlayerId = createPlayer("Player B");
+        Instant now = Instant.now();
+
+        participantRepository.saveAndFlush(SessionParticipantEntity.from(
+                SessionParticipant.register(sessionId, firstPlayerId, 1, now)
+        ));
+
+        assertThatThrownBy(() -> participantRepository.saveAndFlush(
+                SessionParticipantEntity.from(SessionParticipant.register(
+                        sessionId,
+                        secondPlayerId,
+                        1,
+                        now.plusSeconds(1)
+                ))
+        ))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining(
+                        "uk_session_participants_session_code"
+                );
+    }
+
+    @Test
+    void nonPositiveParticipantCodeIsRejected() {
+        UUID sessionId = createSession(createVenue());
+        UUID playerId = createPlayer();
+        var databaseTime = Instant.now().atOffset(ZoneOffset.UTC);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO session_participants (
+                    id,
+                    session_id,
+                    player_id,
+                    participant_code,
+                    status,
+                    joined_at,
+                    total_paused_seconds,
+                    version,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, 0, 'REGISTERED', ?, 0, 0, ?, ?)
+                """, UUID.randomUUID(), sessionId, playerId,
+                databaseTime, databaseTime, databaseTime))
+                .rootCause()
+                .hasMessageContaining(
+                        "ck_session_participants_code_positive"
+                );
     }
 
     @Test
@@ -109,6 +162,7 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
                     id,
                     session_id,
                     player_id,
+                    participant_code,
                     status,
                     joined_at,
                     checked_in_at,
@@ -119,7 +173,7 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
                     version,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, 'WAITING', ?, NULL, NULL, NULL, 0, NULL, 0, ?, ?)
+                ) VALUES (?, ?, ?, 1, 'WAITING', ?, NULL, NULL, NULL, 0, NULL, 0, ?, ?)
                 """, UUID.randomUUID(), sessionId, playerId,
                         databaseTime, databaseTime, databaseTime))
                 .rootCause()
@@ -138,7 +192,11 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
     }
 
     private UUID createPlayer() {
-        Player player = Player.create("Player A", Instant.now());
+        return createPlayer("Player A");
+    }
+
+    private UUID createPlayer(String name) {
+        Player player = Player.create(name, Instant.now());
         return playerRepository.saveAndFlush(PlayerEntity.from(player)).getId();
     }
 

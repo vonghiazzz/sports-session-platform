@@ -461,6 +461,7 @@ class PlayerRatingHistoryIntegrationTest extends PostgreSqlIntegrationTest {
             SessionParticipant participant = SessionParticipant.register(
                     sessionId,
                     playerId,
+                    index + 1,
                     BASE_TIME.plusSeconds(3)
             ).checkIn(BASE_TIME.plusSeconds(4));
             participantIds.add(participantRepository.saveAndFlush(

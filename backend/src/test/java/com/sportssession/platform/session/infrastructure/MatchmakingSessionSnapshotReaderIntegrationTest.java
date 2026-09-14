@@ -323,6 +323,7 @@ class MatchmakingSessionSnapshotReaderIntegrationTest
         SessionParticipant participant = SessionParticipant.register(
                 sessionId,
                 playerId,
+                playerNumber,
                 BASE_TIME.plusSeconds(20)
         );
         participant = switch (status) {

@@ -416,6 +416,7 @@ class MatchmakingApiIntegrationTest extends PostgreSqlIntegrationTest {
         SessionParticipant participant = SessionParticipant.register(
                 sessionId,
                 playerId,
+                order + 1,
                 BASE_TIME.plusSeconds(10L + order)
         );
         participant = switch (status) {

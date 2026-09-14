@@ -7,6 +7,9 @@ import com.sportssession.platform.player.infrastructure.PlayerEntity;
 import com.sportssession.platform.player.infrastructure.PlayerRepository;
 import com.sportssession.platform.player.infrastructure.PlayerSportProfileRepository;
 import com.sportssession.platform.shared.domain.MatchFormat;
+import com.sportssession.platform.session.application.AddParticipantCommand;
+import com.sportssession.platform.session.application.SessionService;
+import com.sportssession.platform.session.domain.SessionParticipant;
 import com.sportssession.platform.session.infrastructure.SessionCourtRepository;
 import com.sportssession.platform.session.infrastructure.SessionParticipantRepository;
 import com.sportssession.platform.session.infrastructure.SessionRepository;
@@ -29,7 +32,13 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,6 +56,9 @@ class SessionRuntimeApiIntegrationTest extends PostgreSqlIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private SessionService sessionService;
 
     @Autowired
     private SessionRepository sessionRepository;
@@ -231,26 +243,150 @@ class SessionRuntimeApiIntegrationTest extends PostgreSqlIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.sessionId").value(sessionId.toString()))
                 .andExpect(jsonPath("$.playerId").value(playerId.toString()))
+                .andExpect(jsonPath("$.participantCode").value(1))
                 .andExpect(jsonPath("$.status").value("REGISTERED"))
                 .andExpect(jsonPath("$.checkedInAt").doesNotExist())
                 .andReturn();
 
-        assertThat(participantRepository.findById(responseId(result))).isPresent();
+        assertThat(participantRepository.findById(responseId(result)))
+                .get()
+                .extracting(entity -> entity.getParticipantCode())
+                .isEqualTo(1);
     }
 
     @Test
-    void duplicatePlayerInSameSessionIsRejected() throws Exception {
+    void sequentialParticipantsReceiveMonotonicSessionLocalCodes()
+            throws Exception {
+        UUID sessionId = createSession(createVenue("Venue A", true));
+
+        for (int expectedCode = 1; expectedCode <= 3; expectedCode++) {
+            addParticipant(
+                    sessionId,
+                    createPlayer("Player " + expectedCode)
+            )
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.participantCode")
+                            .value(expectedCode));
+        }
+
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants",
+                        sessionId
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].participantCode")
+                        .value(org.hamcrest.Matchers.contains(1, 2, 3)));
+    }
+
+    @Test
+    void differentSessionsEachStartParticipantCodesAtOne() throws Exception {
+        UUID venueId = createVenue("Venue A", true);
+        UUID firstSessionId = createSession(venueId);
+        UUID secondSessionId = createSession(venueId);
+
+        addParticipant(firstSessionId, createPlayer("Player A"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.participantCode").value(1));
+        addParticipant(secondSessionId, createPlayer("Player B"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.participantCode").value(1));
+    }
+
+    @Test
+    void participantRuntimeTransitionsPreserveParticipantCode()
+            throws Exception {
+        UUID sessionId = createStartedSession(createVenue("Venue A", true));
+        UUID participantId = createParticipant(
+                sessionId,
+                createPlayer("Player A")
+        );
+
+        checkIn(sessionId, participantId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participantCode").value(1));
+        pause(sessionId, participantId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participantCode").value(1));
+        resume(sessionId, participantId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participantCode").value(1));
+    }
+
+    @Test
+    void leftParticipantCodeIsNotReused() throws Exception {
+        UUID sessionId = createStartedSession(createVenue("Venue A", true));
+        UUID firstParticipantId = createParticipant(
+                sessionId,
+                createPlayer("Player A")
+        );
+        leave(sessionId, firstParticipantId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participantCode").value(1));
+
+        addParticipant(sessionId, createPlayer("Player B"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.participantCode").value(2));
+    }
+
+    @Test
+    void concurrentAddsToSameSessionReceiveDistinctCodes() throws Exception {
+        UUID sessionId = createSession(createVenue("Venue A", true));
+        UUID firstPlayerId = createPlayer("Player A");
+        UUID secondPlayerId = createPlayer("Player B");
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<SessionParticipant> first = executor.submit(() ->
+                    addParticipantAfterGate(
+                            sessionId,
+                            firstPlayerId,
+                            ready,
+                            start
+                    ));
+            Future<SessionParticipant> second = executor.submit(() ->
+                    addParticipantAfterGate(
+                            sessionId,
+                            secondPlayerId,
+                            ready,
+                            start
+                    ));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            assertThat(List.of(
+                    first.get(15, TimeUnit.SECONDS).participantCode(),
+                    second.get(15, TimeUnit.SECONDS).participantCode()
+            )).containsExactlyInAnyOrder(1, 2);
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(participantRepository.findAllBySessionIdOrderByJoinedAtAscIdAsc(
+                sessionId
+        )).extracting(entity -> entity.getParticipantCode())
+                .containsExactlyInAnyOrder(1, 2);
+    }
+        @Test
+        void duplicatePlayerInSameSessionIsRejectedWithoutConsumingParticipantCode()
+                throws Exception {
         UUID sessionId = createSession(createVenue("Venue A", true));
         UUID playerId = createPlayer("Player A");
-        createParticipant(sessionId, playerId);
+
+        addParticipant(sessionId, playerId)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.participantCode").value(1));
 
         addParticipant(sessionId, playerId)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
 
-        assertThat(participantRepository.count()).isEqualTo(1);
-    }
+        addParticipant(sessionId, createPlayer("Player B"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.participantCode").value(2));
 
+        assertThat(participantRepository.count()).isEqualTo(2);
+        }
     @Test
     void samePlayerCanJoinDifferentSessions() throws Exception {
         UUID venueId = createVenue("Venue A", true);
@@ -277,7 +413,9 @@ class SessionRuntimeApiIntegrationTest extends PostgreSqlIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].sessionId").value(firstSessionId.toString()))
-                .andExpect(jsonPath("$[1].sessionId").value(firstSessionId.toString()));
+                .andExpect(jsonPath("$[1].sessionId").value(firstSessionId.toString()))
+                .andExpect(jsonPath("$[*].participantCode")
+                        .value(org.hamcrest.Matchers.contains(1, 2)));
     }
 
     @Test
@@ -571,6 +709,21 @@ class SessionRuntimeApiIntegrationTest extends PostgreSqlIntegrationTest {
         Instant now = Instant.now();
         Venue venue = Venue.create(name, null, active, now);
         return venueRepository.saveAndFlush(VenueEntity.from(venue)).getId();
+    }
+
+    private SessionParticipant addParticipantAfterGate(
+            UUID sessionId,
+            UUID playerId,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("start gate timeout");
+        }
+        return sessionService.addParticipant(
+                new AddParticipantCommand(sessionId, playerId)
+        );
     }
 
     private UUID createCourt(UUID venueId, String name, boolean active) {

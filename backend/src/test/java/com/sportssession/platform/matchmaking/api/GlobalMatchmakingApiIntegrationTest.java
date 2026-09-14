@@ -333,6 +333,7 @@ class GlobalMatchmakingApiIntegrationTest extends PostgreSqlIntegrationTest {
             SessionParticipant participant = SessionParticipant.register(
                     sessionId,
                     playerId,
+                    index + 1,
                     BASE_TIME.plusSeconds(10L + index)
             ).checkIn(BASE_TIME.plusSeconds(20L + index));
             participantIds.add(participantRepository.saveAndFlush(

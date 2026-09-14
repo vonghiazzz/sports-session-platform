@@ -987,6 +987,7 @@ class RatingProcessingServiceIntegrationTest extends PostgreSqlIntegrationTest {
             SessionParticipant participant = SessionParticipant.register(
                     sessionId,
                     playerId,
+                    index + 1,
                     now.plusSeconds(3)
             ).checkIn(now.plusSeconds(4));
             participantIds.add(sessionParticipantRepository.saveAndFlush(

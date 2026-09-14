@@ -286,7 +286,8 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
         RuntimeFixture fixture = createFixture(true, SessionCourtStatus.AVAILABLE);
         UUID participantId = createParticipant(
                 fixture.sessionId(),
-                participantStatus
+                participantStatus,
+                5
         );
         List<MatchParticipantRequest> assignments = new ArrayList<>(
                 validRequest(fixture).participants()
@@ -322,7 +323,9 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
                 validRequest(fixture).participants()
         );
         assignments.add(assignment(
-                createParticipant(fixture.sessionId(), ParticipantStatus.WAITING),
+                createParticipant(
+                        fixture.sessionId(), ParticipantStatus.WAITING, 5
+                ),
                 TeamSide.A,
                 1
         ));
@@ -584,7 +587,8 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
         for (int index = 0; index < 4; index++) {
             participantIds.add(createParticipant(
                     sessionId,
-                    ParticipantStatus.WAITING
+                    ParticipantStatus.WAITING,
+                    index + 1
             ));
         }
 
@@ -593,7 +597,8 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
 
     private UUID createParticipant(
             UUID sessionId,
-            ParticipantStatus status
+            ParticipantStatus status,
+            int participantCode
     ) {
         Instant now = Instant.now();
         Player player = Player.create("Player " + UUID.randomUUID(), now);
@@ -604,6 +609,7 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
         SessionParticipant registered = SessionParticipant.register(
                 sessionId,
                 playerId,
+                participantCode,
                 now
         );
         SessionParticipant participant = switch (status) {
@@ -632,6 +638,7 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
                 waiting.id(),
                 waiting.sessionId(),
                 waiting.playerId(),
+                waiting.participantCode(),
                 ParticipantStatus.PLAYING,
                 waiting.joinedAt(),
                 waiting.checkedInAt(),

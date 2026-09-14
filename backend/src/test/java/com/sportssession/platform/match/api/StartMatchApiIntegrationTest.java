@@ -636,6 +636,7 @@ class StartMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
             SessionParticipant waiting = SessionParticipant.register(
                     sessionId,
                     playerId,
+                    index + 1,
                     now
             ).checkIn(now.plusSeconds(2));
             participantIds.add(sessionParticipantRepository

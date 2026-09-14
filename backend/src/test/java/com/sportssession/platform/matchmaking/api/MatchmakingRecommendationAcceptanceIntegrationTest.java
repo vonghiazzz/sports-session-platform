@@ -292,6 +292,7 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
         createParticipant(
                 fixture.sessionId(),
                 playerId,
+                5,
                 BASE_TIME.plusSeconds(2),
                 BASE_TIME.plusSeconds(3)
         );
@@ -880,6 +881,7 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
             participantIds.add(createParticipant(
                     sessionId,
                     playerId,
+                    index + 1,
                     BASE_TIME.plusSeconds(10L + index),
                     BASE_TIME.plusSeconds(20L + index)
             ));
@@ -958,12 +960,14 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
     private UUID createParticipant(
             UUID sessionId,
             UUID playerId,
+            int participantCode,
             Instant joinedAt,
             Instant waitingSince
     ) {
         SessionParticipant participant = SessionParticipant.register(
                 sessionId,
                 playerId,
+                participantCode,
                 joinedAt
         ).checkIn(waitingSince);
         return participantRepository.saveAndFlush(
