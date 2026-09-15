@@ -36,3 +36,7 @@
   flex-wrap: wrap;
   gap: 1rem;
 }
+
+.home-page {
+  width: min(100% - 2rem, 72rem);
+}

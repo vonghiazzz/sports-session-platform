@@ -115,6 +115,13 @@ public class SessionService {
         return findSessionEntity(sessionId).toDomain();
     }
 
+    @Transactional(readOnly = true)
+    public List<Session> listSessions() {
+        return sessionRepository.findAllForDiscovery().stream()
+                .map(SessionEntity::toDomain)
+                .toList();
+    }
+
     @Transactional
     public Session startSession(UUID sessionId) {
         SessionEntity entity = findSessionEntity(sessionId);

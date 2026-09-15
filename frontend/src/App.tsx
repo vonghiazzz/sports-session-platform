@@ -6,20 +6,25 @@ import { PlayerDetailPage } from './features/player-management/PlayerDetailPage'
 import { PlayerListPage } from './features/player-management/PlayerListPage'
 import { PlayerSessionAccessPage } from './features/player-session/PlayerSessionAccessPage'
 import { PlayerSessionPage } from './features/player-session/PlayerSessionPage'
+import { SessionDiscoveryList } from './features/session-discovery/SessionDiscoveryList'
 import { SessionSetupPage } from './features/session-setup/SessionSetupPage'
 
-function HomePage() {
+export function HomePage() {
   return (
-    <main className="route-message">
-      <p className="eyebrow">Nền tảng Phiên thể thao</p>
-      <h1>Vận hành phiên chơi</h1>
-      <p>Mở một phiên để vào phòng điều hành trực tiếp.</p>
-      <div className="home-actions">
-        <Link className="home-primary-link" to="/sessions/new">
-          Tạo phiên mới
-        </Link>
-        <Link to="/players">Quản lý người chơi</Link>
-      </div>
+    <main className="route-message home-page">
+      <header>
+        <p className="eyebrow">Nền tảng Phiên thể thao</p>
+        <h1>Vận hành phiên chơi</h1>
+        <p>Tạo phiên mới hoặc mở lại một phiên đã có.</p>
+        <div className="home-actions">
+          <Link className="home-primary-link" to="/sessions/new">
+            Tạo phiên mới
+          </Link>
+          <Link to="/players">Quản lý người chơi</Link>
+        </div>
+      </header>
+
+      <SessionDiscoveryList />
     </main>
   )
 }

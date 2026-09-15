@@ -56,6 +56,13 @@ public class SessionController {
         return SessionResponse.from(sessionService.getSession(sessionId));
     }
 
+    @GetMapping
+    public List<SessionResponse> listSessions() {
+        return sessionService.listSessions().stream()
+                .map(SessionResponse::from)
+                .toList();
+    }
+
     @PostMapping("/{sessionId}/start")
     public SessionResponse startSession(@PathVariable UUID sessionId) {
         return SessionResponse.from(sessionService.startSession(sessionId));

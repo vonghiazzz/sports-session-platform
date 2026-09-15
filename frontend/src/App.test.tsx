@@ -24,7 +24,20 @@ vi.mock('./features/check-in/HostCheckInPage', () => ({
   HostCheckInPage: () => <h1>Bàn check-in phiên</h1>,
 }))
 
+vi.mock('./features/session-discovery/SessionDiscoveryList', () => ({
+  SessionDiscoveryList: () => <section aria-label="Phiên gần đây" />,
+}))
+
 describe('Player management routing', () => {
+  it('keeps Create Session and renders Session discovery on Home', () => {
+    render(<App />, { wrapper: MemoryRouter })
+    expect(screen.getByRole('link', { name: 'Tạo phiên mới' })).toHaveAttribute(
+      'href',
+      '/sessions/new',
+    )
+    expect(screen.getByRole('region', { name: 'Phiên gần đây' })).toBeVisible()
+  })
+
   it('provides an obvious Home navigation path to /players', async () => {
     const user = userEvent.setup()
     render(<App />, { wrapper: MemoryRouter })
