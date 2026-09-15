@@ -12,6 +12,10 @@ vi.mock('./features/player-management/PlayerDetailPage', () => ({
   PlayerDetailPage: () => <h1>Chi tiết quản lý người chơi</h1>,
 }))
 
+vi.mock('./features/player-session/PlayerSessionPage', () => ({
+  PlayerSessionPage: () => <h1>Trạng thái người chơi trong phiên</h1>,
+}))
+
 describe('Player management routing', () => {
   it('provides an obvious Home navigation path to /players', async () => {
     const user = userEvent.setup()
@@ -31,5 +35,18 @@ describe('Player management routing', () => {
     )
     expect(screen.getByRole('heading', { name: 'Chi tiết quản lý người chơi' }))
       .toBeInTheDocument()
+  })
+
+  it('registers the Session Participant UUID route for the read-only Player view', () => {
+    render(
+      <MemoryRouter initialEntries={['/sessions/session-1/player/participant-12']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('heading', {
+        name: 'Trạng thái người chơi trong phiên',
+      }),
+    ).toBeInTheDocument()
   })
 })
