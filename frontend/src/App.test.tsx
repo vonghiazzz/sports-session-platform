@@ -20,6 +20,10 @@ vi.mock('./features/player-session/PlayerSessionAccessPage', () => ({
   PlayerSessionAccessPage: () => <h1>Trạng thái người chơi qua liên kết</h1>,
 }))
 
+vi.mock('./features/check-in/HostCheckInPage', () => ({
+  HostCheckInPage: () => <h1>Bàn check-in phiên</h1>,
+}))
+
 describe('Player management routing', () => {
   it('provides an obvious Home navigation path to /players', async () => {
     const user = userEvent.setup()
@@ -65,5 +69,14 @@ describe('Player management routing', () => {
         name: 'Trạng thái người chơi qua liên kết',
       }),
     ).toBeInTheDocument()
+  })
+
+  it('registers the Host Check-In Desk route without changing Player routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/sessions/session-1/check-in']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('heading', { name: 'Bàn check-in phiên' })).toBeVisible()
   })
 })

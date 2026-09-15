@@ -1,6 +1,7 @@
 import { Link, Route, Routes } from 'react-router-dom'
 import './App.css'
 import { LiveSessionPage } from './features/live-session/LiveSessionPage'
+import { HostCheckInPage } from './features/check-in/HostCheckInPage'
 import { PlayerDetailPage } from './features/player-management/PlayerDetailPage'
 import { PlayerListPage } from './features/player-management/PlayerListPage'
 import { PlayerSessionAccessPage } from './features/player-session/PlayerSessionAccessPage'
@@ -44,6 +45,7 @@ function App() {
         path="/sessions/:sessionId/player/:sessionParticipantId"
         element={<PlayerSessionPage />}
       />
+      <Route path="/sessions/:sessionId/check-in" element={<HostCheckInPage />} />
       <Route path="/sessions/:sessionId" element={<LiveSessionPage />} />
       <Route path="/players" element={<PlayerListPage />} />
       <Route path="/players/:playerId" element={<PlayerDetailPage />} />

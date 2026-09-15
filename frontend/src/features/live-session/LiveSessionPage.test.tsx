@@ -138,6 +138,10 @@ describe('LiveSessionScreen', () => {
     expect(screen.queryByText('AVAILABLE')).not.toBeInTheDocument()
     expect(screen.queryByText(/reserved/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
+    expect(screen.getByRole('link', { name: 'Mở bàn check-in' })).toHaveAttribute(
+      'href',
+      '/sessions/session-1/check-in',
+    )
   })
 
   it('renders People groups in operational priority order with counts', () => {

@@ -54,7 +54,10 @@ export type LiveSessionDataState =
       readonly data: LiveSessionData
     })
 
-function retryRead(failureCount: number, error: Error): boolean {
+export function retryLiveSessionRead(
+  failureCount: number,
+  error: Error,
+): boolean {
   return !(error instanceof HttpError && error.status === 404) && failureCount < 1
 }
 
@@ -67,41 +70,41 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
     queryKey: ['session', sessionId],
     queryFn: ({ signal }) => getSession(sessionId, signal),
     enabled,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
     refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const participantsQuery = useQuery({
     queryKey: ['sessionParticipants', sessionId],
     queryFn: ({ signal }) => getSessionParticipants(sessionId, signal),
     enabled,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
     refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const sessionCourtsQuery = useQuery({
     queryKey: ['sessionCourts', sessionId],
     queryFn: ({ signal }) => getSessionCourts(sessionId, signal),
     enabled,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
     refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const playersQuery = useQuery({
     queryKey: ['players'],
     queryFn: ({ signal }) => getPlayers(signal),
     enabled,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
   })
   const matchesQuery = useQuery({
     queryKey: ['sessionMatches', sessionId],
     queryFn: ({ signal }) => getSessionMatches(sessionId, signal),
     enabled,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
     refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
   const matchPlansQuery = useQuery({
     queryKey: ['sessionMatchPlans', sessionId],
     queryFn: ({ signal }) => getSessionMatchPlans(sessionId, signal),
     enabled,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
     refetchInterval: LIVE_SESSION_POLL_INTERVAL_MS,
   })
 
@@ -115,7 +118,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
       return getVenue(venueId, signal)
     },
     enabled: enabled && venueId !== undefined,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
   })
   const venueCourtsQuery = useQuery({
     queryKey: ['venueCourts', venueId],
@@ -126,7 +129,7 @@ export function useLiveSessionData(sessionId: string): LiveSessionDataState {
       return getVenueCourts(venueId, signal)
     },
     enabled: enabled && venueId !== undefined,
-    retry: retryRead,
+    retry: retryLiveSessionRead,
   })
 
   const refresh = useCallback(async () => {

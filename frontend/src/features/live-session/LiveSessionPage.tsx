@@ -1061,14 +1061,19 @@ function SessionHeader({
             : ''}
         </p>
       </div>
-      <button
-        className="refresh-button"
-        type="button"
-        disabled={isRefreshing}
-        onClick={() => void onRefresh()}
-      >
-        {isRefreshing ? 'Đang làm mới…' : 'Làm mới'}
-      </button>
+      <div className="session-header-actions">
+        <a className="check-in-desk-link" href={`/sessions/${sessionId}/check-in`}>
+          Mở bàn check-in
+        </a>
+        <button
+          className="refresh-button"
+          type="button"
+          disabled={isRefreshing}
+          onClick={() => void onRefresh()}
+        >
+          {isRefreshing ? 'Đang làm mới…' : 'Làm mới'}
+        </button>
+      </div>
       <dl className="session-facts">
         <div>
           <dt>Trạng thái</dt>
