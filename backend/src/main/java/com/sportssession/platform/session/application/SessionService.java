@@ -257,6 +257,15 @@ public class SessionService {
                 .toDomain();
     }
 
+    @Transactional(readOnly = true)
+    public SessionParticipant getParticipantPersonalAccess(
+            UUID sessionId,
+            UUID participantId
+    ) {
+        findSessionEntity(sessionId);
+        return findParticipantEntity(sessionId, participantId).toDomain();
+    }
+
     @Transactional
     public SessionBuddyPair createBuddyPair(
             UUID sessionId,

@@ -95,6 +95,19 @@ public class SessionController {
                 .toList();
     }
 
+    @GetMapping("/{sessionId}/participants/{participantId}/personal-access")
+    public SessionParticipantPersonalAccessResponse getParticipantPersonalAccess(
+            @PathVariable UUID sessionId,
+            @PathVariable UUID participantId
+    ) {
+        return SessionParticipantPersonalAccessResponse.from(
+                sessionService.getParticipantPersonalAccess(
+                        sessionId,
+                        participantId
+                )
+        );
+    }
+
     @PostMapping("/{sessionId}/buddy-pairs")
     public ResponseEntity<BuddyPairResponse> createBuddyPair(
             @PathVariable UUID sessionId,

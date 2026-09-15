@@ -7,6 +7,7 @@ import type {
   MatchResponse,
   PlayerResponse,
   SessionCourtResponse,
+  SessionParticipantPersonalAccessResponse,
   SessionParticipantResponse,
   SessionResponse,
   VenueResponse,
@@ -55,6 +56,15 @@ export function getSessionParticipants(
   signal?: AbortSignal,
 ): Promise<readonly SessionParticipantResponse[]> {
   return getJson(`/api/sessions/${segment(sessionId)}/participants`, signal)
+}
+
+export function getSessionParticipantPersonalAccess(
+  sessionId: string,
+  sessionParticipantId: string,
+): Promise<SessionParticipantPersonalAccessResponse> {
+  return getJson(
+    `/api/sessions/${segment(sessionId)}/participants/${segment(sessionParticipantId)}/personal-access`,
+  )
 }
 
 export function createBuddyPair(

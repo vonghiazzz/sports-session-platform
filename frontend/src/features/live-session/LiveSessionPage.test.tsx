@@ -159,6 +159,11 @@ describe('LiveSessionScreen', () => {
     expect(people.getByText('#1').closest('strong')).toHaveTextContent(
       '#1 An Nguyen',
     )
+    expect(
+      people.getAllByRole('button', {
+        name: /^Sao chép link người chơi cho /,
+      }),
+    ).toHaveLength(8)
   })
 
   it('distinguishes duplicate Player names with Session-local Participant codes', () => {
@@ -534,6 +539,11 @@ describe('LiveSessionScreen', () => {
       expect(screen.queryByRole('button', { name: 'Tạo trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Tạo đề xuất' })).not.toBeInTheDocument()
+      expect(
+        screen.getAllByRole('button', {
+          name: /^Sao chép link người chơi cho /,
+        }),
+      ).toHaveLength(8)
       expect(
         screen.queryByRole('button', {
           name: 'Tạo đề xuất cho các sân sẵn sàng',

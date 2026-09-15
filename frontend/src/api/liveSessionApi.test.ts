@@ -10,6 +10,7 @@ import {
   createManualMatch,
   disableSessionCourt,
   enableSessionCourt,
+  getSessionParticipantPersonalAccess,
   leaveParticipant,
   pauseParticipant,
   removeBuddyPair,
@@ -251,6 +252,33 @@ describe('live Session action API', () => {
       `/api/sessions/${sessionId}/buddy-pairs/buddy-pair-1`,
       {
         method: 'DELETE',
+        headers: { Accept: 'application/json' },
+        signal: undefined,
+      },
+    )
+  })
+
+  it('gets Host personal access using Session and Session Participant UUIDs', async () => {
+    const response = {
+      sessionId: 'session/id',
+      sessionParticipantId: 'participant/id',
+      personalAccessToken: '2cafdbd9-13a5-421a-8981-ac0674450c52',
+    }
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      getSessionParticipantPersonalAccess('session/id', 'participant/id'),
+    ).resolves.toEqual(response)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/session%2Fid/participants/participant%2Fid/personal-access',
+      {
+        method: 'GET',
         headers: { Accept: 'application/json' },
         signal: undefined,
       },

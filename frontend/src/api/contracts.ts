@@ -73,6 +73,12 @@ export interface PlayerSessionAccessResponse {
   readonly sessionParticipantId: UUID
 }
 
+export interface SessionParticipantPersonalAccessResponse {
+  readonly sessionId: UUID
+  readonly sessionParticipantId: UUID
+  readonly personalAccessToken: UUID
+}
+
 export interface CreateBuddyPairRequest {
   readonly firstSessionParticipantId: UUID
   readonly secondSessionParticipantId: UUID

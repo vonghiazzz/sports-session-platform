@@ -337,6 +337,131 @@ class SessionRuntimeApiIntegrationTest extends PostgreSqlIntegrationTest {
     }
 
     @Test
+    void hostPersonalAccessReturnsStableParticipantTokenWithoutMutatingIt()
+            throws Exception {
+        UUID sessionId = createSession(createVenue("Venue A", true));
+        UUID firstParticipantId = createParticipant(
+                sessionId, createPlayer("Player A")
+        );
+        UUID secondParticipantId = createParticipant(
+                sessionId, createPlayer("Player B")
+        );
+        UUID firstToken = participantRepository.findById(firstParticipantId)
+                .orElseThrow()
+                .getPersonalAccessToken();
+        UUID secondToken = participantRepository.findById(secondParticipantId)
+                .orElseThrow()
+                .getPersonalAccessToken();
+
+        for (int read = 0; read < 2; read++) {
+            mockMvc.perform(get(
+                            "/api/sessions/{sessionId}/participants/{participantId}/personal-access",
+                            sessionId,
+                            firstParticipantId
+                    ))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.sessionId")
+                            .value(sessionId.toString()))
+                    .andExpect(jsonPath("$.sessionParticipantId")
+                            .value(firstParticipantId.toString()))
+                    .andExpect(jsonPath("$.personalAccessToken")
+                            .value(firstToken.toString()));
+        }
+
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants/{participantId}/personal-access",
+                        sessionId,
+                        secondParticipantId
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.personalAccessToken")
+                        .value(secondToken.toString()));
+
+        assertThat(firstToken).isNotEqualTo(secondToken);
+        assertThat(participantRepository.findById(firstParticipantId)
+                .orElseThrow()
+                .getPersonalAccessToken()).isEqualTo(firstToken);
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants",
+                        sessionId
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].personalAccessToken").doesNotExist());
+    }
+
+    @Test
+    void hostPersonalAccessUsesSessionAndParticipantIdsDespiteDuplicateCodes()
+            throws Exception {
+        UUID venueId = createVenue("Venue A", true);
+        UUID firstSessionId = createSession(venueId);
+        UUID secondSessionId = createSession(venueId);
+        UUID firstParticipantId = createParticipant(
+                firstSessionId, createPlayer("Player A")
+        );
+        UUID secondParticipantId = createParticipant(
+                secondSessionId, createPlayer("Player B")
+        );
+        var first = participantRepository.findById(firstParticipantId)
+                .orElseThrow();
+        var second = participantRepository.findById(secondParticipantId)
+                .orElseThrow();
+        assertThat(first.getParticipantCode()).isEqualTo(1);
+        assertThat(second.getParticipantCode()).isEqualTo(1);
+
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants/{participantId}/personal-access",
+                        secondSessionId,
+                        secondParticipantId
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId")
+                        .value(secondSessionId.toString()))
+                .andExpect(jsonPath("$.sessionParticipantId")
+                        .value(secondParticipantId.toString()))
+                .andExpect(jsonPath("$.personalAccessToken")
+                        .value(second.getPersonalAccessToken().toString()));
+
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants/{participantId}/personal-access",
+                        firstSessionId,
+                        secondParticipantId
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(
+                        "Session Participant not found in Session "
+                                + firstSessionId + ": " + secondParticipantId
+                ));
+    }
+
+    @Test
+    void hostPersonalAccessReturnsNotFoundForUnknownSessionOrParticipant()
+            throws Exception {
+        UUID sessionId = createSession(createVenue("Venue A", true));
+        UUID unknownSessionId = UUID.randomUUID();
+        UUID unknownParticipantId = UUID.randomUUID();
+
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants/{participantId}/personal-access",
+                        unknownSessionId,
+                        unknownParticipantId
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message")
+                        .value("Session not found: " + unknownSessionId));
+
+        mockMvc.perform(get(
+                        "/api/sessions/{sessionId}/participants/{participantId}/personal-access",
+                        sessionId,
+                        unknownParticipantId
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(
+                        "Session Participant not found in Session "
+                                + sessionId + ": " + unknownParticipantId
+                ));
+    }
+
+    @Test
     void sequentialParticipantsReceiveMonotonicSessionLocalCodes()
             throws Exception {
         UUID sessionId = createSession(createVenue("Venue A", true));

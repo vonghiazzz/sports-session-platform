@@ -50,6 +50,7 @@ import {
   useBuddyPairActions,
   type BuddyPairActions,
 } from './useBuddyPairActions'
+import { ParticipantPersonalLinkAction } from './ParticipantPersonalLinkAction'
 
 function isSessionMutable(status: LiveSessionModel['header']['status']) {
   return status === 'PLANNED' || status === 'IN_PROGRESS'
@@ -480,6 +481,11 @@ function ParticipantRow({
           participants={allParticipants}
           sessionStatus={sessionStatus}
           actions={buddyPairActions}
+        />
+        <ParticipantPersonalLinkAction
+          sessionId={sessionId}
+          sessionParticipantId={participant.sessionParticipantId}
+          participantLabel={`#${participant.participantCode} ${participant.displayName}`}
         />
         {actions.length > 0 && (
           <div className="action-area participant-actions">
