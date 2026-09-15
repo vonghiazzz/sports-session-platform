@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import { LiveSessionScreen } from './LiveSessionPage'
@@ -31,9 +32,11 @@ function renderScreen(state: LiveSessionDataState, currentTime = now) {
   queryClients.push(queryClient)
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      <LiveSessionScreen state={state} now={currentTime} />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={queryClient}>
+        <LiveSessionScreen state={state} now={currentTime} />
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -100,6 +103,32 @@ describe('LiveSessionScreen', () => {
       }),
     ).not.toBeInTheDocument()
   })
+
+  it.each(['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const)(
+    'shows explicit Session-list navigation for a %s Session without a runtime action',
+    (sessionStatus) => {
+      const currentState = readyState()
+      if (currentState.status !== 'ready') {
+        throw new Error('Expected ready fixture data')
+      }
+
+      renderScreen({
+        ...currentState,
+        data: {
+          ...currentState.data,
+          session: {
+            ...currentState.data.session,
+            status: sessionStatus,
+          },
+        },
+      })
+
+      expect(
+        screen.getByRole('link', { name: '← Danh sách phiên' }),
+      ).toHaveAttribute('href', '/')
+      expect(refresh).not.toHaveBeenCalled()
+    },
+  )
 
   it('renders realistic multi-Court and multi-Participant data read-only', () => {
     const { now: fixtureNow, ...data } = createLiveSessionInput()

@@ -5,7 +5,7 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `89d95f299cd62f4c49c3854794ee99fda4f304d7` |
+| HEAD | `d732ee57df1795205d5551640fce6bb582532827` |
 | Ngày audit | 2026-09-15 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
@@ -202,6 +202,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] QR Personal Link
 - [x] Vietnamese terminology polish
 - [x] Rating uncertainty explanation / history presentation
+- [x] Session → Home navigation
 
 ## 10. Matchmaking Current State
 
@@ -285,14 +286,17 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 
 ## 16. Current Work
 
-**Current Work: None — ready for MVP manual acceptance**
+**Current Work: Stable human-readable Player identity — DESIGN REQUIRED**
 
-MVP implementation đã hoàn tất. Chưa có future gap nào được đánh dấu `IN PROGRESS`.
+Manual acceptance vẫn đang mở vì các Player trùng tên chưa thể được phân biệt
+an toàn trước khi thêm vào Session. Không dùng UUID hoặc `participantCode` làm
+mã hiển thị toàn hệ thống.
 
 ## 17. Next Recommended Work
 
-1. **MVP Manual Browser Acceptance Test**
-2. **MVP Checkpoint / Tag / Release Preparation**
+1. **Thiết kế và triển khai stable global `playerCode`**
+2. **Tiếp tục MVP Manual Browser Acceptance Test**
+3. **MVP Checkpoint / Tag / Release Preparation**
 
 ## 18. Deferred / Not Now
 
@@ -344,7 +348,8 @@ Không chuyển các item này trở lại `Current Work` nếu chưa có regres
 
 ## 21. Known Gaps / Caveats
 
-- Không còn MVP implementation gap.
+- Stable human-readable Player identity: **DESIGN REQUIRED**; API hiện chỉ có
+  UUID và `displayName`, trong khi duplicate display name được phép.
 - Manual browser acceptance là bước verification, không phải missing feature.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
 

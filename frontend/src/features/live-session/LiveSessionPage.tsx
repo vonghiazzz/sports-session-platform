@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import {
   composeLiveSessionModel,
   type CourtView,
@@ -1062,6 +1062,9 @@ function SessionHeader({
         </p>
       </div>
       <div className="session-header-actions">
+        <Link className="session-home-link" to="/">
+          ← Danh sách phiên
+        </Link>
         <a className="check-in-desk-link" href={`/sessions/${sessionId}/check-in`}>
           Mở bàn điểm danh
         </a>

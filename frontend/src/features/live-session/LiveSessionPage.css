@@ -923,6 +923,11 @@
   gap: 0.85rem;
 }
 
+.session-home-link {
+  color: var(--accent-strong);
+  font-weight: 750;
+}
+
 .people-heading .section-title-large {
   flex: 1 1 auto;
 }
