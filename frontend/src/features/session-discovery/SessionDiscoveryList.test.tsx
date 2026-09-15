@@ -114,7 +114,7 @@ describe('SessionDiscoveryList', () => {
     renderList()
 
     expect(await screen.findByText('Đang diễn ra')).toBeVisible()
-    expect(screen.getByText('Đã lên lịch')).toBeVisible()
+    expect(screen.getByText('Đã lên kế hoạch')).toBeVisible()
     expect(screen.getByText('Đã kết thúc')).toBeVisible()
     expect(screen.getByText('Đã hủy')).toBeVisible()
     expect(screen.getByRole('link', { name: 'Mở Control Room' })).toHaveAttribute(

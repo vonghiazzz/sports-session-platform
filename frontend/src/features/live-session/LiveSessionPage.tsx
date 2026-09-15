@@ -1126,15 +1126,19 @@ function SessionLifecycleControls({
     return null
   }
 
+  const startIsAvailable = sessionStatus === 'PLANNED'
   const completeIsAvailable = sessionStatus === 'IN_PROGRESS'
   const activeConfirmation =
-    confirmation === 'COMPLETE' &&
-    (!completeIsAvailable || hasPlayingMatch)
+    (confirmation === 'START' && !startIsAvailable) ||
+    (confirmation === 'COMPLETE' &&
+      (!completeIsAvailable || hasPlayingMatch))
       ? null
       : confirmation
   const controlsLocked = actionState.isPending || activeConfirmation !== null
   const confirmationMessage =
-    activeConfirmation === 'COMPLETE'
+    activeConfirmation === 'START'
+      ? 'Bắt đầu phiên này?'
+      : activeConfirmation === 'COMPLETE'
       ? 'Kết thúc phiên này? Thao tác cuối cùng này không thể hoàn tác.'
       : hasPlayingMatch
         ? 'Hủy phiên này? Phiên sẽ bị hủy nhưng trận đang chơi không tự kết thúc. Sau đó, bạn vẫn phải kết thúc hoặc hủy trận để giải phóng sân và người chơi.'
@@ -1156,10 +1160,24 @@ function SessionLifecycleControls({
     >
       <div>
         <p className="eyebrow">Vận hành phiên chơi</p>
-        <h2 id="session-lifecycle-heading">Kết thúc phiên</h2>
+        <h2 id="session-lifecycle-heading">
+          {startIsAvailable ? 'Bắt đầu phiên' : 'Kết thúc phiên'}
+        </h2>
       </div>
       <div className="session-lifecycle-operation">
         <div className="action-area session-lifecycle-actions">
+          {startIsAvailable && (
+            <button
+              className="primary-action-button"
+              type="button"
+              disabled={controlsLocked}
+              onClick={() => setConfirmation('START')}
+            >
+              {actionState.pendingAction === 'START'
+                ? SESSION_ACTION_LABELS.START.pending
+                : SESSION_ACTION_LABELS.START.idle}
+            </button>
+          )}
           {completeIsAvailable && (
             <button
               className="primary-action-button"
@@ -1203,13 +1221,17 @@ function SessionLifecycleControls({
                 disabled={actionState.isPending}
                 onClick={executeConfirmedAction}
               >
-                {actionState.pendingAction === 'COMPLETE'
-                  ? SESSION_ACTION_LABELS.COMPLETE.pending
-                  : actionState.pendingAction === 'CANCEL'
-                    ? SESSION_ACTION_LABELS.CANCEL.pending
-                    : activeConfirmation === 'COMPLETE'
-                      ? 'Xác nhận kết thúc'
-                      : 'Xác nhận hủy'}
+                {actionState.pendingAction === 'START'
+                  ? SESSION_ACTION_LABELS.START.pending
+                  : actionState.pendingAction === 'COMPLETE'
+                    ? SESSION_ACTION_LABELS.COMPLETE.pending
+                    : actionState.pendingAction === 'CANCEL'
+                      ? SESSION_ACTION_LABELS.CANCEL.pending
+                      : activeConfirmation === 'START'
+                        ? 'Xác nhận bắt đầu'
+                        : activeConfirmation === 'COMPLETE'
+                          ? 'Xác nhận kết thúc'
+                          : 'Xác nhận hủy'}
               </button>
               <button
                 className="secondary-action-button"

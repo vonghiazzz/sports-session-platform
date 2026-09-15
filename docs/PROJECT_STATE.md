@@ -5,7 +5,7 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `c81fd414096c446c81785cd0281783983fd0d9d6` |
+| HEAD | `db965cc70949677516cc7741d15d28bd18197d07` |
 | Ngày audit | 2026-09-15 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
@@ -138,9 +138,9 @@ Luồng tạo mới qua UI:
 
 `Home → Create New Session → create/select Venue → create/select Courts → create/select Players → create Session → allocate Courts → add Participants → Start Session → Control Room → Check-In Desk / People Check-In → REGISTERED → WAITING → Buddy / People operations → Manual Match hoặc Matchmaking → Accept & Start hoặc MatchPlan Queue → Start Match → Complete / Cancel Match → Complete / Cancel Session`
 
-Luồng discovery/resume:
+Luồng discovery/resume, gồm recovery cho Session chưa bắt đầu:
 
-`Home → existing Session list → reopen Session bằng Session UUID → existing Control Room`
+`Home → discover PLANNED Session → open Session bằng Session UUID → Start → IN_PROGRESS → Control Room`
 
 **A Host can operate a newly created Session end-to-end using UI only.** Normal path không cần Swagger.
 
@@ -165,6 +165,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | Create Court | DONE | DONE | DONE | Tạo physical Court trong Setup |
 | Create Session | DONE | DONE | DONE | Setup UI không cần Swagger |
 | Session Discovery / Resume | DONE | DONE | DONE | Home list và mở lại bằng Session UUID |
+| PLANNED Session Recovery Start V1 | DONE | DONE | DONE | Start tại Session page bằng API lifecycle hiện có |
 | Add Participant | DONE | DONE | DONE | Allocate lúc Setup |
 | Add Court | DONE | DONE | DONE | Allocate lúc Setup |
 | Start Session | DONE | DONE | DONE | Normal path trong Setup |
@@ -192,6 +193,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] Runtime Add Court
 - [x] Setup without Swagger
 - [x] Session Discovery / Resume
+- [x] PLANNED Session Recovery Start V1
 - [x] Vietnam timezone
 - [x] Host Check-In Desk
 - [x] Personal Link
@@ -275,30 +277,24 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 - Backend: JUnit/Spring integration tests với Testcontainers PostgreSQL 18.4; có Flyway schema/invariant coverage và pure-domain tests.
 - Frontend: Vitest, Testing Library, jsdom; có API contract, model/hook và component interaction coverage; checkpoint còn kiểm tra lint, TypeScript/Vite build và `git diff --check`.
 - Full backend sau Session Discovery / Resume V1: **630 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
-- Full frontend sau Session Discovery / Resume V1: **346 tests PASS**; lint và production build PASS.
+- Full frontend sau PLANNED Session Recovery Start V1: **349 tests PASS**; lint và production build PASS.
 - Các số trên là evidence đã ghi nhận, không phải kết quả chạy lại trong lần cập nhật tài liệu này.
 
 ## 16. Current Work
 
 **Current Work: None — ready for next planned slice**
 
-Session Discovery / Resume V1 đã hoàn tất và được verify. Chưa có future gap nào được đánh dấu `IN PROGRESS`.
+PLANNED Session Recovery Start V1 đã hoàn tất và được verify. Chưa có future gap nào được đánh dấu `IN PROGRESS`.
 
 ## 17. Next Recommended Work
 
-1. **PLANNED Session Recovery Start V1**
-   - Vấn đề: Start có trong Setup, nhưng một Session `PLANNED` mở trực tiếp tại Control Room chưa có recovery Start action rõ ràng.
-   - Tầm quan trọng: Host có thể khôi phục Session đã setup mà không phải tái tạo hoặc dùng API ngoài UI.
-   - Scope dự kiến: chủ yếu frontend; backend `POST /api/sessions/{sessionId}/start` đã có.
-   - Tái sử dụng: lifecycle API/client, confirmation/error patterns và query invalidation hiện tại.
-
-2. **Runtime Create Physical Court V1**
+1. **Runtime Create Physical Court V1**
    - Vấn đề: Runtime Add Court chỉ allocate Court đã tồn tại; Host chưa tạo physical Court mới ngay trong Control Room khi không còn lựa chọn phù hợp.
    - Tầm quan trọng: tránh rời flow vận hành trực tiếp để chuẩn bị master data.
    - Scope dự kiến: frontend reuse; backend create Court theo Venue đã có.
    - Tái sử dụng: Venue Court API, form/validation từ Session Setup và runtime allocation mutation.
 
-3. **Host Vietnamese Terminology Polish**
+2. **Host Vietnamese Terminology Polish**
    - Vấn đề: Host flow còn trộn các term `Host`, `Rating`, `check-in`, `link`, `QR`, `Matchmaking`.
    - Tầm quan trọng: giảm cognitive friction; đây là polish, không phải operational blocker.
    - Scope dự kiến: frontend copy/presentation tests, không đổi contract hoặc business behavior.
@@ -347,12 +343,12 @@ Các item sau đã được source/test/UI xác nhận **DONE** và không còn 
 - Personal random token, Host personal link và QR personal link.
 - Host Check-In Desk và Host manual check-in.
 - Session Discovery / Resume V1 với deterministic backend ordering.
+- PLANNED Session Recovery Start V1 tại Session page.
 
 Không chuyển các item này trở lại `Current Work` nếu chưa có regression hoặc requirement mới được source chứng minh.
 
 ## 21. Known Gaps / Caveats
 
-- **PLANNED recovery Start:** normal Setup flow có Start, nhưng Control Room mở trực tiếp Session `PLANNED` chỉ có Cancel, chưa có Start recovery rõ ràng.
 - **Physical Court creation during runtime:** chỉ allocate existing Court; chưa tạo physical Court mới tại Control Room.
 - **Vietnamese terminology polish:** UI vận hành được, nhưng còn các term `Host`, `Rating`, `check-in`, `link`, `QR`, `Matchmaking`.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.

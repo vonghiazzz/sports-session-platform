@@ -43,7 +43,7 @@ describe('Vietnam presentation', () => {
       statusLabel('UNAVAILABLE'),
       statusLabel('CREATED'),
     ]).toEqual([
-      'Đã lên lịch',
+      'Đã lên kế hoạch',
       'Đang diễn ra',
       'Đã kết thúc',
       'Đã hủy',
@@ -101,6 +101,7 @@ describe('Vietnam presentation', () => {
       CANCEL: { idle: 'Hủy trận', pending: 'Đang hủy…' },
     })
     expect(SESSION_ACTION_LABELS).toEqual({
+      START: { idle: 'Bắt đầu phiên', pending: 'Đang bắt đầu…' },
       COMPLETE: { idle: 'Kết thúc phiên', pending: 'Đang kết thúc…' },
       CANCEL: { idle: 'Hủy phiên', pending: 'Đang hủy…' },
     })

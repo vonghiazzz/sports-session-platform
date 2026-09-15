@@ -22,7 +22,7 @@ const vietnamDateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
 })
 
 const STATUS_LABELS: Readonly<Record<string, string>> = {
-  PLANNED: 'Đã lên lịch',
+  PLANNED: 'Đã lên kế hoạch',
   IN_PROGRESS: 'Đang diễn ra',
   COMPLETED: 'Đã kết thúc',
   CANCELLED: 'Đã hủy',
@@ -89,8 +89,9 @@ export const MATCH_ACTION_LABELS: Readonly<
 }
 
 export const SESSION_ACTION_LABELS: Readonly<
-  Record<'COMPLETE' | 'CANCEL', ActionLabel>
+  Record<'START' | 'COMPLETE' | 'CANCEL', ActionLabel>
 > = {
+  START: { idle: 'Bắt đầu phiên', pending: 'Đang bắt đầu…' },
   COMPLETE: { idle: 'Kết thúc phiên', pending: 'Đang kết thúc…' },
   CANCEL: { idle: 'Hủy phiên', pending: 'Đang hủy…' },
 }

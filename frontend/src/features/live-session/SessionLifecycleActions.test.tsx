@@ -18,6 +18,7 @@ import {
 } from '../../api/liveSessionApi'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import { getSessionMatchPlans } from '../../api/matchPlanApi'
+import { startSetupSession } from '../../api/sessionSetupApi'
 import { LiveSessionScreen } from './LiveSessionPage'
 import { useLiveSessionData } from './useLiveSessionData'
 
@@ -45,6 +46,9 @@ vi.mock('../../api/liveSessionApi', () => ({
 vi.mock('../../api/matchPlanApi', () => ({
   getSessionMatchPlans: vi.fn(),
 }))
+vi.mock('../../api/sessionSetupApi', () => ({
+  startSetupSession: vi.fn(),
+}))
 
 const SESSION_ID = 'session-1'
 const NOW = new Date('2026-09-02T10:00:00Z')
@@ -52,6 +56,7 @@ const queryClients: QueryClient[] = []
 
 const cancelSessionMock = vi.mocked(cancelSession)
 const completeSessionMock = vi.mocked(completeSession)
+const startSetupSessionMock = vi.mocked(startSetupSession)
 const getPlayersMock = vi.mocked(getPlayers)
 const getSessionMock = vi.mocked(getSession)
 const getSessionCourtsMock = vi.mocked(getSessionCourts)
@@ -128,7 +133,7 @@ function renderControlRoom() {
     return <LiveSessionScreen state={state} now={NOW} />
   }
 
-  return render(<Harness />, { wrapper: Wrapper })
+  return { queryClient, ...render(<Harness />, { wrapper: Wrapper }) }
 }
 
 function sessionHeader() {
@@ -159,6 +164,11 @@ async function confirmComplete(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Xác nhận kết thúc' }))
 }
 
+async function confirmStart(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Bắt đầu phiên' }))
+  await user.click(screen.getByRole('button', { name: 'Xác nhận bắt đầu' }))
+}
+
 async function confirmCancel(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Hủy phiên' }))
   await user.click(screen.getByRole('button', { name: 'Xác nhận hủy' }))
@@ -186,7 +196,7 @@ afterEach(() => {
 })
 
 describe('Session lifecycle action matrix', () => {
-  it('offers Cancel but not Complete for a PLANNED Session', async () => {
+  it('offers Start and Cancel but not Complete for a PLANNED Session', async () => {
     const input = createLiveSessionInput()
     arrangeReadSuccess({
       session: sessionWithStatus(input.session, 'PLANNED'),
@@ -195,7 +205,10 @@ describe('Session lifecycle action matrix', () => {
     renderControlRoom()
 
     expect(
-      await screen.findByRole('button', { name: 'Hủy phiên' }),
+      await screen.findByRole('button', { name: 'Bắt đầu phiên' }),
+    ).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Hủy phiên' }),
     ).toBeEnabled()
     expect(
       screen.queryByRole('button', { name: 'Kết thúc phiên' }),
@@ -213,6 +226,9 @@ describe('Session lifecycle action matrix', () => {
       await screen.findByRole('button', { name: 'Kết thúc phiên' }),
     ).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Hủy phiên' })).toBeEnabled()
+    expect(
+      screen.queryByRole('button', { name: 'Bắt đầu phiên' }),
+    ).not.toBeInTheDocument()
   })
 
   it.each(['COMPLETED', 'CANCELLED'] as const)(
@@ -231,6 +247,9 @@ describe('Session lifecycle action matrix', () => {
       ).not.toBeInTheDocument()
       expect(
         screen.queryByRole('button', { name: 'Hủy phiên' }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Bắt đầu phiên' }),
       ).not.toBeInTheDocument()
     },
   )
@@ -251,6 +270,51 @@ describe('Session lifecycle action matrix', () => {
 })
 
 describe('Session lifecycle authoritative reconciliation', () => {
+  it('starts a reopened PLANNED Session by UUID and renders IN_PROGRESS only from refreshed GET', async () => {
+    const user = userEvent.setup()
+    const input = createLiveSessionInput()
+    const plannedSession = sessionWithStatus(input.session, 'PLANNED')
+    const startedSession = sessionWithStatus(input.session, 'IN_PROGRESS')
+    arrangeReadSuccess({
+      session: plannedSession,
+      matches: input.matches.filter((match) => match.status !== 'PLAYING'),
+    })
+    getSessionMock
+      .mockResolvedValueOnce(plannedSession)
+      .mockResolvedValue(startedSession)
+    startSetupSessionMock.mockResolvedValue(startedSession)
+    const { queryClient } = renderControlRoom()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    expect(
+      await screen.findByRole('button', { name: 'Bắt đầu phiên' }),
+    ).toBeEnabled()
+    expect(within(sessionHeader()).getByText('Đã lên kế hoạch')).toBeVisible()
+    await confirmStart(user)
+
+    await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
+    expect(startSetupSessionMock).toHaveBeenCalledOnce()
+    expect(startSetupSessionMock).toHaveBeenCalledWith(SESSION_ID)
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ['session', SESSION_ID],
+      exact: true,
+    })
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ['sessions'],
+      exact: true,
+    })
+    expect(getSessionMatchesMock).toHaveBeenCalledOnce()
+    expect(getSessionParticipantsMock).toHaveBeenCalledOnce()
+    expect(getSessionCourtsMock).toHaveBeenCalledOnce()
+    expect(within(sessionHeader()).getByText('Đang diễn ra')).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Bắt đầu phiên' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Kết thúc phiên' }),
+    ).toBeEnabled()
+  })
+
   it('completes from refreshed GET while preserving a CREATED Match recovery path', async () => {
     const user = userEvent.setup()
     const input = arrangeReadSuccess()
@@ -371,6 +435,64 @@ describe('Session lifecycle authoritative reconciliation', () => {
 })
 
 describe('Session lifecycle pending and failure safety', () => {
+  it('keeps PLANNED authoritative state and prevents replay while Start is pending', async () => {
+    const user = userEvent.setup()
+    const input = createLiveSessionInput()
+    const plannedSession = sessionWithStatus(input.session, 'PLANNED')
+    arrangeReadSuccess({
+      session: plannedSession,
+      matches: input.matches.filter((match) => match.status !== 'PLAYING'),
+    })
+    const request = deferred<SessionResponse>()
+    startSetupSessionMock.mockReturnValue(request.promise)
+    renderControlRoom()
+
+    await screen.findByRole('button', { name: 'Bắt đầu phiên' })
+    await user.click(screen.getByRole('button', { name: 'Bắt đầu phiên' }))
+    const confirmButton = screen.getByRole('button', {
+      name: 'Xác nhận bắt đầu',
+    })
+    fireEvent.click(confirmButton)
+    fireEvent.click(confirmButton)
+
+    expect(
+      await screen.findByRole('button', { name: 'Đang bắt đầu…' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Hủy phiên' })).toBeDisabled()
+    expect(within(sessionHeader()).getByText('Đã lên kế hoạch')).toBeVisible()
+    expect(startSetupSessionMock).toHaveBeenCalledOnce()
+
+    request.resolve(plannedSession)
+    await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows a safe Start error, keeps PLANNED, and restores the Start action without retry', async () => {
+    const user = userEvent.setup()
+    const input = createLiveSessionInput()
+    const plannedSession = sessionWithStatus(input.session, 'PLANNED')
+    arrangeReadSuccess({
+      session: plannedSession,
+      matches: input.matches.filter((match) => match.status !== 'PLAYING'),
+    })
+    startSetupSessionMock.mockRejectedValue(new HttpError(409, 'Conflict'))
+    renderControlRoom()
+
+    await screen.findByRole('button', { name: 'Bắt đầu phiên' })
+    await confirmStart(user)
+
+    await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
+    expect(startSetupSessionMock).toHaveBeenCalledOnce()
+    expect(
+      screen.getByText(
+        'Trạng thái phiên đã thay đổi. Dữ liệu vận hành hiện tại đã được tải lại.',
+      ),
+    ).toBeVisible()
+    expect(within(sessionHeader()).getByText('Đã lên kế hoạch')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Bắt đầu phiên' }),
+    ).toBeEnabled()
+  })
+
   it('keeps GET state and blocks duplicate or competing commands while Complete is pending', async () => {
     const user = userEvent.setup()
     const input = arrangeReadSuccess()
