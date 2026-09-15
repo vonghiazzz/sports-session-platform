@@ -164,6 +164,11 @@ describe('LiveSessionScreen', () => {
         name: /^Sao chép link người chơi cho /,
       }),
     ).toHaveLength(8)
+    expect(
+      people.getAllByRole('button', {
+        name: /^QR người chơi cho /,
+      }),
+    ).toHaveLength(8)
   })
 
   it('distinguishes duplicate Player names with Session-local Participant codes', () => {
@@ -542,6 +547,11 @@ describe('LiveSessionScreen', () => {
       expect(
         screen.getAllByRole('button', {
           name: /^Sao chép link người chơi cho /,
+        }),
+      ).toHaveLength(8)
+      expect(
+        screen.getAllByRole('button', {
+          name: /^QR người chơi cho /,
         }),
       ).toHaveLength(8)
       expect(

@@ -1023,6 +1023,48 @@
   margin: 0;
 }
 
+.personal-link-buttons {
+  justify-content: flex-end;
+}
+
+.personal-qr-overlay {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(7 31 26 / 55%);
+}
+
+.personal-qr-dialog {
+  width: min(24rem, calc(100vw - 2rem));
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  color: var(--text);
+  background: #ffffff;
+  box-shadow: 0 1.5rem 4rem rgb(12 45 37 / 28%);
+  text-align: center;
+}
+
+.personal-qr-dialog h2,
+.personal-qr-dialog p {
+  margin: 0 0 1rem;
+}
+
+.personal-qr-code {
+  display: block;
+  width: min(15rem, 100%);
+  height: auto;
+  margin: 0 auto 1rem;
+}
+
+.personal-qr-actions {
+  justify-content: center;
+}
+
 .buddy-pair-controls {
   display: flex;
   align-items: flex-end;

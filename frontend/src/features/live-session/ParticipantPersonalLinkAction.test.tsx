@@ -10,6 +10,27 @@ vi.mock('../../api/liveSessionApi', async (importOriginal) => ({
   getSessionParticipantPersonalAccess: vi.fn(),
 }))
 
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: ({
+    value,
+    title,
+    className,
+  }: {
+    value: string
+    title: string
+    className: string
+  }) => (
+    <svg
+      className={className}
+      data-testid="personal-qr-code"
+      data-qr-value={value}
+      role="img"
+    >
+      <title>{title}</title>
+    </svg>
+  ),
+}))
+
 const getPersonalAccessMock = vi.mocked(getSessionParticipantPersonalAccess)
 const clipboardWrite = vi.fn<(value: string) => Promise<void>>()
 const queryClients: QueryClient[] = []
@@ -74,7 +95,7 @@ afterEach(() => {
 })
 
 describe('ParticipantPersonalLinkAction', () => {
-  it('copies each duplicate-name Participant link by UUID and never renders the token', async () => {
+  it('lazily opens the correct duplicate-name QR and reuses its exact URL for Copy', async () => {
     const user = userWithClipboard()
     getPersonalAccessMock.mockImplementation(async (_sessionId, participantId) => ({
       sessionId: 'session-1',
@@ -84,25 +105,13 @@ describe('ParticipantPersonalLinkAction', () => {
     }))
     renderActions()
 
-    await user.click(
-      screen.getByRole('button', {
-        name: 'Sao chép link người chơi cho #3 Nguyễn An',
-      }),
-    )
-
-    expect(getPersonalAccessMock).toHaveBeenLastCalledWith(
-      'session-1',
-      'participant-a',
-    )
-    expect(clipboardWrite).toHaveBeenLastCalledWith(
-      new URL('/player-session/token-a', window.location.origin).toString(),
-    )
-    expect(await screen.findByText('Đã sao chép link')).toBeVisible()
-    expect(screen.queryByText('token-a')).not.toBeInTheDocument()
+    expect(getPersonalAccessMock).not.toHaveBeenCalled()
+    expect(screen.getAllByText('QR người chơi')).toHaveLength(2)
+    expect(screen.getAllByText('Sao chép link người chơi')).toHaveLength(2)
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Sao chép link người chơi cho #8 Nguyễn An',
+        name: 'QR người chơi cho #8 Nguyễn An',
       }),
     )
 
@@ -110,13 +119,51 @@ describe('ParticipantPersonalLinkAction', () => {
       'session-1',
       'participant-b',
     )
-    expect(clipboardWrite).toHaveBeenLastCalledWith(
-      new URL('/player-session/token-b', window.location.origin).toString(),
+    const expectedUrl = new URL(
+      '/player-session/token-b',
+      window.location.origin,
+    ).toString()
+    const dialog = await screen.findByRole('dialog', { name: '#8 Nguyễn An' })
+    expect(dialog).toHaveTextContent('#8 Nguyễn An')
+    expect(dialog).toHaveTextContent('Quét để mở trang cá nhân')
+    expect(screen.getByTestId('personal-qr-code')).toHaveAttribute(
+      'data-qr-value',
+      expectedUrl,
     )
+    expect(screen.getByRole('img', { name: 'QR link người chơi #8 Nguyễn An' }))
+      .toBeVisible()
     expect(screen.queryByText('token-b')).not.toBeInTheDocument()
+    expect(clipboardWrite).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Sao chép link' }))
+
+    expect(getPersonalAccessMock).toHaveBeenCalledOnce()
+    expect(clipboardWrite).toHaveBeenLastCalledWith(expectedUrl)
+    expect(await screen.findByText('Đã sao chép link')).toBeVisible()
+    expect(screen.queryByText('token-b')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Đóng' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'QR người chơi cho #8 Nguyễn An',
+      }),
+    ).toHaveFocus()
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'QR người chơi cho #3 Nguyễn An',
+      }),
+    )
+    expect(getPersonalAccessMock).toHaveBeenLastCalledWith(
+      'session-1',
+      'participant-a',
+    )
+    expect(await screen.findByRole('dialog', { name: '#3 Nguyễn An' }))
+      .toBeVisible()
   })
 
-  it('scopes pending state to the clicked Session Participant', async () => {
+  it('scopes QR token-fetch pending state to the clicked Session Participant', async () => {
     const user = userWithClipboard()
     const request = deferred<{
       sessionId: string
@@ -126,42 +173,61 @@ describe('ParticipantPersonalLinkAction', () => {
     getPersonalAccessMock.mockReturnValueOnce(request.promise)
     renderActions()
 
-    const firstButton = screen.getByRole('button', {
+    const firstQrButton = screen.getByRole('button', {
+      name: 'QR người chơi cho #3 Nguyễn An',
+    })
+    const firstCopyButton = screen.getByRole('button', {
       name: 'Sao chép link người chơi cho #3 Nguyễn An',
     })
-    const secondButton = screen.getByRole('button', {
+    const secondQrButton = screen.getByRole('button', {
+      name: 'QR người chơi cho #8 Nguyễn An',
+    })
+    const secondCopyButton = screen.getByRole('button', {
       name: 'Sao chép link người chơi cho #8 Nguyễn An',
     })
-    await user.click(firstButton)
+    await user.click(firstQrButton)
 
-    expect(firstButton).toBeDisabled()
-    expect(secondButton).toBeEnabled()
-    expect(screen.getByText('Đang sao chép…')).toBeVisible()
+    expect(firstQrButton).toBeDisabled()
+    expect(firstCopyButton).toBeDisabled()
+    expect(secondQrButton).toBeEnabled()
+    expect(secondCopyButton).toBeEnabled()
+    expect(screen.getByText('Đang tải QR…')).toBeVisible()
 
     request.resolve({
       sessionId: 'session-1',
       sessionParticipantId: 'participant-a',
       personalAccessToken: 'token-a',
     })
-    expect(await screen.findByText('Đã sao chép link')).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: '#3 Nguyễn An' }))
+      .toBeVisible()
   })
 
-  it('does not write to clipboard after a backend failure and becomes usable again', async () => {
+  it('does not render a QR after backend failure and allows an explicit retry', async () => {
     const user = userWithClipboard()
     getPersonalAccessMock.mockRejectedValueOnce(new Error('secret backend detail'))
+    getPersonalAccessMock.mockResolvedValueOnce({
+      sessionId: 'session-1',
+      sessionParticipantId: 'participant-a',
+      personalAccessToken: 'token-a',
+    })
     renderActions()
 
     const button = screen.getByRole('button', {
-      name: 'Sao chép link người chơi cho #3 Nguyễn An',
+      name: 'QR người chơi cho #3 Nguyễn An',
     })
     await user.click(button)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Không thể sao chép link. Hãy thử lại.',
+      'Không thể mở hoặc sao chép link. Hãy thử lại.',
     )
     expect(screen.queryByText('secret backend detail')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(clipboardWrite).not.toHaveBeenCalled()
     await waitFor(() => expect(button).toBeEnabled())
+
+    await user.click(button)
+    expect(await screen.findByRole('dialog', { name: '#3 Nguyễn An' }))
+      .toBeVisible()
   })
 
   it('shows a safe reusable failure state when clipboard writing fails', async () => {
@@ -180,9 +246,31 @@ describe('ParticipantPersonalLinkAction', () => {
     await user.click(button)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Không thể sao chép link. Hãy thử lại.',
+      'Không thể mở hoặc sao chép link. Hãy thử lại.',
     )
     expect(screen.queryByText(/secret-token|clipboard denied/)).not.toBeInTheDocument()
     expect(button).toBeEnabled()
+  })
+
+  it('closes the QR dialog with Escape and restores trigger focus', async () => {
+    const user = userWithClipboard()
+    getPersonalAccessMock.mockResolvedValueOnce({
+      sessionId: 'session-1',
+      sessionParticipantId: 'participant-a',
+      personalAccessToken: 'token-a',
+    })
+    renderActions()
+    const trigger = screen.getByRole('button', {
+      name: 'QR người chơi cho #3 Nguyễn An',
+    })
+
+    await user.click(trigger)
+    expect(await screen.findByRole('dialog', { name: '#3 Nguyễn An' }))
+      .toBeVisible()
+    expect(screen.getByRole('button', { name: 'Đóng' })).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 })
