@@ -305,12 +305,6 @@
   font-weight: 750;
 }
 
-.rating-history-details .rating-history-diagnostic {
-  grid-column: 1 / -1;
-  color: var(--muted-text);
-  font-size: 0.78rem;
-}
-
 @media (max-width: 48rem) {
   .player-management {
     width: min(100% - 1rem, 76rem);
@@ -335,9 +329,6 @@
     grid-template-columns: 1fr;
   }
 
-  .rating-history-details .rating-history-diagnostic {
-    grid-column: auto;
-  }
 }
 
 @media (max-width: 34rem) {

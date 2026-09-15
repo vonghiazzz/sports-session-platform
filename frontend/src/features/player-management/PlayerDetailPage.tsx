@@ -228,57 +228,59 @@ export function PlayerDetailPage() {
               Chưa có trận nào được tính điểm xếp hạng.
             </p>
           ) : (
-            <ol
-              className="rating-history-list"
-              aria-label="Các thay đổi điểm xếp hạng"
-            >
-              {ratingHistoryQuery.data.events.map((historyEvent) => (
-                <li
-                  className="rating-history-entry"
-                  key={`${historyEvent.matchId}-${historyEvent.resultVersion}`}
-                >
-                  <div className="rating-history-entry-header">
-                    <time dateTime={historyEvent.matchCompletedAt}>
-                      {formatVietnamDateTime(historyEvent.matchCompletedAt)}
-                    </time>
-                    <strong
-                      className={`rating-outcome rating-outcome-${historyEvent.outcome.toLowerCase()}`}
-                    >
-                      {ratingOutcomeLabel(historyEvent.outcome)}
-                    </strong>
-                  </div>
-                  <dl className="rating-history-details">
-                    <div>
-                      <dt>Điểm xếp hạng</dt>
-                      <dd>
-                        {`${formatPlayerRating(historyEvent.beforeRatingValue)} → ${formatPlayerRating(historyEvent.afterRatingValue)}`}
-                      </dd>
+            <>
+              <p className="rating-note">
+                Độ bất định thể hiện mức độ hệ thống chưa chắc chắn về trình độ
+                của người chơi. Giá trị càng thấp, hệ thống càng chắc chắn hơn
+                về điểm xếp hạng hiện tại; giá trị này thường giảm khi có thêm
+                kết quả trận đấu, dù thắng hay thua.
+              </p>
+              <ol
+                className="rating-history-list"
+                aria-label="Các thay đổi điểm xếp hạng"
+              >
+                {ratingHistoryQuery.data.events.map((historyEvent) => (
+                  <li
+                    className="rating-history-entry"
+                    key={`${historyEvent.matchId}-${historyEvent.resultVersion}`}
+                  >
+                    <div className="rating-history-entry-header">
+                      <time dateTime={historyEvent.matchCompletedAt}>
+                        {formatVietnamDateTime(historyEvent.matchCompletedAt)}
+                      </time>
+                      <strong
+                        className={`rating-outcome rating-outcome-${historyEvent.outcome.toLowerCase()}`}
+                      >
+                        {ratingOutcomeLabel(historyEvent.outcome)}
+                      </strong>
                     </div>
-                    <div>
-                      <dt>Thay đổi điểm xếp hạng</dt>
-                      <dd>
-                        {formatPlayerRatingDelta(
-                          historyEvent.beforeRatingValue,
-                          historyEvent.afterRatingValue,
-                        )}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Độ bất định</dt>
-                      <dd>
-                        {`${formatPlayerRating(historyEvent.beforeUncertainty)} → ${formatPlayerRating(historyEvent.afterUncertainty)}`}
-                      </dd>
-                    </div>
-                    <div className="rating-history-diagnostic">
-                      <dt>Xử lý điểm xếp hạng</dt>
-                      <dd>
-                        {`${historyEvent.algorithmVersion} · kết quả v${historyEvent.resultVersion}`}
-                      </dd>
-                    </div>
-                  </dl>
-                </li>
-              ))}
-            </ol>
+                    <dl className="rating-history-details">
+                      <div>
+                        <dt>Điểm xếp hạng</dt>
+                        <dd>
+                          {`${formatPlayerRating(historyEvent.beforeRatingValue)} → ${formatPlayerRating(historyEvent.afterRatingValue)}`}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Thay đổi điểm xếp hạng</dt>
+                        <dd>
+                          {formatPlayerRatingDelta(
+                            historyEvent.beforeRatingValue,
+                            historyEvent.afterRatingValue,
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Độ bất định</dt>
+                        <dd>
+                          {`${formatPlayerRating(historyEvent.beforeUncertainty)} → ${formatPlayerRating(historyEvent.afterUncertainty)}`}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
         </section>
       )}

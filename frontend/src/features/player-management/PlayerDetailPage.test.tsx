@@ -186,6 +186,16 @@ describe('PlayerDetailPage', () => {
     expect(history.getByText('27,0 → 28,24')).toBeInTheDocument()
     expect(history.getByText('+1,24')).toBeInTheDocument()
     expect(history.getByText('8,33 → 8,01')).toBeInTheDocument()
+    expect(
+      history.getByText(/Giá trị càng thấp, hệ thống càng chắc chắn hơn/),
+    ).toHaveTextContent(
+      'giá trị này thường giảm khi có thêm kết quả trận đấu, dù thắng hay thua',
+    )
+    const entry = history.getByRole('listitem')
+    expect(within(entry).queryByText('Xử lý điểm xếp hạng'))
+      .not.toBeInTheDocument()
+    expect(within(entry).queryByText('weng-lin-pl-v1')).not.toBeInTheDocument()
+    expect(within(entry).queryByText(/kết quả v1/)).not.toBeInTheDocument()
   })
 
   it('renders a LOSS event with a negative Rating delta', async () => {
@@ -197,8 +207,11 @@ describe('PlayerDetailPage', () => {
     const historyList = await screen.findByRole('list', {
       name: 'Các thay đổi điểm xếp hạng',
     })
-    expect(within(historyList).getByText('Thua')).toBeInTheDocument()
-    expect(within(historyList).getByText('-0,63')).toBeInTheDocument()
+    const history = within(historyList)
+    expect(history.getByText('Thua')).toBeInTheDocument()
+    expect(history.getByText('28,24 → 27,61')).toBeInTheDocument()
+    expect(history.getByText('-0,63')).toBeInTheDocument()
+    expect(history.getByText('8,01 → 7,88')).toBeInTheDocument()
   })
 
   it('preserves the Rating event order returned by the backend', async () => {

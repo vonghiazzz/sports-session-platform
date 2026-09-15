@@ -5,7 +5,7 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `f699fdc329533eaaef946c6ffdedfa4ee66203f1` |
+| HEAD | `89d95f299cd62f4c49c3854794ee99fda4f304d7` |
 | Ngày audit | 2026-09-15 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
@@ -201,6 +201,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] Personal Link
 - [x] QR Personal Link
 - [x] Vietnamese terminology polish
+- [x] Rating uncertainty explanation / history presentation
 
 ## 10. Matchmaking Current State
 
