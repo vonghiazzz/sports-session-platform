@@ -107,7 +107,7 @@ describe('ParticipantPersonalLinkAction', () => {
 
     expect(getPersonalAccessMock).not.toHaveBeenCalled()
     expect(screen.getAllByText('QR người chơi')).toHaveLength(2)
-    expect(screen.getAllByText('Sao chép link người chơi')).toHaveLength(2)
+    expect(screen.getAllByText('Sao chép liên kết người chơi')).toHaveLength(2)
 
     await user.click(
       screen.getByRole('button', {
@@ -130,16 +130,20 @@ describe('ParticipantPersonalLinkAction', () => {
       'data-qr-value',
       expectedUrl,
     )
-    expect(screen.getByRole('img', { name: 'QR link người chơi #8 Nguyễn An' }))
+    expect(
+      screen.getByRole('img', {
+        name: 'QR liên kết người chơi #8 Nguyễn An',
+      }),
+    )
       .toBeVisible()
     expect(screen.queryByText('token-b')).not.toBeInTheDocument()
     expect(clipboardWrite).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Sao chép link' }))
+    await user.click(screen.getByRole('button', { name: 'Sao chép liên kết' }))
 
     expect(getPersonalAccessMock).toHaveBeenCalledOnce()
     expect(clipboardWrite).toHaveBeenLastCalledWith(expectedUrl)
-    expect(await screen.findByText('Đã sao chép link')).toBeVisible()
+    expect(await screen.findByText('Đã sao chép liên kết')).toBeVisible()
     expect(screen.queryByText('token-b')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Đóng' }))
@@ -177,13 +181,13 @@ describe('ParticipantPersonalLinkAction', () => {
       name: 'QR người chơi cho #3 Nguyễn An',
     })
     const firstCopyButton = screen.getByRole('button', {
-      name: 'Sao chép link người chơi cho #3 Nguyễn An',
+      name: 'Sao chép liên kết người chơi cho #3 Nguyễn An',
     })
     const secondQrButton = screen.getByRole('button', {
       name: 'QR người chơi cho #8 Nguyễn An',
     })
     const secondCopyButton = screen.getByRole('button', {
-      name: 'Sao chép link người chơi cho #8 Nguyễn An',
+      name: 'Sao chép liên kết người chơi cho #8 Nguyễn An',
     })
     await user.click(firstQrButton)
 
@@ -218,7 +222,7 @@ describe('ParticipantPersonalLinkAction', () => {
     await user.click(button)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Không thể mở hoặc sao chép link. Hãy thử lại.',
+      'Không thể mở hoặc sao chép liên kết. Hãy thử lại.',
     )
     expect(screen.queryByText('secret backend detail')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -241,12 +245,12 @@ describe('ParticipantPersonalLinkAction', () => {
     renderActions()
 
     const button = screen.getByRole('button', {
-      name: 'Sao chép link người chơi cho #3 Nguyễn An',
+      name: 'Sao chép liên kết người chơi cho #3 Nguyễn An',
     })
     await user.click(button)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Không thể mở hoặc sao chép link. Hãy thử lại.',
+      'Không thể mở hoặc sao chép liên kết. Hãy thử lại.',
     )
     expect(screen.queryByText(/secret-token|clipboard denied/)).not.toBeInTheDocument()
     expect(button).toBeEnabled()

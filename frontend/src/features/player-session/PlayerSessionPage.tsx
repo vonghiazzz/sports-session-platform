@@ -164,7 +164,8 @@ export function PlayerSessionScreen({
         </p>
       )}
       <p className="player-session-read-only">
-        Đây là màn hình chỉ xem. Mọi thay đổi trạng thái do Host thực hiện.
+        Đây là màn hình chỉ xem. Mọi thay đổi trạng thái do người tổ chức thực
+        hiện.
       </p>
     </main>
   )

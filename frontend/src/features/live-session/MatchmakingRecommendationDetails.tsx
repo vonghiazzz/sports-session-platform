@@ -18,7 +18,7 @@ function ratingContext(player: MatchmakingPlayerResponse) {
     return 'Điểm khởi tạo'
   }
 
-  return `rating từ ${player.ratedMatches} trận`
+  return `điểm xếp hạng từ ${player.ratedMatches} trận`
 }
 
 function RecommendationPlayer({
@@ -45,7 +45,8 @@ function RecommendationPlayer({
       </span>
 
       <span>
-        Rating: {formatRating(player.ratingValue)} · {ratingContext(player)}
+        Điểm xếp hạng: {formatRating(player.ratingValue)} ·{' '}
+        {ratingContext(player)}
       </span>
 
       <span>
@@ -70,7 +71,7 @@ export function MatchmakingRecommendationDetails({
       <div className="recommendation-teams">
         <div>
           <h5>
-            Đội A · Tổng Rating{' '}
+            Đội A · Tổng điểm xếp hạng{' '}
             {formatRating(recommendation.teamARatingTotal)}
           </h5>
 
@@ -89,7 +90,7 @@ export function MatchmakingRecommendationDetails({
 
         <div>
           <h5>
-            Đội B · Tổng Rating{' '}
+            Đội B · Tổng điểm xếp hạng{' '}
             {formatRating(recommendation.teamBRatingTotal)}
           </h5>
 
@@ -108,14 +109,14 @@ export function MatchmakingRecommendationDetails({
       </div>
 
       <p className="recommendation-note">
-        Chênh lệch Rating giữa hai đội:{' '}
+        Chênh lệch điểm xếp hạng giữa hai đội:{' '}
         <strong>{formatRating(recommendation.ratingDifference)}</strong>
       </p>
 
       <p className="recommendation-note">
-        Matchmaking cân đội bằng Rating hiện tại. Trình độ Yếu, TB, Khá là
-        thông tin hồ sơ ban đầu và có thể khác Rating sau khi người chơi đã có
-        lịch sử thi đấu.
+        Ghép trận cân đội bằng điểm xếp hạng hiện tại. Trình độ Yếu, TB, Khá là
+        thông tin hồ sơ ban đầu và có thể khác điểm xếp hạng sau khi người chơi
+        đã có lịch sử thi đấu.
       </p>
     </>
   )

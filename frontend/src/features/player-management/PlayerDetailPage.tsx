@@ -93,7 +93,10 @@ export function PlayerDetailPage() {
         <div>
           <p className="eyebrow">Hồ sơ người chơi</p>
           <h1>{player.displayName}</h1>
-          <p>Trình độ do Host quản lý; Rating thay đổi độc lập theo kết quả thi đấu.</p>
+          <p>
+            Trình độ do người tổ chức quản lý; điểm xếp hạng thay đổi độc lập
+            theo kết quả thi đấu.
+          </p>
         </div>
         <Link to="/players">Về danh sách</Link>
       </header>
@@ -105,7 +108,7 @@ export function PlayerDetailPage() {
       ) : (
         <div className="player-detail-grid">
           <section className="player-panel" aria-labelledby="profile-title">
-            <h2 id="profile-title">Trình độ Host đánh giá</h2>
+            <h2 id="profile-title">Trình độ do người tổ chức đánh giá</h2>
             <dl className="player-details">
               <div><dt>Môn</dt><dd>{sportLabel(profile.sport)}</dd></div>
               <div><dt>Trình hiện tại</dt><dd>{skillLevelLabel(profile.skillLevel)}</dd></div>
@@ -163,7 +166,7 @@ export function PlayerDetailPage() {
           </section>
 
           <section className="player-panel" aria-labelledby="rating-title">
-            <h2 id="rating-title">Rating hiện tại</h2>
+            <h2 id="rating-title">Điểm xếp hạng hiện tại</h2>
             <p className="rating-value">
               {formatPlayerRating(profile.rating.ratingValue)}
             </p>
@@ -177,19 +180,20 @@ export function PlayerDetailPage() {
                 <dd>{ratedMatchesLabel(profile.rating.ratedMatches)}</dd>
               </div>
               <div>
-                <dt>Nguồn Rating</dt>
+                <dt>Nguồn điểm xếp hạng</dt>
                 <dd>{ratingBasisLabel(profile.rating.ratingBasis)}</dd>
               </div>
               {profile.rating.ratingAlgorithmVersion !== null && (
                 <div>
-                  <dt>Phiên bản thuật toán Rating</dt>
+                  <dt>Phiên bản thuật toán xếp hạng</dt>
                   <dd>{profile.rating.ratingAlgorithmVersion}</dd>
                 </div>
               )}
             </dl>
             <p className="rating-note">
-              Rating có thể cập nhật sau khi hệ thống xử lý kết quả trận. Thay đổi
-              trình Host đánh giá không đặt lại một Rating đã học.
+              Điểm xếp hạng có thể cập nhật sau khi hệ thống xử lý kết quả trận.
+              Thay đổi trình độ do người tổ chức đánh giá không đặt lại điểm xếp
+              hạng đã học.
             </p>
           </section>
         </div>
@@ -200,17 +204,18 @@ export function PlayerDetailPage() {
           className="player-panel player-rating-history"
           aria-labelledby="rating-history-title"
         >
-          <h2 id="rating-history-title">Lịch sử Rating</h2>
+          <h2 id="rating-history-title">Lịch sử điểm xếp hạng</h2>
           <p className="rating-note">
-            Lịch sử này ghi lại thay đổi Rating sau các trận đã được hệ thống
-            xử lý. Rating có thể được cập nhật sau thời điểm trận đấu kết thúc.
+            Lịch sử này ghi lại thay đổi điểm xếp hạng sau các trận đã được hệ
+            thống xử lý. Điểm xếp hạng có thể được cập nhật sau thời điểm trận
+            đấu kết thúc.
           </p>
 
           {ratingHistoryQuery.isPending ? (
-            <p className="player-state">Đang tải lịch sử Rating...</p>
+            <p className="player-state">Đang tải lịch sử điểm xếp hạng...</p>
           ) : ratingHistoryQuery.isError ? (
             <div className="player-error scoped-player-error" role="alert">
-              <p>Không thể tải lịch sử Rating.</p>
+              <p>Không thể tải lịch sử điểm xếp hạng.</p>
               <button
                 type="button"
                 onClick={() => void ratingHistoryQuery.refetch()}
@@ -219,9 +224,14 @@ export function PlayerDetailPage() {
               </button>
             </div>
           ) : ratingHistoryQuery.data.events.length === 0 ? (
-            <p className="player-state">Chưa có trận nào được tính Rating.</p>
+            <p className="player-state">
+              Chưa có trận nào được tính điểm xếp hạng.
+            </p>
           ) : (
-            <ol className="rating-history-list" aria-label="Các thay đổi Rating">
+            <ol
+              className="rating-history-list"
+              aria-label="Các thay đổi điểm xếp hạng"
+            >
               {ratingHistoryQuery.data.events.map((historyEvent) => (
                 <li
                   className="rating-history-entry"
@@ -239,13 +249,13 @@ export function PlayerDetailPage() {
                   </div>
                   <dl className="rating-history-details">
                     <div>
-                      <dt>Rating</dt>
+                      <dt>Điểm xếp hạng</dt>
                       <dd>
                         {`${formatPlayerRating(historyEvent.beforeRatingValue)} → ${formatPlayerRating(historyEvent.afterRatingValue)}`}
                       </dd>
                     </div>
                     <div>
-                      <dt>Thay đổi Rating</dt>
+                      <dt>Thay đổi điểm xếp hạng</dt>
                       <dd>
                         {formatPlayerRatingDelta(
                           historyEvent.beforeRatingValue,
@@ -260,7 +270,7 @@ export function PlayerDetailPage() {
                       </dd>
                     </div>
                     <div className="rating-history-diagnostic">
-                      <dt>Xử lý Rating</dt>
+                      <dt>Xử lý điểm xếp hạng</dt>
                       <dd>
                         {`${historyEvent.algorithmVersion} · kết quả v${historyEvent.resultVersion}`}
                       </dd>

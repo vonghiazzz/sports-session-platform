@@ -92,15 +92,21 @@ describe('PlayerListPage', () => {
     expect(await screen.findByText('Nguyễn An')).toBeInTheDocument()
     expect(screen.getByText('Trình: TB+')).toBeInTheDocument()
     expect(screen.getByText('31,0')).toBeInTheDocument()
-    expect(screen.getByText('Chưa có trận được tính Rating')).toBeInTheDocument()
+    expect(screen.getByText('Chưa có trận được tính điểm xếp hạng')).toBeInTheDocument()
     expect(screen.getByText('28,77')).toBeInTheDocument()
-    expect(screen.getByText('14 trận đã tính Rating')).toBeInTheDocument()
+    expect(screen.getByText('14 trận đã tính điểm xếp hạng')).toBeInTheDocument()
   })
 
   it('presents INITIAL_PRIOR and PERSISTED as distinct Host concepts', async () => {
     renderPage()
-    expect(await screen.findByText('Điểm khởi tạo theo trình Host đánh giá')).toBeInTheDocument()
-    expect(screen.getByText('Rating đã học từ kết quả thi đấu')).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Điểm khởi tạo theo trình độ người tổ chức đánh giá',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Điểm xếp hạng đã học từ kết quả thi đấu'),
+    ).toBeInTheDocument()
   })
 
   it('submits normalized search to the backend only on explicit action', async () => {

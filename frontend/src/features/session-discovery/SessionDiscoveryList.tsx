@@ -6,7 +6,7 @@ import './SessionDiscoveryList.css'
 
 function openActionLabel(status: SessionStatus): string {
   if (status === 'IN_PROGRESS') {
-    return 'Mở Control Room'
+    return 'Mở bảng điều hành'
   }
   if (status === 'PLANNED') {
     return 'Mở phiên'

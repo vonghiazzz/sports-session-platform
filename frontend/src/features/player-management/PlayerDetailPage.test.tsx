@@ -155,13 +155,17 @@ describe('PlayerDetailPage', () => {
     expect(await screen.findByRole('heading', { name: 'Nguyễn An' }))
       .toBeInTheDocument()
     expect(screen.getByText('27,0')).toBeInTheDocument()
-    expect(screen.getByText('Đang tải lịch sử Rating...')).toBeInTheDocument()
+    expect(
+      screen.getByText('Đang tải lịch sử điểm xếp hạng...'),
+    ).toBeInTheDocument()
   })
 
   it('shows an expected empty state for a Player without Rating events', async () => {
     renderPage()
 
-    expect(await screen.findByText('Chưa có trận nào được tính Rating.'))
+    expect(
+      await screen.findByText('Chưa có trận nào được tính điểm xếp hạng.'),
+    )
       .toBeInTheDocument()
   })
 
@@ -172,7 +176,7 @@ describe('PlayerDetailPage', () => {
     renderPage()
 
     const historyHeading = await screen.findByRole('heading', {
-      name: 'Lịch sử Rating',
+      name: 'Lịch sử điểm xếp hạng',
     })
     const historySection = historyHeading.closest('section')
     expect(historySection).not.toBeNull()
@@ -191,7 +195,7 @@ describe('PlayerDetailPage', () => {
     renderPage()
 
     const historyList = await screen.findByRole('list', {
-      name: 'Các thay đổi Rating',
+      name: 'Các thay đổi điểm xếp hạng',
     })
     expect(within(historyList).getByText('Thua')).toBeInTheDocument()
     expect(within(historyList).getByText('-0,63')).toBeInTheDocument()
@@ -204,7 +208,7 @@ describe('PlayerDetailPage', () => {
     renderPage()
 
     const historyList = await screen.findByRole('list', {
-      name: 'Các thay đổi Rating',
+      name: 'Các thay đổi điểm xếp hạng',
     })
     const entries = within(historyList).getAllByRole('listitem')
     expect(within(entries[0]).getByText('Thua')).toBeInTheDocument()
@@ -218,7 +222,7 @@ describe('PlayerDetailPage', () => {
     renderPage()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Không thể tải lịch sử Rating.',
+      'Không thể tải lịch sử điểm xếp hạng.',
     )
     expect(screen.getByRole('heading', { name: 'Nguyễn An' }))
       .toBeInTheDocument()
@@ -232,11 +236,13 @@ describe('PlayerDetailPage', () => {
     const { user } = renderPage()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Không thể tải lịch sử Rating.',
+      'Không thể tải lịch sử điểm xếp hạng.',
     )
     await user.click(screen.getByRole('button', { name: 'Thử lại' }))
 
-    expect(await screen.findByText('Chưa có trận nào được tính Rating.'))
+    expect(
+      await screen.findByText('Chưa có trận nào được tính điểm xếp hạng.'),
+    )
       .toBeInTheDocument()
     expect(getPlayerRatingHistory).toHaveBeenCalledTimes(2)
     expect(getPlayer).toHaveBeenCalledOnce()
@@ -263,17 +269,27 @@ describe('PlayerDetailPage', () => {
     expect(within(currentSkill!).getByText('TB')).toBeInTheDocument()
     expect(screen.getByText('27,0')).toBeInTheDocument()
     expect(screen.getByText('8,33')).toBeInTheDocument()
-    expect(screen.getByText('Chưa có trận được tính Rating')).toBeInTheDocument()
-    expect(screen.getByText('Điểm khởi tạo theo trình Host đánh giá')).toBeInTheDocument()
-    expect(screen.queryByText('Phiên bản thuật toán Rating')).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Chưa có trận được tính điểm xếp hạng'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Điểm khởi tạo theo trình độ người tổ chức đánh giá'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Phiên bản thuật toán xếp hạng'),
+    ).not.toBeInTheDocument()
   })
 
   it('renders persisted Rating diagnostics and algorithm version', async () => {
     vi.mocked(getPlayer).mockResolvedValue(maturePlayer)
     renderPage()
     expect(await screen.findByText('28,77')).toBeInTheDocument()
-    expect(screen.getByText('14 trận đã tính Rating')).toBeInTheDocument()
-    expect(screen.getByText('Rating đã học từ kết quả thi đấu')).toBeInTheDocument()
+    expect(
+      screen.getByText('14 trận đã tính điểm xếp hạng'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('Điểm xếp hạng đã học từ kết quả thi đấu'),
+    ).toBeInTheDocument()
     expect(screen.getByText('weng-lin-pl-v1')).toBeInTheDocument()
   })
 
@@ -311,7 +327,9 @@ describe('PlayerDetailPage', () => {
       { skillLevel: 'INTERMEDIATE_PLUS' },
     )
     expect(screen.getByText('28,77')).toBeInTheDocument()
-    expect(screen.getByText('14 trận đã tính Rating')).toBeInTheDocument()
+    expect(
+      screen.getByText('14 trận đã tính điểm xếp hạng'),
+    ).toBeInTheDocument()
     expect(queryClient.getQueryState(['players', ''])?.isInvalidated).toBe(true)
   })
 

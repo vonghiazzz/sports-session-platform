@@ -238,19 +238,19 @@ describe('Matchmaking recommendation', () => {
 
     expect(
       within(proposal).getByRole('heading', {
-        name: 'Đội A · Tổng Rating 50,0',
+        name: 'Đội A · Tổng điểm xếp hạng 50,0',
       }),
     ).toBeVisible()
 
     expect(
       within(proposal).getByRole('heading', {
-        name: 'Đội B · Tổng Rating 50,0',
+        name: 'Đội B · Tổng điểm xếp hạng 50,0',
       }),
     ).toBeVisible()
 
     expect(
       within(proposal).getAllByText(
-        'Rating: 25,0 · Điểm khởi tạo',
+        'Điểm xếp hạng: 25,0 · Điểm khởi tạo',
       ),
     ).toHaveLength(3)
 
@@ -264,19 +264,19 @@ describe('Matchmaking recommendation', () => {
 
     expect(
       within(proposal).getByText(
-        'Rating: 25,0 · rating từ 12 trận',
+        'Điểm xếp hạng: 25,0 · điểm xếp hạng từ 12 trận',
       ),
     ).toBeVisible()
 
     expect(
       within(proposal).getByText(
-        /Chênh lệch Rating giữa hai đội:/,
+        /Chênh lệch điểm xếp hạng giữa hai đội:/,
       ),
     ).toBeVisible()
 
     expect(
       within(proposal).getByText(
-        /Matchmaking cân đội bằng Rating hiện tại/,
+        /Ghép trận cân đội bằng điểm xếp hạng hiện tại/,
       ),
     ).toBeVisible()
     expect(within(proposal).getByText('An Nguyen')).toBeVisible()

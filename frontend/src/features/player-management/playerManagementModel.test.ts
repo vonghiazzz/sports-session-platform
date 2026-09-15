@@ -42,13 +42,15 @@ describe('Player management presentation model', () => {
   })
 
   it('presents zero, one, and many rated matches clearly', () => {
-    expect(ratedMatchesLabel(0)).toBe('Chưa có trận được tính Rating')
-    expect(ratedMatchesLabel(1)).toBe('1 trận đã tính Rating')
-    expect(ratedMatchesLabel(14)).toBe('14 trận đã tính Rating')
+    expect(ratedMatchesLabel(0)).toBe('Chưa có trận được tính điểm xếp hạng')
+    expect(ratedMatchesLabel(1)).toBe('1 trận đã tính điểm xếp hạng')
+    expect(ratedMatchesLabel(14)).toBe('14 trận đã tính điểm xếp hạng')
   })
 
   it('distinguishes initial and learned Rating bases', () => {
-    expect(ratingBasisLabel('INITIAL_PRIOR')).toContain('Host đánh giá')
+    expect(ratingBasisLabel('INITIAL_PRIOR')).toContain(
+      'người tổ chức đánh giá',
+    )
     expect(ratingBasisLabel('PERSISTED')).toContain('kết quả thi đấu')
   })
 

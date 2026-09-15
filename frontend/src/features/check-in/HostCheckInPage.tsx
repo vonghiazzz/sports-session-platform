@@ -90,7 +90,7 @@ export function HostCheckInScreen({
   if (state.status === 'loading') {
     return (
       <main className="check-in-desk route-message">
-        <h1>Đang tải bàn check-in…</h1>
+        <h1>Đang tải bàn điểm danh…</h1>
         <p>Đang tải phiên và danh sách người chơi.</p>
       </main>
     )
@@ -106,7 +106,7 @@ export function HostCheckInScreen({
   if (state.status === 'error') {
     return (
       <main className="check-in-desk route-message">
-        <h1>Không thể tải bàn check-in.</h1>
+        <h1>Không thể tải bàn điểm danh.</h1>
         <button
           className="refresh-button"
           type="button"
@@ -158,7 +158,7 @@ function HostCheckInReadyScreen({
       <header className="check-in-desk-header">
         <div>
           <p className="eyebrow">Vận hành phiên chơi</p>
-          <h1>Bàn check-in</h1>
+          <h1>Bàn điểm danh</h1>
           <p>{state.data.session.title}</p>
         </div>
         <div className="check-in-desk-navigation">
@@ -181,13 +181,13 @@ function HostCheckInReadyScreen({
         </p>
       )}
 
-      <dl className="check-in-summary" aria-label="Tổng quan check-in">
+      <dl className="check-in-summary" aria-label="Tổng quan điểm danh">
         <div>
-          <dt>Chưa check-in</dt>
+          <dt>Chưa điểm danh</dt>
           <dd>{summary.registered}</dd>
         </div>
         <div>
-          <dt>Đã từng check-in</dt>
+          <dt>Đã từng điểm danh</dt>
           <dd>{summary.checkedIn}</dd>
         </div>
         <div>
@@ -200,7 +200,7 @@ function HostCheckInReadyScreen({
         <div className="check-in-list-heading">
           <div>
             <p className="eyebrow">Người chơi trong phiên</p>
-            <h2 id="check-in-list-heading">Danh sách check-in</h2>
+            <h2 id="check-in-list-heading">Danh sách điểm danh</h2>
           </div>
           <span>{visibleParticipants.length} kết quả</span>
         </div>

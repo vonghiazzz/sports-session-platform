@@ -138,7 +138,7 @@ describe('LiveSessionScreen', () => {
     expect(screen.queryByText('AVAILABLE')).not.toBeInTheDocument()
     expect(screen.queryByText(/reserved/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
-    expect(screen.getByRole('link', { name: 'Mở bàn check-in' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Mở bàn điểm danh' })).toHaveAttribute(
       'href',
       '/sessions/session-1/check-in',
     )
@@ -165,7 +165,7 @@ describe('LiveSessionScreen', () => {
     )
     expect(
       people.getAllByRole('button', {
-        name: /^Sao chép link người chơi cho /,
+        name: /^Sao chép liên kết người chơi cho /,
       }),
     ).toHaveLength(8)
     expect(
@@ -550,7 +550,7 @@ describe('LiveSessionScreen', () => {
       expect(screen.queryByRole('button', { name: 'Tạo đề xuất' })).not.toBeInTheDocument()
       expect(
         screen.getAllByRole('button', {
-          name: /^Sao chép link người chơi cho /,
+          name: /^Sao chép liên kết người chơi cho /,
         }),
       ).toHaveLength(8)
       expect(

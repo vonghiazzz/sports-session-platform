@@ -276,16 +276,26 @@ describe('Global Matchmaking recommendation', () => {
     expect(first.getByText('Người 8')).toBeVisible()
     expect(first.getAllByText('Trình độ: TB')).toHaveLength(4)
     expect(first.getAllByText('Trong phiên: 0 trận hoàn tất')).toHaveLength(4)
-    expect(first.getAllByText('Rating: 25,0 · Điểm khởi tạo')).toHaveLength(4)
     expect(
-      first.getByRole('heading', { name: 'Đội A · Tổng Rating 50,0' }),
+      first.getAllByText('Điểm xếp hạng: 25,0 · Điểm khởi tạo'),
+    ).toHaveLength(4)
+    expect(
+      first.getByRole('heading', {
+        name: 'Đội A · Tổng điểm xếp hạng 50,0',
+      }),
     ).toBeVisible()
-    expect(first.getByText(/Chênh lệch Rating giữa hai đội:/)).toBeVisible()
+    expect(
+      first.getByText(/Chênh lệch điểm xếp hạng giữa hai đội:/),
+    ).toBeVisible()
 
     const second = within(resultCards[1])
     expect(second.getByText('Trình độ: Yếu')).toBeVisible()
     expect(second.getByText('Trong phiên: 2 trận hoàn tất')).toBeVisible()
-    expect(second.getByText('Rating: 25,0 · rating từ 12 trận')).toBeVisible()
+    expect(
+      second.getByText(
+        'Điểm xếp hạng: 25,0 · điểm xếp hạng từ 12 trận',
+      ),
+    ).toBeVisible()
     expect(
       screen.getByRole('button', { name: 'Thêm tất cả vào hàng chờ' }),
     ).toBeEnabled()

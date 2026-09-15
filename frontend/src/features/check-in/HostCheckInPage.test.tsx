@@ -105,7 +105,7 @@ describe('HostCheckInScreen', () => {
     ]
     renderDesk(readyState(participants))
 
-    expect(screen.getByRole('heading', { name: 'Bàn check-in' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Bàn điểm danh' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Quay lại phòng điều hành' })).toHaveAttribute(
       'href',
       '/sessions/session-1',
@@ -113,11 +113,11 @@ describe('HostCheckInScreen', () => {
     expect(
       screen.getAllByRole('listitem').map((row) => row.getAttribute('aria-label')),
     ).toEqual(['#3 An Nguyen', '#8 Bao Tran', '#12 Chi Le'])
-    const summary = screen.getByLabelText('Tổng quan check-in')
-    expect(within(summary).getByText('Chưa check-in').nextSibling).toHaveTextContent(
+    const summary = screen.getByLabelText('Tổng quan điểm danh')
+    expect(within(summary).getByText('Chưa điểm danh').nextSibling).toHaveTextContent(
       '1',
     )
-    expect(within(summary).getByText('Đã từng check-in').nextSibling).toHaveTextContent(
+    expect(within(summary).getByText('Đã từng điểm danh').nextSibling).toHaveTextContent(
       '2',
     )
     expect(within(summary).getByText('Tổng người chơi').nextSibling).toHaveTextContent(

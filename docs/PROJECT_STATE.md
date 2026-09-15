@@ -5,7 +5,7 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `dc460c5e7a44db8bf32791e0d5e1364c3ff13921` |
+| HEAD | `f699fdc329533eaaef946c6ffdedfa4ee66203f1` |
 | Ngày audit | 2026-09-15 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
@@ -183,7 +183,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | Personal Link | DONE | DONE | DONE | Opaque token được cấp theo participant |
 | QR | DONE | DONE | DONE | QR mở personal read-only page |
 | Player Session View | DONE | DONE | DONE | Hỗ trợ toàn bộ participant runtime states |
-| Host Vietnamese UI | N/A | PARTIAL | PARTIAL | Còn thuật ngữ polish, không chặn vận hành |
+| Host Vietnamese UI | N/A | DONE | DONE | Thuật ngữ hiển thị đã được Việt hóa nhất quán; giữ QR theo cách dùng tự nhiên |
 
 ## 9. Host UI Capability Checklist
 
@@ -200,7 +200,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] Host Check-In Desk
 - [x] Personal Link
 - [x] QR Personal Link
-- [~] Vietnamese terminology polish — còn `Host`, `Rating`, `check-in`, `link`, `QR`, `Matchmaking`
+- [x] Vietnamese terminology polish
 
 ## 10. Matchmaking Current State
 
@@ -284,17 +284,14 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 
 ## 16. Current Work
 
-**Current Work: None — ready for next planned slice**
+**Current Work: None — ready for MVP manual acceptance**
 
-Runtime Create Physical Court V1 đã hoàn tất và được verify. Chưa có future gap nào được đánh dấu `IN PROGRESS`.
+MVP implementation đã hoàn tất. Chưa có future gap nào được đánh dấu `IN PROGRESS`.
 
 ## 17. Next Recommended Work
 
-1. **Host Vietnamese Terminology Polish**
-   - Vấn đề: Host flow còn trộn các term `Host`, `Rating`, `check-in`, `link`, `QR`, `Matchmaking`.
-   - Tầm quan trọng: giảm cognitive friction; đây là polish, không phải operational blocker.
-   - Scope dự kiến: frontend copy/presentation tests, không đổi contract hoặc business behavior.
-   - Tái sử dụng: presentation helpers và action/status label maps hiện có.
+1. **MVP Manual Browser Acceptance Test**
+2. **MVP Checkpoint / Tag / Release Preparation**
 
 ## 18. Deferred / Not Now
 
@@ -346,7 +343,8 @@ Không chuyển các item này trở lại `Current Work` nếu chưa có regres
 
 ## 21. Known Gaps / Caveats
 
-- **Vietnamese terminology polish:** UI vận hành được, nhưng còn các term `Host`, `Rating`, `check-in`, `link`, `QR`, `Matchmaking`.
+- Không còn MVP implementation gap.
+- Manual browser acceptance là bước verification, không phải missing feature.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
 
 ## 22. How To Use This Document

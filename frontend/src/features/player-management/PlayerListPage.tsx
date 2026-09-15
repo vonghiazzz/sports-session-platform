@@ -27,7 +27,10 @@ export function PlayerListPage() {
         <div>
           <p className="eyebrow">Quản lý người chơi</p>
           <h1>Người chơi</h1>
-          <p>Xem trình Host đánh giá và Rating hiện tại của từng người chơi.</p>
+          <p>
+            Xem trình độ do người tổ chức đánh giá và điểm xếp hạng hiện tại
+            của từng người chơi.
+          </p>
         </div>
         <nav aria-label="Điều hướng quản lý người chơi">
           <Link to="/sessions/new">Tạo phiên mới</Link>
@@ -79,7 +82,7 @@ export function PlayerListPage() {
                 <tr>
                   <th>Người chơi</th>
                   <th>Hồ sơ</th>
-                  <th>Rating hiện tại</th>
+                  <th>Điểm xếp hạng hiện tại</th>
                   <th aria-label="Thao tác" />
                 </tr>
               </thead>

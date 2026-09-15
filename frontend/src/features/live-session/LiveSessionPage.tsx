@@ -1063,7 +1063,7 @@ function SessionHeader({
       </div>
       <div className="session-header-actions">
         <a className="check-in-desk-link" href={`/sessions/${sessionId}/check-in`}>
-          Mở bàn check-in
+          Mở bàn điểm danh
         </a>
         <button
           className="refresh-button"

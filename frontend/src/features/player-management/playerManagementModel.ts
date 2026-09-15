@@ -45,18 +45,18 @@ export function ratingOutcomeLabel(
 
 export function ratedMatchesLabel(ratedMatches: number): string {
   if (ratedMatches === 0) {
-    return 'Chưa có trận được tính Rating'
+    return 'Chưa có trận được tính điểm xếp hạng'
   }
   if (ratedMatches === 1) {
-    return '1 trận đã tính Rating'
+    return '1 trận đã tính điểm xếp hạng'
   }
-  return `${ratedMatches} trận đã tính Rating`
+  return `${ratedMatches} trận đã tính điểm xếp hạng`
 }
 
 export function ratingBasisLabel(basis: PlayerRatingBasis): string {
   return basis === 'INITIAL_PRIOR'
-    ? 'Điểm khởi tạo theo trình Host đánh giá'
-    : 'Rating đã học từ kết quả thi đấu'
+    ? 'Điểm khởi tạo theo trình độ người tổ chức đánh giá'
+    : 'Điểm xếp hạng đã học từ kết quả thi đấu'
 }
 
 export function badmintonProfile(

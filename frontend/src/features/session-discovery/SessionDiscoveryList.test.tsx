@@ -117,7 +117,7 @@ describe('SessionDiscoveryList', () => {
     expect(screen.getByText('Đã lên kế hoạch')).toBeVisible()
     expect(screen.getByText('Đã kết thúc')).toBeVisible()
     expect(screen.getByText('Đã hủy')).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Mở Control Room' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Mở bảng điều hành' })).toHaveAttribute(
       'href',
       '/sessions/session-in-progress',
     )

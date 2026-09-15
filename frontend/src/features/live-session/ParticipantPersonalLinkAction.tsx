@@ -131,13 +131,13 @@ export function ParticipantPersonalLinkAction({
         <button
           className="secondary-action-button"
           type="button"
-          aria-label={`Sao chép link người chơi cho ${participantLabel}`}
+          aria-label={`Sao chép liên kết người chơi cho ${participantLabel}`}
           disabled={pending}
           onClick={() => void copyLink()}
         >
           {pendingAction === 'copy'
             ? 'Đang sao chép…'
-            : 'Sao chép link người chơi'}
+            : 'Sao chép liên kết người chơi'}
         </button>
         <button
           ref={qrTriggerRef}
@@ -152,12 +152,12 @@ export function ParticipantPersonalLinkAction({
       </div>
       {feedback === 'copy-success' && (
         <p className="personal-link-feedback" role="status">
-          Đã sao chép link
+          Đã sao chép liên kết
         </p>
       )}
       {feedback === 'error' && (
         <p className="action-feedback personal-link-error" role="alert">
-          Không thể mở hoặc sao chép link. Hãy thử lại.
+          Không thể mở hoặc sao chép liên kết. Hãy thử lại.
         </p>
       )}
       {qrOpen && personalUrl !== null && (
@@ -178,7 +178,7 @@ export function ParticipantPersonalLinkAction({
                 level="M"
                 marginSize={2}
                 role="img"
-                title={`QR link người chơi ${participantLabel}`}
+                title={`QR liên kết người chơi ${participantLabel}`}
               />
             </QrRenderBoundary>
             <p id={dialogDescriptionId}>Quét để mở trang cá nhân</p>
@@ -189,7 +189,9 @@ export function ParticipantPersonalLinkAction({
                 disabled={pending}
                 onClick={() => void copyLink()}
               >
-                {pendingAction === 'copy' ? 'Đang sao chép…' : 'Sao chép link'}
+                {pendingAction === 'copy'
+                  ? 'Đang sao chép…'
+                  : 'Sao chép liên kết'}
               </button>
               <button
                 ref={closeButtonRef}

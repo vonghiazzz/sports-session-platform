@@ -21,7 +21,7 @@ vi.mock('./features/player-session/PlayerSessionAccessPage', () => ({
 }))
 
 vi.mock('./features/check-in/HostCheckInPage', () => ({
-  HostCheckInPage: () => <h1>Bàn check-in phiên</h1>,
+  HostCheckInPage: () => <h1>Bàn điểm danh phiên</h1>,
 }))
 
 vi.mock('./features/session-discovery/SessionDiscoveryList', () => ({
@@ -90,6 +90,6 @@ describe('Player management routing', () => {
         <App />
       </MemoryRouter>,
     )
-    expect(screen.getByRole('heading', { name: 'Bàn check-in phiên' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Bàn điểm danh phiên' })).toBeVisible()
   })
 })
