@@ -1357,6 +1357,7 @@ export function LiveSessionScreen({
           sessionId={state.data.session.id}
           sessionStatus={model.header.status}
           venueId={state.data.session.venueId}
+          sport={state.data.session.sport}
           venueCourts={state.data.venueCourts}
           sessionCourts={state.data.sessionCourts}
         />

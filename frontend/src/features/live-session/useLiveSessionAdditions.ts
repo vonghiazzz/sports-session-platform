@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 import type {
   CourtResponse,
+  CreateCourtRequest,
   CreatePlayerRequest,
   PlayerResponse,
   SessionCourtResponse,
@@ -11,9 +12,11 @@ import { HttpError } from '../../api/http'
 import {
   addSessionCourt,
   addSessionParticipant,
+  createCourt,
   createPlayer,
   getSetupSessionCourts,
   getSetupSessionParticipants,
+  getSetupVenueCourts,
 } from '../../api/sessionSetupApi'
 
 function appendById<T extends { readonly id: string }>(
@@ -44,6 +47,15 @@ async function readSessionCourts(
 ): Promise<readonly SessionCourtResponse[]> {
   const courts = await getSetupSessionCourts(sessionId)
   queryClient.setQueryData(['sessionCourts', sessionId], courts)
+  return courts
+}
+
+async function readVenueCourts(
+  queryClient: ReturnType<typeof useQueryClient>,
+  venueId: string,
+): Promise<readonly CourtResponse[]> {
+  const courts = await getSetupVenueCourts(venueId)
+  queryClient.setQueryData(['venueCourts', venueId], courts)
   return courts
 }
 
@@ -216,80 +228,174 @@ export function useLiveAddPlayer(sessionId: string) {
   }
 }
 
+type CourtCommand =
+  | { readonly type: 'existing'; readonly court: CourtResponse }
+  | {
+      readonly type: 'create'
+      readonly venueId: string
+      readonly request: CreateCourtRequest
+    }
+  | { readonly type: 'retry-created'; readonly court: CourtResponse }
+
+type CourtAllocationOutcome = 'added' | 'not-added' | 'unknown'
+
 interface CourtCommandResult {
   readonly added: boolean
-  readonly court: CourtResponse
+  readonly court: CourtResponse | null
+}
+
+interface UnknownCourtCreation {
+  readonly venueId: string
+  readonly request: CreateCourtRequest
 }
 
 export function useLiveAddCourt(sessionId: string) {
   const queryClient = useQueryClient()
   const inFlight = useRef(false)
+  const recoveryCourtRef = useRef<CourtResponse | null>(null)
+  const [recoveryCourt, setRecoveryCourt] = useState<CourtResponse | null>(null)
   const [unknownCourtId, setUnknownCourtId] = useState<string | null>(null)
+  const [unknownCreation, setUnknownCreation] =
+    useState<UnknownCourtCreation | null>(null)
+  const [pendingStage, setPendingStage] =
+    useState<'CREATING' | 'ALLOCATING' | null>(null)
   const [message, setMessage] = useState<string | null>(null)
 
-  const mutation = useMutation({
-    mutationFn: async (court: CourtResponse): Promise<CourtCommandResult> => {
-      let createdSessionCourt: SessionCourtResponse | null = null
-      let postError: unknown = null
-      try {
-        createdSessionCourt = await addSessionCourt(sessionId, {
-          courtId: court.id,
-        })
-      } catch (error) {
-        postError = error
-      }
+  async function addAndReconcile(
+    court: CourtResponse,
+    cachePostResponseOnReadFailure: boolean,
+  ): Promise<CourtAllocationOutcome> {
+    let createdSessionCourt: SessionCourtResponse | null = null
+    let postError: unknown = null
+    try {
+      createdSessionCourt = await addSessionCourt(sessionId, {
+        courtId: court.id,
+      })
+    } catch (error) {
+      postError = error
+    }
 
-      try {
-        const sessionCourts = await readSessionCourts(queryClient, sessionId)
-        if (sessionCourts.some((candidate) => candidate.courtId === court.id)) {
-          setUnknownCourtId(null)
-          setMessage('Đã thêm sân vào phiên.')
-          return { added: true, court }
-        }
+    try {
+      const sessionCourts = await readSessionCourts(queryClient, sessionId)
+      if (sessionCourts.some((candidate) => candidate.courtId === court.id)) {
         setUnknownCourtId(null)
-        setMessage(
-          postError instanceof HttpError
-            ? 'Không thể thêm sân vào phiên.'
-            : 'Máy chủ xác nhận sân chưa được thêm. Bạn có thể chủ động thử lại.',
-        )
-        return { added: false, court }
-      } catch {
-        if (createdSessionCourt !== null) {
+        setMessage('Đã thêm sân vào phiên.')
+        return 'added'
+      }
+      setUnknownCourtId(null)
+      setMessage(
+        postError instanceof HttpError
+          ? 'Không thể thêm sân vào phiên.'
+          : 'Máy chủ xác nhận sân chưa được thêm. Bạn có thể chủ động thử lại.',
+      )
+      return 'not-added'
+    } catch {
+      if (createdSessionCourt !== null) {
+        if (cachePostResponseOnReadFailure) {
           queryClient.setQueryData<readonly SessionCourtResponse[]>(
             ['sessionCourts', sessionId],
             (current) => appendById(current, createdSessionCourt),
           )
-          void queryClient.invalidateQueries({
-            queryKey: ['sessionCourts', sessionId],
+        }
+        void queryClient.invalidateQueries({
+          queryKey: ['sessionCourts', sessionId],
+          exact: true,
+        })
+        setMessage('Đã thêm sân; danh sách đang được đồng bộ lại.')
+        return 'added'
+      }
+      setUnknownCourtId(court.id)
+      setMessage(
+        'Chưa thể xác định sân đã được thêm hay chưa. Hãy kiểm tra lại trạng thái trước khi gửi lại.',
+      )
+      return 'unknown'
+    }
+  }
+
+  const mutation = useMutation({
+    mutationFn: async (command: CourtCommand): Promise<CourtCommandResult> => {
+      let court: CourtResponse
+      const createdNow = command.type === 'create'
+
+      if (command.type === 'create') {
+        setPendingStage('CREATING')
+        try {
+          court = await createCourt(command.venueId, command.request)
+        } catch (error) {
+          await queryClient.invalidateQueries({
+            queryKey: ['venueCourts', command.venueId],
             exact: true,
           })
-          setMessage('Đã thêm sân; danh sách đang được đồng bộ lại.')
-          return { added: true, court }
+          if (error instanceof HttpError) {
+            setMessage(
+              error.status === 409
+                ? 'Không thể tạo sân vì tên sân đã tồn tại hoặc dữ liệu không còn hợp lệ.'
+                : 'Không thể tạo sân. Hãy kiểm tra thông tin và thử lại.',
+            )
+          } else {
+            setUnknownCreation({
+              venueId: command.venueId,
+              request: command.request,
+            })
+            setMessage(
+              'Mất kết nối nên chưa thể xác định sân đã được tạo hay chưa. Hãy kiểm tra lại danh sách trước khi tạo lại.',
+            )
+          }
+          return { added: false, court: null }
         }
-        setUnknownCourtId(court.id)
-        setMessage(
-          'Chưa thể xác định sân đã được thêm hay chưa. Hãy kiểm tra lại trạng thái trước khi gửi lại.',
-        )
-        return { added: false, court }
+
+        try {
+          await readVenueCourts(queryClient, command.venueId)
+        } catch {
+          void queryClient.invalidateQueries({
+            queryKey: ['venueCourts', command.venueId],
+            exact: true,
+          })
+        }
+      } else {
+        court = command.court
       }
+
+      setPendingStage('ALLOCATING')
+      const outcome = await addAndReconcile(court, !createdNow)
+      if (outcome === 'added') {
+        recoveryCourtRef.current = null
+        setRecoveryCourt(null)
+        return { added: true, court }
+      }
+      if (createdNow) {
+        recoveryCourtRef.current = court
+        setRecoveryCourt(court)
+        setMessage(
+          outcome === 'not-added'
+            ? 'Sân đã được tạo nhưng chưa thể thêm vào phiên. Bạn có thể chọn sân này và thử thêm lại.'
+            : 'Sân đã được tạo nhưng chưa thể xác định đã thêm vào phiên hay chưa. Hãy kiểm tra lại trạng thái trước khi thử thêm.',
+        )
+      }
+      return { added: false, court }
     },
     retry: false,
   })
 
-  const addCourt = useCallback(
-    async (court: CourtResponse): Promise<boolean> => {
-      if (inFlight.current || unknownCourtId !== null) {
+  const execute = useCallback(
+    async (command: CourtCommand): Promise<boolean> => {
+      if (
+        inFlight.current ||
+        unknownCourtId !== null ||
+        unknownCreation !== null
+      ) {
         return false
       }
       inFlight.current = true
       setMessage(null)
       try {
-        return (await mutation.mutateAsync(court)).added
+        return (await mutation.mutateAsync(command)).added
       } finally {
+        setPendingStage(null)
         inFlight.current = false
       }
     },
-    [mutation, unknownCourtId],
+    [mutation, unknownCourtId, unknownCreation],
   )
 
   const reconcileUnknown = useCallback(async (): Promise<boolean> => {
@@ -302,11 +408,18 @@ export function useLiveAddCourt(sessionId: string) {
       const courts = await readSessionCourts(queryClient, sessionId)
       const added = courts.some((court) => court.courtId === courtId)
       setUnknownCourtId(null)
+      const createdCourt = recoveryCourtRef.current
       setMessage(
         added
           ? 'Sân đã có trong phiên.'
-          : 'Sân chưa có trong phiên. Bạn có thể chủ động thử lại.',
+          : createdCourt === null
+            ? 'Sân chưa có trong phiên. Bạn có thể chủ động thử lại.'
+            : 'Sân đã được tạo nhưng chưa có trong phiên. Bạn có thể chọn sân này và thử thêm lại.',
       )
+      if (added) {
+        recoveryCourtRef.current = null
+        setRecoveryCourt(null)
+      }
       return added
     } catch {
       setMessage('Vẫn chưa thể kiểm tra trạng thái. Chưa gửi lại yêu cầu thêm sân.')
@@ -316,11 +429,66 @@ export function useLiveAddCourt(sessionId: string) {
     }
   }, [queryClient, sessionId, unknownCourtId])
 
+  const reconcileUnknownCreation = useCallback(async (): Promise<boolean> => {
+    const pendingCreation = unknownCreation
+    if (pendingCreation === null || inFlight.current) {
+      return false
+    }
+    inFlight.current = true
+    try {
+      const courts = await readVenueCourts(
+        queryClient,
+        pendingCreation.venueId,
+      )
+      const expectedName = pendingCreation.request.name.trim()
+      const created = courts.find(
+        (court) =>
+          court.venueId === pendingCreation.venueId &&
+          court.name === expectedName &&
+          court.sport === pendingCreation.request.sport &&
+          court.active === pendingCreation.request.active,
+      )
+      setUnknownCreation(null)
+      if (created === undefined) {
+        setMessage('Sân chưa được tạo. Bạn có thể kiểm tra thông tin và thử lại.')
+        return false
+      }
+      recoveryCourtRef.current = created
+      setRecoveryCourt(created)
+      setMessage(
+        'Sân đã được tạo nhưng chưa thêm vào phiên. Bạn có thể chọn sân này và thử thêm lại.',
+      )
+      return true
+    } catch {
+      setMessage(
+        'Vẫn chưa thể kiểm tra danh sách sân. Chưa gửi lại yêu cầu tạo sân.',
+      )
+      return false
+    } finally {
+      inFlight.current = false
+    }
+  }, [queryClient, unknownCreation])
+
   return {
-    addCourt,
+    addCourt: (court: CourtResponse) =>
+      execute({ type: 'existing', court }),
+    createAndAddCourt: (
+      venueId: string,
+      request: CreateCourtRequest,
+    ) => execute({ type: 'create', venueId, request }),
+    retryCreatedCourt: () => {
+      const court = recoveryCourtRef.current
+      return court === null
+        ? Promise.resolve(false)
+        : execute({ type: 'retry-created', court })
+    },
     reconcileUnknown,
+    reconcileUnknownCreation,
     isPending: mutation.isPending,
+    pendingStage,
+    recoveryCourt,
     hasUnknownOutcome: unknownCourtId !== null,
+    hasUnknownCreateOutcome: unknownCreation !== null,
     message,
   }
 }

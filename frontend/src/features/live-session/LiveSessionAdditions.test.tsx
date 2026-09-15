@@ -20,7 +20,29 @@ const createAndAddPlayer = vi.fn(async () => true)
 const retryCreatedPlayer = vi.fn(async () => true)
 const reconcilePlayer = vi.fn(async () => true)
 const addCourt = vi.fn(async () => true)
+const createAndAddCourt = vi.fn(async () => true)
+const retryCreatedCourt = vi.fn(async () => true)
 const reconcileCourt = vi.fn(async () => true)
+const reconcileCourtCreation = vi.fn(async () => true)
+
+function courtActionState(
+  overrides: Partial<ReturnType<typeof useLiveAddCourt>> = {},
+): ReturnType<typeof useLiveAddCourt> {
+  return {
+    addCourt,
+    createAndAddCourt,
+    retryCreatedCourt,
+    reconcileUnknown: reconcileCourt,
+    reconcileUnknownCreation: reconcileCourtCreation,
+    isPending: false,
+    pendingStage: null,
+    recoveryCourt: null,
+    hasUnknownOutcome: false,
+    hasUnknownCreateOutcome: false,
+    message: null,
+    ...overrides,
+  }
+}
 
 function player(id: string, displayName: string): PlayerResponse {
   return {
@@ -101,7 +123,10 @@ beforeEach(() => {
   retryCreatedPlayer.mockResolvedValue(true)
   reconcilePlayer.mockResolvedValue(true)
   addCourt.mockResolvedValue(true)
+  createAndAddCourt.mockResolvedValue(true)
+  retryCreatedCourt.mockResolvedValue(true)
   reconcileCourt.mockResolvedValue(true)
+  reconcileCourtCreation.mockResolvedValue(true)
   vi.mocked(useLiveAddPlayer).mockReturnValue({
     addExistingPlayer,
     createAndAddPlayer,
@@ -113,13 +138,7 @@ beforeEach(() => {
     createOutcomeUnknown: false,
     message: null,
   })
-  vi.mocked(useLiveAddCourt).mockReturnValue({
-    addCourt,
-    reconcileUnknown: reconcileCourt,
-    isPending: false,
-    hasUnknownOutcome: false,
-    message: null,
-  })
+  vi.mocked(useLiveAddCourt).mockReturnValue(courtActionState())
 })
 
 describe('LiveAddPlayer', () => {
@@ -212,6 +231,7 @@ describe('LiveAddCourt', () => {
         sessionId="session-1"
         sessionStatus="IN_PROGRESS"
         venueId="venue-1"
+        sport="BADMINTON"
         venueCourts={courts}
         sessionCourts={sessionCourts}
       />,
@@ -226,16 +246,125 @@ describe('LiveAddCourt', () => {
     expect(addCourt).toHaveBeenCalledWith(courts[1])
   })
 
-  it('does not expose live Court allocation for a terminal Session', () => {
+  it('creates and allocates a Court under the authoritative Session Venue and sport', async () => {
+    const user = userEvent.setup()
+    render(
+      <LiveAddCourt
+        sessionId="session-uuid"
+        sessionStatus="IN_PROGRESS"
+        venueId="venue-uuid"
+        sport="BADMINTON"
+        venueCourts={[]}
+        sessionCourts={[]}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '+ Thêm sân' }))
+    expect(screen.getByText('Không còn sân phù hợp để thêm.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Tạo sân mới' }))
+    await user.type(screen.getByLabelText('Tên sân'), ' Sân mới ')
+    await user.click(
+      screen.getByRole('button', { name: 'Tạo và thêm vào phiên' }),
+    )
+
+    expect(createAndAddCourt).toHaveBeenCalledWith('venue-uuid', {
+      name: 'Sân mới',
+      sport: 'BADMINTON',
+      active: true,
+    })
+    expect(
+      screen.queryByLabelText('Thêm sân vào phiên'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('disables only the Runtime Add Court controls and shows the current pending stage', async () => {
+    const user = userEvent.setup()
+    const view = render(
+      <LiveAddCourt
+        sessionId="session-1"
+        sessionStatus="IN_PROGRESS"
+        venueId="venue-1"
+        sport="BADMINTON"
+        venueCourts={[]}
+        sessionCourts={[]}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: '+ Thêm sân' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo sân mới' }))
+
+    vi.mocked(useLiveAddCourt).mockReturnValue(
+      courtActionState({ isPending: true, pendingStage: 'CREATING' }),
+    )
+    view.rerender(
+      <LiveAddCourt
+        sessionId="session-1"
+        sessionStatus="IN_PROGRESS"
+        venueId="venue-1"
+        sport="BADMINTON"
+        venueCourts={[]}
+        sessionCourts={[]}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: '+ Thêm sân' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Đang tạo sân…' })).toBeDisabled()
+    expect(screen.getByLabelText('Tên sân')).toBeDisabled()
+  })
+
+  it('reveals a created-but-unallocated Court for retry without offering another create', async () => {
+    const user = userEvent.setup()
+    const createdCourt = court('created')
+    vi.mocked(useLiveAddCourt).mockReturnValue(
+      courtActionState({
+        recoveryCourt: createdCourt,
+        message:
+          'Sân đã được tạo nhưng chưa thể thêm vào phiên. Bạn có thể chọn sân này và thử thêm lại.',
+      }),
+    )
     render(
       <LiveAddCourt
         sessionId="session-1"
-        sessionStatus="CANCELLED"
+        sessionStatus="IN_PROGRESS"
         venueId="venue-1"
-        venueCourts={courts}
+        sport="BADMINTON"
+        venueCourts={[...courts, createdCourt]}
         sessionCourts={sessionCourts}
       />,
     )
-    expect(screen.queryByRole('button', { name: '+ Thêm sân' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '+ Thêm sân' }))
+
+    expect(screen.getByRole('radio', { name: 'Sân created' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Tạo sân mới' })).toBeDisabled()
+    expect(
+      screen.getByText(/đã được tạo nhưng chưa thể thêm vào phiên/i),
+    ).toBeVisible()
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Thử thêm Sân created vào phiên',
+      }),
+    )
+    expect(retryCreatedCourt).toHaveBeenCalledOnce()
   })
+
+  it.each(['PLANNED', 'COMPLETED', 'CANCELLED'] as const)(
+    'does not expose runtime Court creation for a %s Session',
+    (sessionStatus) => {
+      render(
+        <LiveAddCourt
+          sessionId="session-1"
+          sessionStatus={sessionStatus}
+          venueId="venue-1"
+          sport="BADMINTON"
+          venueCourts={courts}
+          sessionCourts={sessionCourts}
+        />,
+      )
+      expect(
+        screen.queryByRole('button', { name: '+ Thêm sân' }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Tạo sân mới' }),
+      ).not.toBeInTheDocument()
+    },
+  )
 })

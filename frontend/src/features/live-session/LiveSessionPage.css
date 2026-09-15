@@ -768,7 +768,8 @@
   margin-top: 0.7rem;
 }
 
-.live-create-player {
+.live-create-player,
+.live-create-court {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(8rem, 0.45fr) auto;
   align-items: end;
@@ -776,6 +777,10 @@
   margin-top: 0.75rem;
   border-top: 1px solid var(--border);
   padding-top: 0.75rem;
+}
+
+.live-create-court {
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .recovery-action {
@@ -1334,7 +1339,8 @@
     width: 100%;
   }
 
-  .live-create-player {
+  .live-create-player,
+  .live-create-court {
     grid-template-columns: 1fr;
   }
 

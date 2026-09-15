@@ -6,6 +6,7 @@ import type {
   SessionParticipantResponse,
   SessionStatus,
   SkillLevel,
+  SportCode,
 } from '../../api/contracts'
 import { skillLevelLabel } from '../../lib/presentation'
 import {
@@ -242,18 +243,22 @@ export function LiveAddCourt({
   sessionId,
   sessionStatus,
   venueId,
+  sport,
   venueCourts,
   sessionCourts,
 }: {
   readonly sessionId: string
   readonly sessionStatus: SessionStatus
   readonly venueId: string
+  readonly sport: SportCode
   readonly venueCourts: readonly CourtResponse[]
   readonly sessionCourts: readonly SessionCourtResponse[]
 }) {
   const action = useLiveAddCourt(sessionId)
   const [open, setOpen] = useState(false)
   const [selectedCourtId, setSelectedCourtId] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [courtName, setCourtName] = useState('')
   const allocatedCourtIds = new Set(
     sessionCourts.map((sessionCourt) => sessionCourt.courtId),
   )
@@ -261,7 +266,7 @@ export function LiveAddCourt({
     (court) =>
       court.venueId === venueId &&
       court.active &&
-      court.sport === 'BADMINTON' &&
+      court.sport === sport &&
       !allocatedCourtIds.has(court.id),
   )
 
@@ -280,11 +285,37 @@ export function LiveAddCourt({
     }
   }
 
+  async function handleCreateCourt(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const name = courtName.trim()
+    if (
+      name.length === 0 ||
+      action.isPending ||
+      action.hasUnknownCreateOutcome ||
+      action.recoveryCourt !== null
+    ) {
+      return
+    }
+    if (
+      await action.createAndAddCourt(venueId, {
+        name,
+        sport,
+        active: true,
+      })
+    ) {
+      setCourtName('')
+      setShowCreate(false)
+      setSelectedCourtId('')
+      setOpen(false)
+    }
+  }
+
   return (
     <div className="live-addition court-addition">
       <button
         className="secondary-action-button"
         type="button"
+        disabled={action.isPending}
         onClick={() => setOpen((current) => !current)}
       >
         + Thêm sân
@@ -310,18 +341,98 @@ export function LiveAddCourt({
               ))}
             </div>
           )}
-          <button
-            className="primary-action-button"
-            type="button"
-            disabled={
-              selectedCourtId.length === 0 ||
-              action.isPending ||
-              action.hasUnknownOutcome
-            }
-            onClick={() => void handleAddCourt()}
-          >
-            {action.isPending ? 'Đang thêm sân…' : 'Thêm sân vào phiên'}
-          </button>
+          <div className="live-addition-actions">
+            <button
+              className="primary-action-button"
+              type="button"
+              disabled={
+                selectedCourtId.length === 0 ||
+                action.isPending ||
+                action.hasUnknownOutcome ||
+                action.hasUnknownCreateOutcome
+              }
+              onClick={() => void handleAddCourt()}
+            >
+              {action.isPending ? 'Đang thêm sân…' : 'Thêm sân vào phiên'}
+            </button>
+            <button
+              className="secondary-action-button"
+              type="button"
+              disabled={
+                action.isPending ||
+                action.hasUnknownOutcome ||
+                action.hasUnknownCreateOutcome ||
+                action.recoveryCourt !== null
+              }
+              onClick={() => setShowCreate((current) => !current)}
+            >
+              Tạo sân mới
+            </button>
+          </div>
+          {showCreate &&
+            action.recoveryCourt === null &&
+            !action.hasUnknownCreateOutcome && (
+              <form className="live-create-court" onSubmit={handleCreateCourt}>
+                <label className="live-addition-field">
+                  <span>Tên sân</span>
+                  <input
+                    value={courtName}
+                    maxLength={120}
+                    required
+                    disabled={action.isPending}
+                    onChange={(event) => setCourtName(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="secondary-action-button"
+                  type="button"
+                  disabled={action.isPending}
+                  onClick={() => {
+                    setCourtName('')
+                    setShowCreate(false)
+                  }}
+                >
+                  Hủy
+                </button>
+                <button
+                  className="primary-action-button"
+                  disabled={action.isPending}
+                >
+                  {action.pendingStage === 'CREATING'
+                    ? 'Đang tạo sân…'
+                    : action.pendingStage === 'ALLOCATING'
+                      ? 'Đang thêm sân vào phiên…'
+                      : 'Tạo và thêm vào phiên'}
+                </button>
+              </form>
+            )}
+          {action.recoveryCourt && (
+            <button
+              className="secondary-action-button recovery-action"
+              type="button"
+              disabled={action.isPending || action.hasUnknownOutcome}
+              onClick={async () => {
+                if (await action.retryCreatedCourt()) {
+                  setCourtName('')
+                  setShowCreate(false)
+                  setSelectedCourtId('')
+                  setOpen(false)
+                }
+              }}
+            >
+              Thử thêm {action.recoveryCourt.name} vào phiên
+            </button>
+          )}
+          {action.hasUnknownCreateOutcome && (
+            <button
+              className="secondary-action-button recovery-action"
+              type="button"
+              disabled={action.isPending}
+              onClick={() => void action.reconcileUnknownCreation()}
+            >
+              Kiểm tra lại danh sách sân
+            </button>
+          )}
           {action.hasUnknownOutcome && (
             <button
               className="secondary-action-button recovery-action"
