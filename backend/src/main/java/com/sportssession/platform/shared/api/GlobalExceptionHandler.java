@@ -25,6 +25,7 @@ import com.sportssession.platform.session.domain.InvalidParticipantStateExceptio
 import com.sportssession.platform.session.domain.InvalidSessionCourtStateException;
 import com.sportssession.platform.session.domain.InvalidSessionStateException;
 import com.sportssession.platform.session.domain.InvalidSessionTimeRangeException;
+import com.sportssession.platform.session.domain.PlayerSessionAccessNotFoundException;
 import com.sportssession.platform.session.domain.SessionCourtNotFoundException;
 import com.sportssession.platform.session.domain.SessionBuddyPairNotFoundException;
 import com.sportssession.platform.session.domain.SessionNotFoundException;
@@ -78,6 +79,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             SessionNotFoundException.class,
+            PlayerSessionAccessNotFoundException.class,
             SessionBuddyPairNotFoundException.class,
             SessionParticipantNotFoundException.class,
             SessionCourtNotFoundException.class

@@ -19,7 +19,10 @@ class SessionParticipantTest {
         Instant leftAt = pausedAt.plusSeconds(900);
 
         SessionParticipant participant = SessionParticipant
-                .register(UUID.randomUUID(), UUID.randomUUID(), 7, JOINED_AT)
+                .register(
+                        UUID.randomUUID(), UUID.randomUUID(), 7,
+                        UUID.randomUUID(), JOINED_AT
+                )
                 .checkIn(checkedInAt)
                 .pause(pausedAt)
                 .leave(leftAt);
@@ -37,7 +40,10 @@ class SessionParticipantTest {
         Instant resumedAt = pausedAt.plusSeconds(300);
 
         SessionParticipant participant = SessionParticipant
-                .register(UUID.randomUUID(), UUID.randomUUID(), 7, JOINED_AT)
+                .register(
+                        UUID.randomUUID(), UUID.randomUUID(), 7,
+                        UUID.randomUUID(), JOINED_AT
+                )
                 .checkIn(checkedInAt)
                 .pause(pausedAt)
                 .resume(resumedAt);
@@ -56,6 +62,7 @@ class SessionParticipantTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 7,
+                UUID.randomUUID(),
                 ParticipantStatus.PLAYING,
                 JOINED_AT,
                 checkedInAt,
@@ -78,7 +85,10 @@ class SessionParticipantTest {
         Instant checkedInAt = JOINED_AT.plusSeconds(60);
         Instant startedAt = checkedInAt.plusSeconds(120);
         SessionParticipant waiting = SessionParticipant
-                .register(UUID.randomUUID(), UUID.randomUUID(), 7, JOINED_AT)
+                .register(
+                        UUID.randomUUID(), UUID.randomUUID(), 7,
+                        UUID.randomUUID(), JOINED_AT
+                )
                 .checkIn(checkedInAt);
 
         SessionParticipant playing = waiting.startMatch(startedAt);
@@ -97,6 +107,7 @@ class SessionParticipantTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 7,
+                UUID.randomUUID(),
                 JOINED_AT
         );
         SessionParticipant waiting = registered.checkIn(JOINED_AT.plusSeconds(60));
@@ -115,7 +126,10 @@ class SessionParticipantTest {
         Instant checkedInAt = JOINED_AT.plusSeconds(60);
         Instant releasedAt = checkedInAt.plusSeconds(300);
         SessionParticipant playing = SessionParticipant
-                .register(UUID.randomUUID(), UUID.randomUUID(), 7, JOINED_AT)
+                .register(
+                        UUID.randomUUID(), UUID.randomUUID(), 7,
+                        UUID.randomUUID(), JOINED_AT
+                )
                 .checkIn(checkedInAt)
                 .startMatch(checkedInAt.plusSeconds(60));
 
@@ -135,6 +149,7 @@ class SessionParticipantTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 7,
+                UUID.randomUUID(),
                 JOINED_AT
         );
         SessionParticipant waiting = registered.checkIn(JOINED_AT.plusSeconds(60));
@@ -150,23 +165,27 @@ class SessionParticipantTest {
     @Test
     void participantCodeMustBePositive() {
         assertThatThrownBy(() -> SessionParticipant.register(
-                UUID.randomUUID(), UUID.randomUUID(), 0, JOINED_AT
+                UUID.randomUUID(), UUID.randomUUID(), 0,
+                UUID.randomUUID(), JOINED_AT
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("participantCode must be positive");
 
         assertThatThrownBy(() -> SessionParticipant.register(
-                UUID.randomUUID(), UUID.randomUUID(), -1, JOINED_AT
+                UUID.randomUUID(), UUID.randomUUID(), -1,
+                UUID.randomUUID(), JOINED_AT
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("participantCode must be positive");
     }
 
     @Test
-    void runtimeAndBuddyTransitionsPreserveParticipantCode() {
+    void runtimeAndBuddyTransitionsPreserveParticipantCodeAndPersonalAccessToken() {
         UUID buddyPairId = UUID.randomUUID();
+        UUID personalAccessToken = UUID.randomUUID();
         SessionParticipant registered = SessionParticipant.register(
-                UUID.randomUUID(), UUID.randomUUID(), 12, JOINED_AT
+                UUID.randomUUID(), UUID.randomUUID(), 12,
+                personalAccessToken, JOINED_AT
         );
         SessionParticipant waiting = registered.checkIn(JOINED_AT.plusSeconds(1));
         SessionParticipant paused = waiting.pause(JOINED_AT.plusSeconds(2));
@@ -197,6 +216,27 @@ class SessionParticipantTest {
                 left
         )).extracting(SessionParticipant::participantCode)
                 .containsOnly(12);
+        assertThat(java.util.List.of(
+                registered,
+                waiting,
+                paused,
+                resumed,
+                playing,
+                released,
+                paired,
+                unpaired,
+                left
+        )).extracting(SessionParticipant::personalAccessToken)
+                .containsOnly(personalAccessToken);
+    }
+
+    @Test
+    void personalAccessTokenIsRequired() {
+        assertThatThrownBy(() -> SessionParticipant.register(
+                UUID.randomUUID(), UUID.randomUUID(), 1, null, JOINED_AT
+        ))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("personalAccessToken is required");
     }
 
     private void assertCannotStartMatch(

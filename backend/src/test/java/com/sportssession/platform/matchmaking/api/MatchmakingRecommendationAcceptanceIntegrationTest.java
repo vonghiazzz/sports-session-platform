@@ -968,6 +968,7 @@ class MatchmakingRecommendationAcceptanceIntegrationTest
                 sessionId,
                 playerId,
                 participantCode,
+                UUID.randomUUID(),
                 joinedAt
         ).checkIn(waitingSince);
         return participantRepository.saveAndFlush(

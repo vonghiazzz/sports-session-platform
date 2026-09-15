@@ -74,11 +74,15 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
         Instant now = Instant.now();
 
         participantRepository.saveAndFlush(SessionParticipantEntity.from(
-                SessionParticipant.register(sessionId, playerId, 1, now)));
+                SessionParticipant.register(
+                        sessionId, playerId, 1, UUID.randomUUID(), now
+                )));
 
         assertThatThrownBy(() -> participantRepository.saveAndFlush(
                 SessionParticipantEntity.from(
-                        SessionParticipant.register(sessionId, playerId, 2, now))))
+                        SessionParticipant.register(
+                                sessionId, playerId, 2, UUID.randomUUID(), now
+                        ))))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -90,7 +94,9 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
         Instant now = Instant.now();
 
         participantRepository.saveAndFlush(SessionParticipantEntity.from(
-                SessionParticipant.register(sessionId, firstPlayerId, 1, now)
+                SessionParticipant.register(
+                        sessionId, firstPlayerId, 1, UUID.randomUUID(), now
+                )
         ));
 
         assertThatThrownBy(() -> participantRepository.saveAndFlush(
@@ -98,6 +104,7 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
                         sessionId,
                         secondPlayerId,
                         1,
+                        UUID.randomUUID(),
                         now.plusSeconds(1)
                 ))
         ))
@@ -109,7 +116,41 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
     }
 
     @Test
-    void nonPositiveParticipantCodeIsRejected() {
+    void personalAccessTokenIsGloballyUniqueAcrossSessions() {
+        UUID venueId = createVenue();
+        UUID firstSessionId = createSession(venueId);
+        UUID secondSessionId = createSession(venueId);
+        UUID sharedToken = UUID.randomUUID();
+        Instant now = Instant.now();
+
+        participantRepository.saveAndFlush(SessionParticipantEntity.from(
+                SessionParticipant.register(
+                        firstSessionId,
+                        createPlayer("Player A"),
+                        1,
+                        sharedToken,
+                        now
+                )
+        ));
+
+        assertThatThrownBy(() -> participantRepository.saveAndFlush(
+                SessionParticipantEntity.from(SessionParticipant.register(
+                        secondSessionId,
+                        createPlayer("Player B"),
+                        1,
+                        sharedToken,
+                        now.plusSeconds(1)
+                ))
+        ))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .rootCause()
+                .hasMessageContaining(
+                        "uk_session_participants_personal_access_token"
+                );
+    }
+
+    @Test
+    void personalAccessTokenCannotBeNull() {
         UUID sessionId = createSession(createVenue());
         UUID playerId = createPlayer();
         var databaseTime = Instant.now().atOffset(ZoneOffset.UTC);
@@ -126,8 +167,34 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
                     version,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, 0, 'REGISTERED', ?, 0, 0, ?, ?)
+                ) VALUES (?, ?, ?, 1, 'REGISTERED', ?, 0, 0, ?, ?)
                 """, UUID.randomUUID(), sessionId, playerId,
+                databaseTime, databaseTime, databaseTime))
+                .rootCause()
+                .hasMessageContaining("personal_access_token");
+    }
+
+    @Test
+    void nonPositiveParticipantCodeIsRejected() {
+        UUID sessionId = createSession(createVenue());
+        UUID playerId = createPlayer();
+        var databaseTime = Instant.now().atOffset(ZoneOffset.UTC);
+
+        assertThatThrownBy(() -> jdbcTemplate.update("""
+                INSERT INTO session_participants (
+                    id,
+                    session_id,
+                    player_id,
+                    participant_code,
+                    personal_access_token,
+                    status,
+                    joined_at,
+                    total_paused_seconds,
+                    version,
+                    created_at,
+                    updated_at
+                ) VALUES (?, ?, ?, 0, ?, 'REGISTERED', ?, 0, 0, ?, ?)
+                """, UUID.randomUUID(), sessionId, playerId, UUID.randomUUID(),
                 databaseTime, databaseTime, databaseTime))
                 .rootCause()
                 .hasMessageContaining(
@@ -163,6 +230,7 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
                     session_id,
                     player_id,
                     participant_code,
+                    personal_access_token,
                     status,
                     joined_at,
                     checked_in_at,
@@ -173,8 +241,8 @@ class SessionRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest 
                     version,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, 1, 'WAITING', ?, NULL, NULL, NULL, 0, NULL, 0, ?, ?)
-                """, UUID.randomUUID(), sessionId, playerId,
+                ) VALUES (?, ?, ?, 1, ?, 'WAITING', ?, NULL, NULL, NULL, 0, NULL, 0, ?, ?)
+                """, UUID.randomUUID(), sessionId, playerId, UUID.randomUUID(),
                         databaseTime, databaseTime, databaseTime))
                 .rootCause()
                 .hasMessageContaining("chk_session_participants_state_timestamps");

@@ -359,6 +359,7 @@ class SessionBuddyPairApiIntegrationTest extends PostgreSqlIntegrationTest {
                 sessionId,
                 playerId,
                 index + 1,
+                UUID.randomUUID(),
                 NOW.plusSeconds(10L + index)
         );
         return participantRepository.saveAndFlush(

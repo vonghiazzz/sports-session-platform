@@ -29,6 +29,9 @@ public class SessionParticipantEntity {
     @Column(name = "participant_code", nullable = false)
     private int participantCode;
 
+    @Column(name = "personal_access_token", nullable = false, unique = true)
+    private UUID personalAccessToken;
+
     @Column(name = "buddy_pair_id")
     private UUID buddyPairId;
 
@@ -72,6 +75,7 @@ public class SessionParticipantEntity {
         this.sessionId = participant.sessionId();
         this.playerId = participant.playerId();
         this.participantCode = participant.participantCode();
+        this.personalAccessToken = participant.personalAccessToken();
         this.buddyPairId = participant.buddyPairId();
         this.status = participant.status();
         this.joinedAt = participant.joinedAt();
@@ -106,6 +110,7 @@ public class SessionParticipantEntity {
                 sessionId,
                 playerId,
                 participantCode,
+                personalAccessToken,
                 buddyPairId,
                 status,
                 joinedAt,
@@ -133,6 +138,10 @@ public class SessionParticipantEntity {
 
     public int getParticipantCode() {
         return participantCode;
+    }
+
+    public UUID getPersonalAccessToken() {
+        return personalAccessToken;
     }
 
     public ParticipantStatus getStatus() {

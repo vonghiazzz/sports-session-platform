@@ -172,6 +172,22 @@ export function PlayerSessionScreen({
 
 export function PlayerSessionPage() {
   const { sessionId = '', sessionParticipantId = '' } = useParams()
+
+  return (
+    <PlayerSessionView
+      sessionId={sessionId}
+      sessionParticipantId={sessionParticipantId}
+    />
+  )
+}
+
+export function PlayerSessionView({
+  sessionId,
+  sessionParticipantId,
+}: {
+  readonly sessionId: string
+  readonly sessionParticipantId: string
+}) {
   const state = useLiveSessionData(sessionId)
 
   return (

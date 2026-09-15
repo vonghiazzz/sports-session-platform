@@ -26,6 +26,10 @@ public interface SessionParticipantRepository
 
     Optional<SessionParticipantEntity> findByIdAndSessionId(UUID id, UUID sessionId);
 
+    Optional<SessionParticipantEntity> findByPersonalAccessToken(
+            UUID personalAccessToken
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select participant

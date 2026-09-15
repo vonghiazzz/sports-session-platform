@@ -583,6 +583,7 @@ class ResolveMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
                     sessionId,
                     playerId,
                     index + 1,
+                    UUID.randomUUID(),
                     now
             ).checkIn(now.plusSeconds(2));
             participantIds.add(sessionParticipantRepository

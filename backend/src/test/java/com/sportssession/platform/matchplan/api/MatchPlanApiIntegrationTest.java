@@ -730,7 +730,7 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
                     PlayerEntity.from(player)
             ).getId();
             SessionParticipant participant = SessionParticipant.register(
-                    sessionId, playerId, index + 1, now
+                    sessionId, playerId, index + 1, UUID.randomUUID(), now
             );
             participant = switch (status) {
                 case REGISTERED -> participant;

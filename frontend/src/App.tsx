@@ -3,6 +3,7 @@ import './App.css'
 import { LiveSessionPage } from './features/live-session/LiveSessionPage'
 import { PlayerDetailPage } from './features/player-management/PlayerDetailPage'
 import { PlayerListPage } from './features/player-management/PlayerListPage'
+import { PlayerSessionAccessPage } from './features/player-session/PlayerSessionAccessPage'
 import { PlayerSessionPage } from './features/player-session/PlayerSessionPage'
 import { SessionSetupPage } from './features/session-setup/SessionSetupPage'
 
@@ -38,6 +39,7 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/sessions/new" element={<SessionSetupPage />} />
+      <Route path="/player-session/:token" element={<PlayerSessionAccessPage />} />
       <Route
         path="/sessions/:sessionId/player/:sessionParticipantId"
         element={<PlayerSessionPage />}

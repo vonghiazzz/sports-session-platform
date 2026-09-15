@@ -6,6 +6,7 @@ import com.sportssession.platform.session.domain.DuplicateSessionCourtException;
 import com.sportssession.platform.session.domain.DuplicateSessionParticipantException;
 import com.sportssession.platform.session.domain.InvalidBuddyPairRequestException;
 import com.sportssession.platform.session.domain.InvalidSessionStateException;
+import com.sportssession.platform.session.domain.PlayerSessionAccessNotFoundException;
 import com.sportssession.platform.session.domain.Session;
 import com.sportssession.platform.session.domain.SessionBuddyPair;
 import com.sportssession.platform.session.domain.SessionBuddyPairNotFoundException;
@@ -202,12 +203,14 @@ public class SessionService {
                         .orElse(0),
                 1
         );
+        UUID personalAccessToken = UUID.randomUUID();
 
         SessionParticipant participant =
                 SessionParticipant.register(
                         command.sessionId(),
                         command.playerId(),
                         participantCode,
+                        personalAccessToken,
                         now
                 );
 
@@ -244,6 +247,14 @@ public class SessionService {
                 .stream()
                 .map(SessionParticipantEntity::toDomain)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SessionParticipant resolvePlayerSessionAccess(UUID personalAccessToken) {
+        return participantRepository
+                .findByPersonalAccessToken(personalAccessToken)
+                .orElseThrow(PlayerSessionAccessNotFoundException::new)
+                .toDomain();
     }
 
     @Transactional

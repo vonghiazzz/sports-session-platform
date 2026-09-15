@@ -584,6 +584,7 @@ class GlobalMatchmakingQueueApiIntegrationTest
                     sessionId,
                     playerId,
                     index + 1,
+                    UUID.randomUUID(),
                     BASE_TIME.plusSeconds(10L + index)
             ).checkIn(BASE_TIME.plusSeconds(20L + index));
             participantIds.add(participantRepository.saveAndFlush(

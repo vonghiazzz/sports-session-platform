@@ -246,12 +246,94 @@ class SessionRuntimeApiIntegrationTest extends PostgreSqlIntegrationTest {
                 .andExpect(jsonPath("$.participantCode").value(1))
                 .andExpect(jsonPath("$.status").value("REGISTERED"))
                 .andExpect(jsonPath("$.checkedInAt").doesNotExist())
+                .andExpect(jsonPath("$.personalAccessToken").doesNotExist())
                 .andReturn();
 
-        assertThat(participantRepository.findById(responseId(result)))
-                .get()
-                .extracting(entity -> entity.getParticipantCode())
-                .isEqualTo(1);
+        var persisted = participantRepository.findById(responseId(result))
+                .orElseThrow();
+        assertThat(persisted.getParticipantCode()).isEqualTo(1);
+        assertThat(persisted.getPersonalAccessToken()).isNotNull();
+        assertThat(persisted.getPersonalAccessToken()).isNotEqualTo(persisted.getId());
+    }
+
+    @Test
+    void participantTokensAreGloballyDistinctAcrossSessions() throws Exception {
+        UUID venueId = createVenue("Venue A", true);
+        UUID firstSessionId = createSession(venueId);
+        UUID secondSessionId = createSession(venueId);
+        UUID firstParticipantId = createParticipant(
+                firstSessionId, createPlayer("Player A")
+        );
+        UUID secondParticipantId = createParticipant(
+                firstSessionId, createPlayer("Player B")
+        );
+        UUID thirdParticipantId = createParticipant(
+                secondSessionId, createPlayer("Player C")
+        );
+
+        assertThat(List.of(
+                participantRepository.findById(firstParticipantId)
+                        .orElseThrow().getPersonalAccessToken(),
+                participantRepository.findById(secondParticipantId)
+                        .orElseThrow().getPersonalAccessToken(),
+                participantRepository.findById(thirdParticipantId)
+                        .orElseThrow().getPersonalAccessToken()
+        )).doesNotContainNull().doesNotHaveDuplicates();
+    }
+
+    @Test
+    void personalAccessTokenResolvesExactParticipantWithoutUsingParticipantCode()
+            throws Exception {
+        UUID venueId = createVenue("Venue A", true);
+        UUID firstSessionId = createSession(venueId);
+        UUID secondSessionId = createSession(venueId);
+        UUID firstParticipantId = createParticipant(
+                firstSessionId, createPlayer("Player A")
+        );
+        UUID secondParticipantId = createParticipant(
+                secondSessionId, createPlayer("Player B")
+        );
+        var first = participantRepository.findById(firstParticipantId)
+                .orElseThrow();
+        var second = participantRepository.findById(secondParticipantId)
+                .orElseThrow();
+        assertThat(first.getParticipantCode()).isEqualTo(1);
+        assertThat(second.getParticipantCode()).isEqualTo(1);
+
+        mockMvc.perform(get(
+                        "/api/player-session-access/{token}",
+                        second.getPersonalAccessToken()
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId")
+                        .value(secondSessionId.toString()))
+                .andExpect(jsonPath("$.sessionParticipantId")
+                        .value(secondParticipantId.toString()))
+                .andExpect(jsonPath("$.personalAccessToken").doesNotExist());
+    }
+
+    @Test
+    void unknownPersonalAccessTokenReturnsNotFoundWithoutTokenInMessage()
+            throws Exception {
+        UUID unknownToken = UUID.randomUUID();
+
+        mockMvc.perform(get("/api/player-session-access/{token}", unknownToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message")
+                        .value("Player Session access was not found"))
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.not(
+                                org.hamcrest.Matchers.containsString(
+                                        unknownToken.toString()
+                                )
+                        )));
+    }
+
+    @Test
+    void malformedPersonalAccessTokenReturnsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/player-session-access/not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid value for token"));
     }
 
     @Test

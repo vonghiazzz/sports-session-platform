@@ -610,6 +610,7 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
                 sessionId,
                 playerId,
                 participantCode,
+                UUID.randomUUID(),
                 now
         );
         SessionParticipant participant = switch (status) {
@@ -639,6 +640,7 @@ class CreateManualMatchApiIntegrationTest extends PostgreSqlIntegrationTest {
                 waiting.sessionId(),
                 waiting.playerId(),
                 waiting.participantCode(),
+                waiting.personalAccessToken(),
                 ParticipantStatus.PLAYING,
                 waiting.joinedAt(),
                 waiting.checkedInAt(),

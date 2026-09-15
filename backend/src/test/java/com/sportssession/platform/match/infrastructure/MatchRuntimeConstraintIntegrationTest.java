@@ -341,6 +341,7 @@ class MatchRuntimeConstraintIntegrationTest extends PostgreSqlIntegrationTest {
                 sessionId,
                 playerId,
                 participantCode,
+                UUID.randomUUID(),
                 now
         );
         return sessionParticipantRepository

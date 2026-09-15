@@ -20,7 +20,7 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesRuntimeTablesThroughParticipantCodeFoundation() {
+    void flywayCreatesRuntimeTablesThroughPersonalAccessTokenFoundation() {
         String serverVersion = jdbcTemplate.queryForObject(
                 "SHOW server_version", String.class);
         assertThat(serverVersion).startsWith("18.4");
@@ -105,6 +105,13 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 """, Integer.class);
         assertThat(participantCodeMigrationCount).isEqualTo(1);
 
+        Integer personalAccessTokenMigrationCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE version = '8' AND success = true
+                """, Integer.class);
+        assertThat(personalAccessTokenMigrationCount).isEqualTo(1);
+
         Integer participantCodeColumnCount = jdbcTemplate.queryForObject("""
                 SELECT count(*)
                 FROM information_schema.columns
@@ -131,6 +138,27 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 "ck_session_participants_code_positive",
                 "uk_session_participants_session_code"
         );
+
+        Integer personalAccessTokenColumnCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'session_participants'
+                  AND column_name = 'personal_access_token'
+                  AND data_type = 'uuid'
+                  AND is_nullable = 'NO'
+                """, Integer.class);
+        assertThat(personalAccessTokenColumnCount).isEqualTo(1);
+
+        Integer personalAccessTokenConstraintCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM information_schema.table_constraints
+                WHERE table_schema = 'public'
+                  AND table_name = 'session_participants'
+                  AND constraint_name = 'uk_session_participants_personal_access_token'
+                  AND constraint_type = 'UNIQUE'
+                """, Integer.class);
+        assertThat(personalAccessTokenConstraintCount).isEqualTo(1);
 
         List<String> buddyPairColumns = jdbcTemplate.queryForList("""
                 SELECT column_name
@@ -413,7 +441,95 @@ void participantCodeMigrationBackfillsExistingParticipantsDeterministically() {
     }
 }
 
- private int participantCodeColumnCount(String schemaName) {
+@Test
+void personalAccessTokenMigrationBackfillsExistingParticipantsGloballyUniquely() {
+    String schemaName =
+            "personal_access_token_backfill_"
+                    + UUID.randomUUID().toString().replace("-", "");
+    Instant now = Instant.parse("2026-01-01T00:00:00Z");
+    UUID venueId = UUID.randomUUID();
+    UUID firstSessionId = UUID.randomUUID();
+    UUID secondSessionId = UUID.randomUUID();
+    UUID firstParticipantId = UUID.randomUUID();
+    UUID secondParticipantId = UUID.randomUUID();
+    UUID thirdParticipantId = UUID.randomUUID();
+
+    try {
+        Flyway.configure()
+                .dataSource(
+                        POSTGRESQL.getJdbcUrl(),
+                        POSTGRESQL.getUsername(),
+                        POSTGRESQL.getPassword()
+                )
+                .locations("classpath:db/migration")
+                .schemas(schemaName)
+                .defaultSchema(schemaName)
+                .target("7")
+                .load()
+                .migrate();
+
+        insertLegacyVenue(schemaName, venueId, now);
+        UUID firstPlayerId = UUID.randomUUID();
+        UUID secondPlayerId = UUID.randomUUID();
+        UUID thirdPlayerId = UUID.randomUUID();
+        insertLegacyPlayer(schemaName, firstPlayerId, "Player 1", now);
+        insertLegacyPlayer(schemaName, secondPlayerId, "Player 2", now);
+        insertLegacyPlayer(schemaName, thirdPlayerId, "Player 3", now);
+        insertLegacySession(
+                schemaName, firstSessionId, venueId, "Session A", now
+        );
+        insertLegacySession(
+                schemaName, secondSessionId, venueId, "Session B", now
+        );
+        insertV7Participant(
+                schemaName, firstParticipantId, firstSessionId,
+                firstPlayerId, 1, now
+        );
+        insertV7Participant(
+                schemaName, secondParticipantId, firstSessionId,
+                secondPlayerId, 2, now.plusSeconds(1)
+        );
+        insertV7Participant(
+                schemaName, thirdParticipantId, secondSessionId,
+                thirdPlayerId, 1, now.plusSeconds(2)
+        );
+
+        assertThat(personalAccessTokenColumnCount(schemaName)).isZero();
+
+        Flyway.configure()
+                .dataSource(
+                        POSTGRESQL.getJdbcUrl(),
+                        POSTGRESQL.getUsername(),
+                        POSTGRESQL.getPassword()
+                )
+                .locations("classpath:db/migration")
+                .schemas(schemaName)
+                .defaultSchema(schemaName)
+                .target("8")
+                .load()
+                .migrate();
+
+        assertThat(personalAccessTokenColumnCount(schemaName)).isEqualTo(1);
+        List<UUID> tokens = jdbcTemplate.queryForList(
+                """
+                SELECT personal_access_token
+                FROM %s.session_participants
+                ORDER BY id
+                """.formatted(schemaName),
+                UUID.class
+        );
+        assertThat(tokens)
+                .hasSize(3)
+                .doesNotContainNull()
+                .doesNotHaveDuplicates();
+    } finally {
+        jdbcTemplate.execute(
+                "DROP SCHEMA IF EXISTS " + schemaName + " CASCADE"
+        );
+    }
+}
+
+private int participantCodeColumnCount(String schemaName) {
     Integer count = jdbcTemplate.queryForObject(
             """
             SELECT count(*)
@@ -421,6 +537,24 @@ void participantCodeMigrationBackfillsExistingParticipantsDeterministically() {
             WHERE table_schema = ?
               AND table_name = 'session_participants'
               AND column_name = 'participant_code'
+            """,
+            Integer.class,
+            schemaName
+    );
+
+    return count == null ? 0 : count;
+}
+
+private int personalAccessTokenColumnCount(String schemaName) {
+    Integer count = jdbcTemplate.queryForObject(
+            """
+            SELECT count(*)
+            FROM information_schema.columns
+            WHERE table_schema = ?
+              AND table_name = 'session_participants'
+              AND column_name = 'personal_access_token'
+              AND data_type = 'uuid'
+              AND is_nullable = 'NO'
             """,
             Integer.class,
             schemaName
@@ -588,6 +722,46 @@ private void insertLegacyParticipant(
             participantId,
             sessionId,
             playerId,
+            Timestamp.from(joinedAt),
+            Timestamp.from(joinedAt),
+            Timestamp.from(joinedAt)
+    );
+}
+
+private void insertV7Participant(
+        String schemaName,
+        UUID participantId,
+        UUID sessionId,
+        UUID playerId,
+        int participantCode,
+        Instant joinedAt
+) {
+    jdbcTemplate.update(
+            """
+            INSERT INTO %s.session_participants (
+                id,
+                session_id,
+                player_id,
+                participant_code,
+                status,
+                joined_at,
+                checked_in_at,
+                waiting_since,
+                paused_at,
+                total_paused_seconds,
+                left_at,
+                version,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?, ?, ?, ?, 'REGISTERED', ?, NULL, NULL, NULL, 0, NULL, 0, ?, ?
+            )
+            """.formatted(schemaName),
+            participantId,
+            sessionId,
+            playerId,
+            participantCode,
             Timestamp.from(joinedAt),
             Timestamp.from(joinedAt),
             Timestamp.from(joinedAt)

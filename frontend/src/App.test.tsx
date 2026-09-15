@@ -16,6 +16,10 @@ vi.mock('./features/player-session/PlayerSessionPage', () => ({
   PlayerSessionPage: () => <h1>Trạng thái người chơi trong phiên</h1>,
 }))
 
+vi.mock('./features/player-session/PlayerSessionAccessPage', () => ({
+  PlayerSessionAccessPage: () => <h1>Trạng thái người chơi qua liên kết</h1>,
+}))
+
 describe('Player management routing', () => {
   it('provides an obvious Home navigation path to /players', async () => {
     const user = userEvent.setup()
@@ -46,6 +50,19 @@ describe('Player management routing', () => {
     expect(
       screen.getByRole('heading', {
         name: 'Trạng thái người chơi trong phiên',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('registers the opaque token route as the preferred Player view route', () => {
+    render(
+      <MemoryRouter initialEntries={['/player-session/opaque-token']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('heading', {
+        name: 'Trạng thái người chơi qua liên kết',
       }),
     ).toBeInTheDocument()
   })

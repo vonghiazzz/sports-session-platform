@@ -10,6 +10,7 @@ public record SessionParticipant(
         UUID sessionId,
         UUID playerId,
         int participantCode,
+        UUID personalAccessToken,
         UUID buddyPairId,
         ParticipantStatus status,
         Instant joinedAt,
@@ -27,6 +28,7 @@ public record SessionParticipant(
             UUID sessionId,
             UUID playerId,
             int participantCode,
+            UUID personalAccessToken,
             ParticipantStatus status,
             Instant joinedAt,
             Instant checkedInAt,
@@ -43,6 +45,7 @@ public record SessionParticipant(
                 sessionId,
                 playerId,
                 participantCode,
+                personalAccessToken,
                 null,
                 status,
                 joinedAt,
@@ -64,6 +67,10 @@ public record SessionParticipant(
         if (participantCode <= 0) {
             throw new IllegalArgumentException("participantCode must be positive");
         }
+        Objects.requireNonNull(
+                personalAccessToken,
+                "personalAccessToken is required"
+        );
         Objects.requireNonNull(status, "status is required");
         Objects.requireNonNull(joinedAt, "joinedAt is required");
         Objects.requireNonNull(createdAt, "createdAt is required");
@@ -81,6 +88,7 @@ public record SessionParticipant(
             UUID sessionId,
             UUID playerId,
             int participantCode,
+            UUID personalAccessToken,
             Instant now
     ) {
         return new SessionParticipant(
@@ -88,6 +96,7 @@ public record SessionParticipant(
                 sessionId,
                 playerId,
                 participantCode,
+                personalAccessToken,
                 null,
                 ParticipantStatus.REGISTERED,
                 now,
@@ -234,6 +243,7 @@ public record SessionParticipant(
                 sessionId,
                 playerId,
                 participantCode,
+                personalAccessToken,
                 buddyPairId,
                 newStatus,
                 joinedAt,
@@ -256,6 +266,7 @@ public record SessionParticipant(
                 sessionId,
                 playerId,
                 participantCode,
+                personalAccessToken,
                 newBuddyPairId,
                 status,
                 joinedAt,

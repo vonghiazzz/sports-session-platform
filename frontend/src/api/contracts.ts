@@ -68,6 +68,11 @@ export interface SessionParticipantResponse {
   readonly updatedAt: ISOInstant
 }
 
+export interface PlayerSessionAccessResponse {
+  readonly sessionId: UUID
+  readonly sessionParticipantId: UUID
+}
+
 export interface CreateBuddyPairRequest {
   readonly firstSessionParticipantId: UUID
   readonly secondSessionParticipantId: UUID

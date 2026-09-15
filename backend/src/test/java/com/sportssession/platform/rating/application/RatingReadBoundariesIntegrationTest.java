@@ -285,6 +285,7 @@ class RatingReadBoundariesIntegrationTest extends PostgreSqlIntegrationTest {
                     sessionId,
                     playerId,
                     index + 1,
+                    UUID.randomUUID(),
                     now.plusSeconds(3)
             ).checkIn(now.plusSeconds(4));
             participantIds.add(sessionParticipantRepository.saveAndFlush(

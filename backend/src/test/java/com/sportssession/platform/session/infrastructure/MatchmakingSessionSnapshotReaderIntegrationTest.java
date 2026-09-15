@@ -324,6 +324,7 @@ class MatchmakingSessionSnapshotReaderIntegrationTest
                 sessionId,
                 playerId,
                 playerNumber,
+                UUID.randomUUID(),
                 BASE_TIME.plusSeconds(20)
         );
         participant = switch (status) {

@@ -284,6 +284,7 @@ class MatchmakingSessionMatchCountReaderIntegrationTest
                 sessionId,
                 playerId,
                 number,
+                UUID.randomUUID(),
                 NOW.plusSeconds(1)
         ).checkIn(NOW.plusSeconds(2));
         return participantRepository.saveAndFlush(
