@@ -504,10 +504,10 @@ describe('LiveSessionScreen', () => {
     const boardQueries = within(board as HTMLElement)
 
     expect(
-      boardQueries.getByRole('button', {
+      boardQueries.queryByRole('button', {
         name: 'Tạo đề xuất cho các sân sẵn sàng',
       }),
-    ).toBeEnabled()
+    ).not.toBeInTheDocument()
 
     const playingCard = boardQueries
       .getByRole('heading', { name: 'Court One' })
@@ -574,22 +574,27 @@ describe('LiveSessionScreen', () => {
     ).toBeEnabled()
   })
 
-  it('shows Create and Start controls only while the Session is in progress', () => {
+  it('shows only the two primary placement entry points and preserves CREATED Match recovery', () => {
     renderScreen(readyState())
 
-    expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Bắt đầu trận' })).toBeEnabled()
-    const manualMatchSection = screen
-      .getByRole('heading', { name: 'Tạo trận thủ công' })
-      .closest('section')
-
-    expect(manualMatchSection).not.toBeNull()
-
     expect(
-      within(manualMatchSection as HTMLElement).getByText(
-        /Việc tạo trận chưa giữ sân hoặc người chơi/i,
-      ),
-    ).toBeVisible()
+      screen.getAllByRole('button', { name: 'Tạo đề xuất ghép trận' }),
+    ).toHaveLength(3)
+    expect(
+      screen.getAllByRole('button', { name: 'Xếp vào hàng chờ' }),
+    ).toHaveLength(3)
+    expect(
+      screen.queryByRole('heading', { name: 'Tạo trận thủ công' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Tạo trận' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', {
+        name: 'Tạo đề xuất cho các sân sẵn sàng',
+      }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bắt đầu trận' })).toBeEnabled()
   })
 
   it.each(['PLANNED', 'COMPLETED', 'CANCELLED'] as const)(
@@ -613,6 +618,9 @@ describe('LiveSessionScreen', () => {
 
       expect(screen.queryByRole('button', { name: 'Tạo trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Xếp vào hàng chờ' }),
+      ).not.toBeInTheDocument()
       expect(
         screen.queryByRole('button', { name: 'Tạo đề xuất ghép trận' }),
       ).not.toBeInTheDocument()
@@ -640,11 +648,6 @@ describe('LiveSessionScreen', () => {
           name: 'Hủy trận',
         }),
       ).toBeEnabled()
-      expect(
-        screen.getByText(
-          'Chỉ có thể tạo trận thủ công khi phiên đang diễn ra.',
-        ),
-      ).toBeVisible()
       expect(
         screen.getByText(
           'Trận này chỉ có thể bắt đầu khi phiên đang diễn ra.',

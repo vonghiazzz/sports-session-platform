@@ -8,6 +8,7 @@ import com.sportssession.platform.match.domain.TeamSide;
 import com.sportssession.platform.match.infrastructure.MatchParticipantRepository;
 import com.sportssession.platform.match.infrastructure.MatchRepository;
 import com.sportssession.platform.matchplan.application.CreateMatchPlanCommand;
+import com.sportssession.platform.matchplan.application.CreateRecommendedMatchPlanCommand;
 import com.sportssession.platform.matchplan.application.MatchPlanAssignment;
 import com.sportssession.platform.matchplan.application.MatchPlanDetails;
 import com.sportssession.platform.matchplan.application.MatchPlanService;
@@ -189,6 +190,153 @@ class MatchPlanApiIntegrationTest extends PostgreSqlIntegrationTest {
                 fixture.sessionId(), fixture.courtIds().getFirst(), duplicate
         )).isInstanceOf(InvalidMatchPlanRequestException.class);
         assertThat(planRepository.count()).isZero();
+    }
+
+    @Test
+    void manualCreateAllowsBuddyPairAssignedToSameTeam() {
+        Fixture fixture = waitingFixture(1, 4);
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                fixture.participantIds().get(0),
+                fixture.participantIds().get(1)
+        );
+
+        MatchPlanDetails plan = create(
+                fixture, 0, fixture.participantIds()
+        );
+
+        assertThat(plan.plan().status()).isEqualTo(MatchPlanStatus.QUEUED);
+        assertThat(plan.participants())
+                .filteredOn(participant -> participant.teamSide() == TeamSide.A)
+                .extracting(participant -> participant.sessionParticipantId())
+                .containsExactlyInAnyOrder(
+                        fixture.participantIds().get(0),
+                        fixture.participantIds().get(1)
+                );
+    }
+
+    @Test
+    void manualCreateApiRejectsBuddyPairSplitAcrossTeams() throws Exception {
+        Fixture fixture = waitingFixture(1, 4);
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                fixture.participantIds().get(0),
+                fixture.participantIds().get(2)
+        );
+        String request = objectMapper.writeValueAsString(
+                new CreateMatchPlanRequest(requestAssignments(
+                        fixture.participantIds()
+                ))
+        );
+
+        mockMvc.perform(post(
+                        "/api/sessions/{sessionId}/courts/{courtId}/match-plans",
+                        fixture.sessionId(), fixture.courtIds().getFirst()
+                ).contentType(MediaType.APPLICATION_JSON).content(request))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString(
+                                "must be assigned to the same Team"
+                        )
+                ));
+
+        assertThat(planRepository.count()).isZero();
+        assertThat(planParticipantRepository.count()).isZero();
+    }
+
+    @Test
+    void manualCreateAllowsNoBuddyAndOnlyOneSelectedBuddyMember() {
+        Fixture noBuddy = waitingFixture(1, 4);
+        assertThat(create(noBuddy, 0, noBuddy.participantIds()).plan().status())
+                .isEqualTo(MatchPlanStatus.QUEUED);
+
+        Fixture oneBuddyMember = waitingFixture(1, 5);
+        sessionService.createBuddyPair(
+                oneBuddyMember.sessionId(),
+                oneBuddyMember.participantIds().get(0),
+                oneBuddyMember.participantIds().get(4)
+        );
+
+        MatchPlanDetails plan = create(
+                oneBuddyMember,
+                0,
+                oneBuddyMember.participantIds().subList(0, 4)
+        );
+
+        assertThat(plan.plan().status()).isEqualTo(MatchPlanStatus.QUEUED);
+        assertThat(plan.participants())
+                .extracting(participant -> participant.sessionParticipantId())
+                .contains(oneBuddyMember.participantIds().get(0))
+                .doesNotContain(oneBuddyMember.participantIds().get(4));
+    }
+
+    @Test
+    void manualUpdateRejectsBuddyPairSplitAcrossTeams() {
+        Fixture fixture = waitingFixture(1, 8);
+        MatchPlanDetails plan = create(
+                fixture, 0, fixture.participantIds().subList(0, 4)
+        );
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                fixture.participantIds().get(4),
+                fixture.participantIds().get(6)
+        );
+
+        assertThatThrownBy(() -> service.update(new UpdateMatchPlanCommand(
+                plan.plan().id(),
+                assignments(fixture.participantIds().subList(4, 8))
+        )))
+                .isInstanceOf(MatchPlanConflictException.class)
+                .hasMessageContaining("must be assigned to the same Team");
+
+        assertThat(service.list(fixture.sessionId()).getFirst().participants())
+                .extracting(participant -> participant.sessionParticipantId())
+                .containsExactlyInAnyOrderElementsOf(
+                        fixture.participantIds().subList(0, 4)
+                );
+    }
+
+    @Test
+    void recommendedCreateStillQueuesSameTeamBuddyPair() {
+        Fixture fixture = waitingFixture(1, 4);
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                fixture.participantIds().get(0),
+                fixture.participantIds().get(1)
+        );
+
+        MatchPlanDetails plan = service.createRecommended(
+                new CreateRecommendedMatchPlanCommand(
+                        fixture.sessionId(),
+                        fixture.courtIds().getFirst(),
+                        assignments(fixture.participantIds())
+                )
+        );
+
+        assertThat(plan.plan().source()).isEqualTo(MatchSource.RECOMMENDATION);
+        assertThat(plan.plan().status()).isEqualTo(MatchPlanStatus.QUEUED);
+    }
+
+    @Test
+    void buddyPairCreatedAfterQueueDoesNotRewriteExistingPlan() {
+        Fixture fixture = waitingFixture(1, 4);
+        MatchPlanDetails queued = create(
+                fixture, 0, fixture.participantIds()
+        );
+
+        sessionService.createBuddyPair(
+                fixture.sessionId(),
+                fixture.participantIds().get(0),
+                fixture.participantIds().get(2)
+        );
+
+        MatchPlanDetails persisted = service.list(fixture.sessionId())
+                .getFirst();
+        assertThat(persisted.plan().id()).isEqualTo(queued.plan().id());
+        assertThat(persisted.plan().status()).isEqualTo(MatchPlanStatus.QUEUED);
+        assertThat(persisted.participants()).containsExactlyElementsOf(
+                queued.participants()
+        );
     }
 
     @Test

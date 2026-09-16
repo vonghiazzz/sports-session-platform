@@ -5,7 +5,7 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `b923e98f5e19c0eb33011dc17b5a41ac38684644` |
+| HEAD | `cc499acaf6838675101782bbf268f723960b2554` |
 | Ngày audit | 2026-09-16 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
@@ -88,7 +88,7 @@ State machine:
 
 `QUEUED → STARTED | CANCELLED`
 
-MatchPlan là kế hoạch/hàng đợi theo Session Court, hỗ trợ tạo, sửa đội hình, di chuyển court, đổi thứ tự, cancel và start. MatchPlan không phải một Match đã chơi.
+MatchPlan là kế hoạch/hàng đợi theo Session Court, hỗ trợ tạo, sửa đội hình, di chuyển court, đổi thứ tự, cancel và start. MatchPlan không phải một Match đã chơi. Manual create/update bắt buộc hai thành viên của cùng Buddy Pair phải cùng team nếu cả hai được chọn; chỉ chọn một thành viên vẫn hợp lệ theo semantics hiện tại.
 
 ### Buddy Pair
 
@@ -148,7 +148,25 @@ Opaque external locator cho Player Session View:
 
 Luồng tạo mới qua UI:
 
-`Home → Create New Session → create/select Venue → create/select Courts → create/select Players → create Session → allocate Courts → add Participants → Start Session → Control Room → Check-In Desk / People Check-In → REGISTERED → WAITING → Buddy / People operations → Runtime Add Court bằng cách chọn existing Court hoặc tạo physical Court rồi allocate → Manual Match hoặc Matchmaking → Accept & Start hoặc MatchPlan Queue → Start Match → Complete / Cancel Match → Complete / Cancel Session`
+`Home → Create New Session → create/select Venue → create/select Courts → create/select Players → create Session → allocate Courts → add Participants → Start Session → Control Room → Check-In Desk / People Check-In → REGISTERED → WAITING → Buddy / People operations → Runtime Add Court bằng cách chọn existing Court hoặc tạo physical Court rồi allocate → Tạo đề xuất ghép trận hoặc Xếp vào hàng chờ → MatchPlan Queue → Start Match → Complete / Cancel Match → Complete / Cancel Session`
+
+Luồng placement canonical của Host:
+
+```text
+WAITING
+├─ Tạo đề xuất ghép trận
+└─ Xếp vào hàng chờ
+        ↓
+MatchPlan Queue
+        ↓
+Court
+        ↓
+Match
+```
+
+Manual Match backend capability và lifecycle của Match đã tồn tại vẫn được giữ
+cho recovery, API compatibility và future admin, nhưng tạo Manual Match trực
+tiếp không còn là primary Host UI path.
 
 Player trùng `displayName` được phân biệt trước khi cấp phát vào Session bằng
 `playerCode · displayName`; mọi lựa chọn/mutation vẫn gửi Player UUID.
@@ -197,9 +215,11 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | Runtime Create Physical Court V1 | DONE | DONE | DONE | Hai API tuần tự, có recovery khi allocation thất bại |
 | Check-In | DONE | DONE | DONE | Host desk và People action |
 | Buddy Pair | DONE | DONE | DONE | Create/remove, có matchmaking invariant |
-| Manual Match | DONE | DONE | DONE | Create/start/complete/cancel |
-| Matchmaking | DONE | DONE | DONE | Generate, dismiss, accept/start; có queue path |
+| Manual Match | DONE | DONE | DONE | Backend create vẫn tồn tại; Host UI giữ start/cancel/complete recovery cho Match hiện có |
+| Matchmaking | DONE | DONE | DONE | Generate, dismiss và queue; accept/start API vẫn tồn tại nhưng không còn là primary Host action |
 | MatchPlan Queue | DONE | DONE | DONE | Per-court queue và điều phối plan |
+| Host Match Placement Simplification | N/A | DONE | DONE | Hai entry point chính hội tụ vào MatchPlan Queue |
+| Manual MatchPlan Buddy Consistency | DONE | DONE | DONE | Server reject split Buddy; editor hiển thị Buddy và chặn submit sai team |
 | Complete/Cancel Match | DONE | DONE | DONE | Manual và recommendation Match |
 | Personal Link | DONE | DONE | DONE | Opaque token được cấp theo participant |
 | QR | DONE | DONE | DONE | QR mở personal read-only page |
@@ -228,6 +248,8 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] Session-local completed Match count visibility
 - [x] Player Session View manual refresh
 - [x] Recommendation refresh wording clarification
+- [x] Host Match Placement Simplification
+- [x] Manual MatchPlan Buddy Consistency
 
 ## 10. Matchmaking Current State
 
@@ -246,7 +268,7 @@ Thứ tự chọn đã xác thực:
 9. Waiting vector tie-break.
 10. Player UUID và partition key làm deterministic tie-break.
 
-Recommendation là preview, không tự chiếm resource. Accept/Queue tái tạo và so sánh authoritative evidence; thay đổi participant, Court, Buddy, algorithm version hoặc composition khiến evidence cũ bị từ chối như stale. Host có thể accept-and-start hoặc đưa recommendation vào MatchPlan Queue.
+Recommendation là preview, không tự chiếm resource. Queue/Accept backend tái tạo và so sánh authoritative evidence; thay đổi participant, Court, Buddy, algorithm version hoặc composition khiến evidence cũ bị từ chối như stale. Trong Host UI bình thường, recommendation chỉ được đưa vào MatchPlan Queue; accept-and-start backend vẫn tồn tại cho API compatibility nhưng không còn được expose như primary action.
 
 People rows hiển thị số Match `COMPLETED` trong Session theo
 `SessionParticipant UUID`, cùng semantics với fairness reader của backend.
@@ -311,9 +333,10 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 
 - Backend: JUnit/Spring integration tests với Testcontainers PostgreSQL 18.4; có Flyway schema/invariant coverage và pure-domain tests.
 - Frontend: Vitest, Testing Library, jsdom; có API contract, model/hook và component interaction coverage; checkpoint còn kiểm tra lint, TypeScript/Vite build và `git diff --check`.
-- Full backend sau Global Player Code V1: **635 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
-- Full frontend sau Fairness Visibility + Player Refresh + Recommendation Clarity: **382 tests PASS**; lint và production build PASS.
-- Các số trên là evidence đã ghi nhận, không phải kết quả chạy lại trong lần cập nhật tài liệu này.
+- Focused backend sau Manual MatchPlan Buddy Consistency: **22 tests PASS**, PostgreSQL 18.4.
+- Full backend sau Manual MatchPlan Buddy Consistency: **641 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
+- Focused frontend sau Manual MatchPlan Buddy Consistency: **20 tests PASS**.
+- Full frontend sau Manual MatchPlan Buddy Consistency: **377 tests PASS**; lint và production build PASS.
 
 ## 16. Current Work
 
@@ -322,8 +345,7 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 ## 17. Next Recommended Work
 
 1. **Tiếp tục MVP Manual Browser Acceptance Test**
-2. **Host Match Placement Simplification**
-3. **MVP Checkpoint / Tag / Release Preparation**
+2. **MVP Checkpoint / Tag / Release Preparation**
 
 ## 18. Deferred / Not Now
 
@@ -347,6 +369,7 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 - V1–V9 đã áp dụng là immutable.
 - Live status thuộc `SessionCourt`, không thuộc physical `Court`.
 - Buddy Pair không được tách khi pair eligible/được chọn.
+- Manual MatchPlan create/update phải xếp hai Buddy được chọn vào cùng team; một Buddy member được chọn riêng vẫn hợp lệ.
 - Buddy change không viết lại hồi tố Match/MatchPlan hiện có.
 - Recommendation phải được kiểm tra stale với authoritative state trước Accept/Queue.
 - QR chỉ mở Player View; không thực hiện check-in mutation.
@@ -363,8 +386,10 @@ Các item sau đã được source/test/UI xác nhận **DONE** và không còn 
 - Buddy Pair backend và Host UI.
 - Session Participant Code backend và Host UI.
 - Manual Match runtime và frontend lifecycle.
-- Matchmaking recommendation, stale protection và Accept & Start.
+- Matchmaking recommendation, stale protection và Queue; accept/start backend vẫn được giữ.
 - MatchPlan Queue và Court Queue UI.
+- Host Match Placement Simplification với hai primary entry point hội tụ vào Queue.
+- Manual MatchPlan Buddy consistency ở backend và Host queue editor.
 - Player Session View.
 - Personal random token, Host personal link và QR personal link.
 - Host Check-In Desk và Host manual check-in.
@@ -381,7 +406,7 @@ Không chuyển các item này trở lại `Current Work` nếu chưa có regres
 ## 21. Known Gaps / Caveats
 
 - Manual browser acceptance là bước verification, không phải missing feature.
-- Host Match Placement Simplification là hạng mục manual acceptance lớn còn lại.
+- Host Match Placement Simplification đã hoàn tất; tiếp tục manual browser acceptance trước release checkpoint.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
 
 ## 22. How To Use This Document

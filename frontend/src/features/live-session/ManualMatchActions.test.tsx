@@ -11,7 +11,6 @@ import type {
 } from '../../api/contracts'
 import { HttpError } from '../../api/http'
 import {
-  createManualMatch,
   getPlayers,
   getSession,
   getSessionCourts,
@@ -30,7 +29,7 @@ vi.mock('../../api/liveSessionApi', () => ({
   cancelMatch: vi.fn(),
   checkInParticipant: vi.fn(),
   completeMatch: vi.fn(),
-  createManualMatch: vi.fn(),
+    createManualMatch: vi.fn(),
   disableSessionCourt: vi.fn(),
   enableSessionCourt: vi.fn(),
   getPlayers: vi.fn(),
@@ -53,7 +52,6 @@ const SESSION_ID = 'session-1'
 const NOW = new Date('2026-09-02T10:00:00Z')
 const queryClients: QueryClient[] = []
 
-const createManualMatchMock = vi.mocked(createManualMatch)
 const getPlayersMock = vi.mocked(getPlayers)
 const getSessionMock = vi.mocked(getSession)
 const getSessionCourtsMock = vi.mocked(getSessionCourts)
@@ -108,23 +106,6 @@ function fourWaitingParticipants(
   )
 }
 
-function newCreatedMatch(template: MatchResponse): MatchResponse {
-  return {
-    ...template,
-    id: 'match-new',
-    status: 'CREATED',
-    source: 'MANUAL',
-    sessionCourtId: 'session-court-2',
-    startedAt: null,
-    participants: [
-      { sessionParticipantId: 'participant-1', teamSide: 'A', teamSlot: 1 },
-      { sessionParticipantId: 'participant-2', teamSide: 'A', teamSlot: 2 },
-      { sessionParticipantId: 'participant-3', teamSide: 'B', teamSlot: 1 },
-      { sessionParticipantId: 'participant-4', teamSide: 'B', teamSlot: 2 },
-    ],
-  }
-}
-
 function startedMatch(template: MatchResponse): MatchResponse {
   return {
     ...template,
@@ -174,29 +155,6 @@ function renderControlRoom() {
   return render(<Harness />, { wrapper: Wrapper })
 }
 
-async function selectValidMatch(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(
-    screen.getByLabelText('Sân trong phiên'),
-    'session-court-2',
-  )
-  await user.selectOptions(
-    screen.getByLabelText('Đội A — Vị trí 1'),
-    'participant-1',
-  )
-  await user.selectOptions(
-    screen.getByLabelText('Đội A — Vị trí 2'),
-    'participant-2',
-  )
-  await user.selectOptions(
-    screen.getByLabelText('Đội B — Vị trí 1'),
-    'participant-3',
-  )
-  await user.selectOptions(
-    screen.getByLabelText('Đội B — Vị trí 2'),
-    'participant-4',
-  )
-}
-
 function createdMatchCard() {
   const heading = screen.getAllByRole('heading', { name: 'Court Two' }).at(-1)
   const card = heading?.closest('article')
@@ -213,206 +171,6 @@ beforeEach(() => {
 afterEach(() => {
   queryClients.forEach((queryClient) => queryClient.clear())
   queryClients.length = 0
-})
-
-describe('Create Manual Match form', () => {
-  it('offers only eligible resources, fixed unique slots, and exact composition', async () => {
-    const user = userEvent.setup()
-    const input = arrangeReadSuccess()
-    createManualMatchMock.mockResolvedValue(newCreatedMatch(input.matches[1]))
-    renderControlRoom()
-
-    const courtSelect = await screen.findByLabelText('Sân trong phiên')
-    expect(within(courtSelect).getByRole('option', { name: 'Court Two' })).toBeEnabled()
-    expect(within(courtSelect).queryByRole('option', { name: 'Court One' })).not.toBeInTheDocument()
-    expect(within(courtSelect).queryByRole('option', { name: 'Court Three' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Đội A — Vị trí 1')).toBeVisible()
-    expect(screen.getByLabelText('Đội A — Vị trí 2')).toBeVisible()
-    expect(screen.getByLabelText('Đội B — Vị trí 1')).toBeVisible()
-    expect(screen.getByLabelText('Đội B — Vị trí 2')).toBeVisible()
-    expect(
-      within(screen.getByLabelText('Đội A — Vị trí 1')).queryByRole('option', {
-        name: /Giang Vo/,
-      }),
-    ).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
-
-    await user.selectOptions(screen.getByLabelText('Đội A — Vị trí 1'), 'participant-1')
-    expect(
-      within(screen.getByLabelText('Đội A — Vị trí 2')).getByRole('option', {
-        name: /An Nguyen/,
-      }),
-    ).toBeDisabled()
-
-    await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
-
-    expect(createManualMatchMock).toHaveBeenCalledOnce()
-    expect(createManualMatchMock).toHaveBeenCalledWith(SESSION_ID, {
-      sessionCourtId: 'session-court-2',
-      participants: [
-        { sessionParticipantId: 'participant-1', teamSide: 'A', teamSlot: 1 },
-        { sessionParticipantId: 'participant-2', teamSide: 'A', teamSlot: 2 },
-        { sessionParticipantId: 'participant-3', teamSide: 'B', teamSlot: 1 },
-        { sessionParticipantId: 'participant-4', teamSide: 'B', teamSlot: 2 },
-      ],
-    })
-    expect(screen.queryByText('participant-1')).not.toBeInTheDocument()
-    expect(screen.queryByText(/rating/i)).not.toBeInTheDocument()
-  })
-
-  it('shows concise resource explanations without manufacturing options', async () => {
-    arrangeReadSuccess()
-    getSessionCourtsMock.mockResolvedValue(
-      createLiveSessionInput().sessionCourts.map((court) => ({
-        ...court,
-        status: 'UNAVAILABLE',
-      })),
-    )
-    getSessionParticipantsMock.mockResolvedValue(
-      createLiveSessionInput().participants.slice(0, 3),
-    )
-    renderControlRoom()
-
-    expect(
-      await screen.findByText('Không có sân sẵn sàng để chọn.'),
-    ).toBeVisible()
-    expect(
-      screen.getByText('Cần ít nhất bốn người chơi đang chờ để tạo trận.'),
-    ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Tạo trận' })).toBeDisabled()
-  })
-})
-
-describe('Create Manual Match mutation', () => {
-  it('re-reads only Matches on success and renders the refreshed GET Match', async () => {
-    const user = userEvent.setup()
-    const input = arrangeReadSuccess()
-    const created = newCreatedMatch(input.matches[1])
-    createManualMatchMock.mockResolvedValue(created)
-    getSessionMatchesMock
-      .mockResolvedValueOnce(input.matches)
-      .mockResolvedValue([...input.matches, created])
-
-    renderControlRoom()
-    await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
-
-    await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-    expect(getSessionParticipantsMock).toHaveBeenCalledTimes(1)
-    expect(getSessionCourtsMock).toHaveBeenCalledTimes(1)
-    expect(getSessionMock).toHaveBeenCalledTimes(1)
-    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(2)
-
-    const courtBoard = screen
-      .getByRole('heading', { name: 'Bảng sân' })
-      .closest('section')
-
-    expect(courtBoard).not.toBeNull()
-
-    const courtTwo = within(courtBoard as HTMLElement)
-      .getByRole('heading', { name: 'Court Two' })
-      .closest('article')
-
-    expect(courtTwo).not.toBeNull()
-
-    expect(
-      within(courtTwo as HTMLElement).getByText('Sẵn sàng'),
-    ).toBeVisible()
-
-    expect(
-      screen.getByRole('heading', { name: 'Đang chờ' }).closest('section'),
-    ).toHaveTextContent('An Nguyen')
-
-    const manualMatchSection = screen
-      .getByRole('heading', { name: 'Tạo trận thủ công' })
-      .closest('section')
-
-    expect(manualMatchSection).not.toBeNull()
-
-    expect(
-      within(manualMatchSection as HTMLElement).getByText(
-        /Việc tạo trận chưa giữ sân hoặc người chơi/i,
-      ),
-    ).toBeVisible()
-  })
-
-  it('keeps GET business state while pending and blocks a duplicate submit', async () => {
-    const user = userEvent.setup()
-    const input = arrangeReadSuccess()
-    const request = deferred<MatchResponse>()
-    createManualMatchMock.mockReturnValue(request.promise)
-    renderControlRoom()
-    await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    await selectValidMatch(user)
-
-    const createButton = screen.getByRole('button', { name: 'Tạo trận' })
-    await user.click(createButton)
-    const pendingButton = screen.getByRole('button', { name: 'Đang tạo…' })
-    expect(pendingButton).toBeDisabled()
-    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(1)
-    expect(screen.getByText('Sẵn sàng')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Đang chờ' }).closest('section')).toHaveTextContent('An Nguyen')
-
-    await user.click(pendingButton)
-    expect(createManualMatchMock).toHaveBeenCalledOnce()
-
-    request.resolve(newCreatedMatch(input.matches[1]))
-    await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-  })
-
-  it('does not display a Match returned only by POST response', async () => {
-    const user = userEvent.setup()
-    const input = arrangeReadSuccess()
-    createManualMatchMock.mockResolvedValue(newCreatedMatch(input.matches[1]))
-    renderControlRoom()
-    await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
-
-    await waitFor(() => expect(getSessionMatchesMock).toHaveBeenCalledTimes(2))
-    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(1)
-  })
-
-  it('reconciles four runtime reads and shows scoped feedback after 409', async () => {
-    const user = userEvent.setup()
-    arrangeReadSuccess()
-    createManualMatchMock.mockRejectedValue(new HttpError(409, 'Conflict'))
-    renderControlRoom()
-    await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
-
-    await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
-    expect(createManualMatchMock).toHaveBeenCalledOnce()
-    expect(getSessionMatchesMock).toHaveBeenCalledTimes(2)
-    expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
-    expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Tài nguyên trực tiếp đã thay đổi. Trạng thái phiên hiện tại đã được tải lại.',
-    )
-    expect(screen.getAllByText('Đã tạo — chưa bắt đầu')).toHaveLength(1)
-  })
-
-  it('does not retry an unknown Create outcome and warns the Host to inspect Matches', async () => {
-    const user = userEvent.setup()
-    arrangeReadSuccess()
-    createManualMatchMock.mockRejectedValue(new TypeError('Failed to fetch'))
-    renderControlRoom()
-    await screen.findByRole('heading', { name: 'Wednesday Badminton' })
-    await selectValidMatch(user)
-    await user.click(screen.getByRole('button', { name: 'Tạo trận' }))
-
-    await waitFor(() => expect(getSessionMock).toHaveBeenCalledTimes(2))
-    expect(createManualMatchMock).toHaveBeenCalledOnce()
-    expect(getSessionMatchesMock).toHaveBeenCalledTimes(2)
-    expect(getSessionParticipantsMock).toHaveBeenCalledTimes(2)
-    expect(getSessionCourtsMock).toHaveBeenCalledTimes(2)
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'chưa xác định được kết quả',
-    )
-  })
 })
 
 describe('Start Match mutation', () => {

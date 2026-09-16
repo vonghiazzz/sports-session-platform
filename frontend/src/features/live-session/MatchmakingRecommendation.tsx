@@ -63,40 +63,18 @@ export function MatchmakingRecommendation({
             <button
               className="primary-action-button"
               type="button"
-              disabled={
-                court.status !== 'AVAILABLE' ||
-                action.isAccepting ||
-                action.isQueueing ||
-                action.acceptBlocked ||
-                action.queueBlocked
-              }
-              onClick={() => void action.accept()}
-            >
-              {action.isAccepting
-                ? 'Đang chấp nhận…'
-                : 'Chấp nhận & bắt đầu'}
-            </button>
-
-            <button
-              className="secondary-action-button"
-              type="button"
-              disabled={
-                action.isQueueing ||
-                action.isAccepting ||
-                action.queueBlocked
-              }
+              disabled={action.isQueueing || action.queueBlocked}
               onClick={() => void action.addToQueue()}
             >
               {action.isQueueing
-                ? 'Đang thêm vào hàng chờ…'
-                : 'Thêm vào hàng chờ'}
+                ? 'Đang đưa vào hàng chờ…'
+                : 'Đưa vào hàng chờ'}
             </button>
 
             <button
               className="secondary-action-button"
               type="button"
               disabled={
-                action.isAccepting ||
                 action.isGenerating ||
                 action.isQueueing ||
                 action.queueBlocked
@@ -119,18 +97,6 @@ export function MatchmakingRecommendation({
               </button>
             )}
 
-            {action.acceptBlocked && !action.queueBlocked && (
-              <button
-                className="secondary-action-button"
-                type="button"
-                disabled={action.isGenerating || action.isQueueing}
-                onClick={() => void action.generate()}
-              >
-                {action.isGenerating
-                  ? 'Đang cập nhật đề xuất…'
-                  : 'Cập nhật đề xuất'}
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -138,12 +104,6 @@ export function MatchmakingRecommendation({
       {action.generateError && (
         <p className="action-feedback" role="alert">
           {action.generateError}
-        </p>
-      )}
-
-      {action.acceptError && (
-        <p className="action-feedback" role="alert">
-          {action.acceptError}
         </p>
       )}
 
@@ -155,12 +115,12 @@ export function MatchmakingRecommendation({
 
       <p className="recommendation-note">
         Đề xuất được tính từ trạng thái hiện tại. Nếu dữ liệu chưa thay đổi, kết
-        quả có thể giống trước. Đề xuất chưa giữ sân hoặc người chơi; bạn có thể
-        bắt đầu ngay khi đủ điều kiện hoặc thêm vào hàng chờ để chuẩn bị trước.
+        quả có thể giống trước. Đề xuất chưa giữ sân hoặc người chơi; hãy đưa
+        vào hàng chờ rồi bắt đầu từ hàng chờ của sân khi sẵn sàng.
       </p>
 
       <p className="recommendation-fallback">
-        Không phù hợp? Bạn vẫn có thể tạo trận thủ công bên dưới.
+        Không phù hợp? Bạn có thể tự chọn bốn người bằng “Xếp vào hàng chờ”.
       </p>
     </section>
   )

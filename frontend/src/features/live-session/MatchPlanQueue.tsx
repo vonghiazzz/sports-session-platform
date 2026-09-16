@@ -56,7 +56,34 @@ function planRequest(
   }
 }
 
-function planningOptionLabel(participant: ParticipantView): string {
+function buddyByParticipantId(
+  participants: readonly ParticipantView[],
+): ReadonlyMap<string, ParticipantView> {
+  const membersByPairId = new Map<string, ParticipantView[]>()
+  participants.forEach((participant) => {
+    if (participant.buddyPairId === null) {
+      return
+    }
+    const members = membersByPairId.get(participant.buddyPairId) ?? []
+    members.push(participant)
+    membersByPairId.set(participant.buddyPairId, members)
+  })
+
+  const buddyByParticipant = new Map<string, ParticipantView>()
+  membersByPairId.forEach((members) => {
+    if (members.length !== 2) {
+      return
+    }
+    buddyByParticipant.set(members[0].sessionParticipantId, members[1])
+    buddyByParticipant.set(members[1].sessionParticipantId, members[0])
+  })
+  return buddyByParticipant
+}
+
+function planningOptionLabel(
+  participant: ParticipantView,
+  buddy: ParticipantView | undefined,
+): string {
   const statusContext =
     participant.status === 'PLAYING'
       ? 'Đang chơi'
@@ -69,7 +96,10 @@ function planningOptionLabel(participant: ParticipantView): string {
     participant.plannedMatchCount > 0
       ? ` · Đã được xếp ${participant.plannedMatchCount} trận chờ khác`
       : ''
-  return `${participant.displayName} · ${participant.skillLabel ?? 'Chưa có trình độ'} · ${statusContext}${planContext}`
+  const buddyContext = buddy
+    ? ` · Buddy với #${buddy.participantCode} ${buddy.displayName}`
+    : ''
+  return `#${participant.participantCode} ${participant.displayName} · ${participant.skillLabel ?? 'Chưa có trình độ'} · ${statusContext}${buddyContext}${planContext}`
 }
 
 function MatchPlanEditor({
@@ -87,20 +117,61 @@ function MatchPlanEditor({
   readonly onSubmit: (request: SaveMatchPlanRequest) => Promise<boolean>
   readonly onClose: () => void
 }) {
-  const candidates = participants.filter(
-    (participant) => participant.status !== 'LEFT',
+  const initialParticipantIds = new Set(
+    initialPlan?.participants.map(
+      (participant) => participant.sessionParticipantId,
+    ) ?? [],
   )
+  const candidates = participants.filter((participant) => {
+    if (participant.status === 'LEFT') {
+      return false
+    }
+    if (initialParticipantIds.has(participant.sessionParticipantId)) {
+      return true
+    }
+    return (
+      participant.status === 'WAITING' && participant.plannedMatchCount === 0
+    )
+  })
   const candidateIds = new Set(
     candidates.map((participant) => participant.sessionParticipantId),
   )
+  const candidateById = new Map(
+    candidates.map((participant) => [
+      participant.sessionParticipantId,
+      participant,
+    ]),
+  )
+  const buddies = buddyByParticipantId(participants)
   const [participantsBySlot, setParticipantsBySlot] = useState(() =>
     slotsFor(initialPlan),
   )
   const selected = Object.values(participantsBySlot).filter(Boolean)
   const unique = new Set(selected).size === selected.length
+  const selectedBuddyTeams = new Map<
+    string,
+    { readonly teamSide: 'A' | 'B'; readonly participant: ParticipantView }
+  >()
+  let splitBuddyMessage: string | null = null
+  PLAN_SLOTS.forEach((slot) => {
+    const participant = candidateById.get(participantsBySlot[slot.id])
+    if (participant?.buddyPairId === null || participant === undefined) {
+      return
+    }
+    const selectedBuddy = selectedBuddyTeams.get(participant.buddyPairId)
+    if (selectedBuddy && selectedBuddy.teamSide !== slot.teamSide) {
+      splitBuddyMessage = `Buddy #${selectedBuddy.participant.participantCode} ${selectedBuddy.participant.displayName} và #${participant.participantCode} ${participant.displayName} phải ở cùng đội.`
+      return
+    }
+    selectedBuddyTeams.set(participant.buddyPairId, {
+      teamSide: slot.teamSide,
+      participant,
+    })
+  })
   const valid =
     selected.length === 4 &&
     unique &&
+    splitBuddyMessage === null &&
     selected.every((participantId) => candidateIds.has(participantId))
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -148,7 +219,10 @@ function MatchPlanEditor({
                     value={participant.sessionParticipantId}
                     disabled={selectedElsewhere}
                   >
-                    {planningOptionLabel(participant)}
+                    {planningOptionLabel(
+                      participant,
+                      buddies.get(participant.sessionParticipantId),
+                    )}
                   </option>
                 )
               })}
@@ -159,6 +233,11 @@ function MatchPlanEditor({
       {!unique && (
         <p className="form-note" role="alert">
           Mỗi người chơi chỉ được chọn một lần trong trận chờ này.
+        </p>
+      )}
+      {splitBuddyMessage && (
+        <p className="form-note" role="alert">
+          {splitBuddyMessage}
         </p>
       )}
       <p className="form-note">
@@ -391,10 +470,6 @@ export function MatchPlanQueue({
         (left.queuePosition ?? Number.MAX_SAFE_INTEGER) -
         (right.queuePosition ?? Number.MAX_SAFE_INTEGER),
     )
-  const allParticipants = participants.filter(
-    (participant) => participant.status !== 'LEFT',
-  )
-
   return (
     <section className="match-plan-queue" aria-label={`Hàng chờ trận ${court.name}`}>
       <div className="match-plan-queue-heading">
@@ -433,14 +508,14 @@ export function MatchPlanQueue({
           disabled={createAction.isPending || createAction.hasUnknownOutcome}
           onClick={() => setCreating(true)}
         >
-          Xếp trận tiếp theo
+          Xếp vào hàng chờ
         </button>
       )}
       {creating && (
         <MatchPlanEditor
-          participants={allParticipants}
+          participants={participants}
           pending={createAction.isPending}
-          submitLabel="Xếp trận"
+          submitLabel="Xếp vào hàng chờ"
           onSubmit={createAction.execute}
           onClose={() => setCreating(false)}
         />

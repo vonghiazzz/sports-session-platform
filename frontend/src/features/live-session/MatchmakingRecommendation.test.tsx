@@ -6,11 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   MatchPlanResponse,
   MatchRecommendationResponse,
-  MatchResponse,
 } from '../../api/contracts'
 import { HttpError } from '../../api/http'
 import {
-  acceptMatchmakingRecommendation,
   generateMatchmakingRecommendation,
   queueMatchmakingRecommendation,
 } from '../../api/matchmakingApi'
@@ -24,7 +22,6 @@ vi.mock('../../api/matchmakingApi', () => ({
 }))
 
 const generateMock = vi.mocked(generateMatchmakingRecommendation)
-const acceptMock = vi.mocked(acceptMatchmakingRecommendation)
 const queueMock = vi.mocked(queueMatchmakingRecommendation)
 const queryClients: QueryClient[] = []
 const algorithmVersion =
@@ -108,30 +105,6 @@ const recommendation: MatchRecommendationResponse = {
   oldestWaitingSince: '2026-09-02T09:30:00Z',
 }
 
-const acceptedMatch: MatchResponse = {
-  id: 'recommended-match-1',
-  sessionId: 'session-1',
-  sessionCourtId: court.sessionCourtId,
-  status: 'PLAYING',
-  source: 'RECOMMENDATION',
-  winnerTeam: null,
-  teamAScore: null,
-  teamBScore: null,
-  resultVersion: 0,
-  participants: [
-    { sessionParticipantId: 'participant-1', teamSide: 'A', teamSlot: 1 },
-    { sessionParticipantId: 'participant-4', teamSide: 'A', teamSlot: 2 },
-    { sessionParticipantId: 'participant-2', teamSide: 'B', teamSlot: 1 },
-    { sessionParticipantId: 'participant-3', teamSide: 'B', teamSlot: 2 },
-  ],
-  createdAt: '2026-09-02T10:00:00Z',
-  startedAt: '2026-09-02T10:00:00Z',
-  completedAt: null,
-  cancelledAt: null,
-  updatedAt: '2026-09-02T10:00:00Z',
-  version: 1,
-}
-
 const queuedRecommendationPlan: MatchPlanResponse = {
   id: 'recommended-plan-1',
   sessionId: 'session-1',
@@ -212,7 +185,7 @@ function renderRecommendation(courtOverride: CourtView = court) {
 async function generate(user: ReturnType<typeof userEvent.setup>) {
   generateMock.mockResolvedValue(recommendation)
   await user.click(screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' }))
-  await screen.findByRole('button', { name: 'Chấp nhận & bắt đầu' })
+  await screen.findByRole('button', { name: 'Đưa vào hàng chờ' })
 }
 
 beforeEach(() => {
@@ -287,7 +260,9 @@ describe('Matchmaking recommendation', () => {
     expect(within(proposal).getByText('Chờ 30 phút')).toBeVisible()
     expect(proposal).not.toHaveTextContent('participant-1')
     expect(proposal).not.toHaveTextContent(algorithmVersion)
-    expect(acceptMock).not.toHaveBeenCalled()
+    expect(
+      within(proposal).queryByRole('button', { name: 'Chấp nhận & bắt đầu' }),
+    ).not.toBeInTheDocument()
   })
 
   it('guards duplicate Generate and does not retry it', async () => {
@@ -314,10 +289,10 @@ describe('Matchmaking recommendation', () => {
     ).toBe(false)
 
     request.resolve(recommendation)
-    await screen.findByRole('button', { name: 'Chấp nhận & bắt đầu' })
+    await screen.findByRole('button', { name: 'Đưa vào hàng chờ' })
   })
 
-  it('dismisses only local state and leaves Manual Match as the fallback', async () => {
+  it('dismisses only local state and leaves manual Queue selection as the fallback', async () => {
     const user = userEvent.setup()
     renderRecommendation()
     await generate(user)
@@ -327,8 +302,7 @@ describe('Matchmaking recommendation', () => {
     expect(
       screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' }),
     ).toBeEnabled()
-    expect(screen.getByText(/tạo trận thủ công bên dưới/i)).toBeVisible()
-    expect(acceptMock).not.toHaveBeenCalled()
+    expect(screen.getByText(/Xếp vào hàng chờ/i)).toBeVisible()
   })
 
   it('shows an unavailable outcome as scoped guidance without fabricating teams', async () => {
@@ -361,133 +335,6 @@ describe('Matchmaking recommendation', () => {
     ).toBeEnabled()
   })
 
-  it('submits exact evidence once and reconciles all four runtime queries', async () => {
-    const user = userEvent.setup()
-    acceptMock.mockResolvedValue(acceptedMatch)
-    const { queryClient } = renderRecommendation()
-    const refetch = vi.spyOn(queryClient, 'refetchQueries')
-    await generate(user)
-
-    await user.click(
-      screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    )
-
-    await waitFor(() => expect(acceptMock).toHaveBeenCalledOnce())
-    expect(
-      queryClient
-        .getMutationCache()
-        .getAll()
-        .map((mutation) => mutation.options.retry),
-    ).toEqual([false, false])
-    expect(acceptMock).toHaveBeenCalledWith('session-1', 'session-court-2', {
-      algorithmVersion,
-      assignments: [
-        { sessionParticipantId: 'participant-1', teamSide: 'A', teamSlot: 1 },
-        { sessionParticipantId: 'participant-4', teamSide: 'A', teamSlot: 2 },
-        { sessionParticipantId: 'participant-2', teamSide: 'B', teamSlot: 1 },
-        { sessionParticipantId: 'participant-3', teamSide: 'B', teamSlot: 2 },
-      ],
-    })
-    await waitFor(() => expect(refetch).toHaveBeenCalledTimes(4))
-    expect(refetch.mock.calls.map(([filters]) => filters?.queryKey)).toEqual([
-      ['session', 'session-1'],
-      ['sessionMatches', 'session-1'],
-      ['sessionParticipants', 'session-1'],
-      ['sessionCourts', 'session-1'],
-    ])
-    expect(
-      screen.queryByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    ).not.toBeInTheDocument()
-  })
-
-  it('guards duplicate Accept while the first request is pending', async () => {
-    const user = userEvent.setup()
-    const request = deferred<MatchResponse>()
-    acceptMock.mockReturnValue(request.promise)
-    renderRecommendation()
-    await generate(user)
-
-    await user.click(
-      screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    )
-    const pendingButton = screen.getByRole('button', {
-      name: 'Đang chấp nhận…',
-    })
-    await user.click(pendingButton)
-    expect(acceptMock).toHaveBeenCalledOnce()
-
-    request.resolve(acceptedMatch)
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'Đang chấp nhận…' }),
-      ).not.toBeInTheDocument(),
-    )
-  })
-
-  it('keeps a stale failure scoped and requires a newly generated proposal', async () => {
-    const user = userEvent.setup()
-    acceptMock.mockRejectedValue(new HttpError(409, 'Submitted recommendation is stale'))
-    renderRecommendation()
-    await generate(user)
-
-    await user.click(
-      screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    )
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Đề xuất không thể bắt đầu với trạng thái hiện tại',
-    )
-    expect(
-      screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    ).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Cập nhật đề xuất' })).toBeEnabled()
-    expect(screen.getByText(/tạo trận thủ công bên dưới/i)).toBeVisible()
-    expect(acceptMock).toHaveBeenCalledOnce()
-  })
-
-  it('uses reconciled server truth after a lost Accept response', async () => {
-    const user = userEvent.setup()
-    acceptMock.mockRejectedValue(new TypeError('Failed to fetch'))
-    const { queryClient } = renderRecommendation()
-    queryClient.setQueryData(['sessionMatches', 'session-1'], [acceptedMatch])
-    await generate(user)
-
-    await user.click(
-      screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    )
-
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-      ).not.toBeInTheDocument(),
-    )
-    expect(acceptMock).toHaveBeenCalledOnce()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-  })
-
-  it('blocks blind repeat when Accept and authoritative reconciliation are uncertain', async () => {
-    const user = userEvent.setup()
-    acceptMock.mockRejectedValue(new TypeError('Failed to fetch'))
-    const { queryClient } = renderRecommendation()
-    vi.spyOn(queryClient, 'refetchQueries').mockRejectedValue(
-      new TypeError('Failed to refresh'),
-    )
-    await generate(user)
-
-    await user.click(
-      screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
-    )
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'không chấp nhận lại đề xuất này',
-    )
-    const acceptButton = screen.getByRole('button', {
-      name: 'Chấp nhận & bắt đầu',
-    })
-    expect(acceptButton).toBeDisabled()
-    await user.click(acceptButton)
-    expect(acceptMock).toHaveBeenCalledOnce()
-  })
   it('queues exact recommendation evidence and reconciles MatchPlans', async () => {
     const user = userEvent.setup()
     queueMock.mockResolvedValue(queuedRecommendationPlan)
@@ -498,7 +345,7 @@ describe('Matchmaking recommendation', () => {
     await generate(user)
 
     await user.click(
-      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
     )
 
     await waitFor(() => expect(queueMock).toHaveBeenCalledOnce())
@@ -554,14 +401,43 @@ describe('Matchmaking recommendation', () => {
         { throwOnError: true },
       ),
     )
+    expect(refetch).toHaveBeenCalledWith(
+      {
+        queryKey: ['sessionParticipants', 'session-1'],
+        exact: true,
+        type: 'active',
+      },
+      { throwOnError: true },
+    )
 
     expect(
       screen.queryByRole('button', { name: 'Chấp nhận & bắt đầu' }),
     ).not.toBeInTheDocument()
   })
 
+  it('blocks duplicate Queue submission while the request is pending', async () => {
+    const user = userEvent.setup()
+    const request = deferred<MatchPlanResponse>()
+    queueMock.mockReturnValue(request.promise)
+    renderRecommendation()
+    await generate(user)
+
+    await user.click(
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
+    )
+    const pendingButton = screen.getByRole('button', {
+      name: 'Đang đưa vào hàng chờ…',
+    })
+    expect(pendingButton).toBeDisabled()
+    await user.click(pendingButton)
+    expect(queueMock).toHaveBeenCalledOnce()
+
+    request.resolve(queuedRecommendationPlan)
+    await screen.findByRole('button', { name: 'Tạo đề xuất ghép trận' })
+  })
+
   it.each(['PLAYING', 'UNAVAILABLE'] as const)(
-    'allows recommendation Queue while Court is %s but disables immediate Accept',
+    'allows recommendation Queue while Court is %s without exposing immediate Accept',
     async (status) => {
       const user = userEvent.setup()
 
@@ -573,14 +449,14 @@ describe('Matchmaking recommendation', () => {
       await generate(user)
 
       expect(
-        screen.getByRole('button', {
+        screen.queryByRole('button', {
           name: 'Chấp nhận & bắt đầu',
         }),
-      ).toBeDisabled()
+      ).not.toBeInTheDocument()
 
       expect(
         screen.getByRole('button', {
-          name: 'Thêm vào hàng chờ',
+          name: 'Đưa vào hàng chờ',
         }),
       ).toBeEnabled()
 
@@ -599,7 +475,7 @@ describe('Matchmaking recommendation', () => {
     await generate(user)
 
     await user.click(
-      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
     )
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -642,16 +518,10 @@ describe('Matchmaking recommendation', () => {
     await generate(user)
 
     await user.click(
-      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
     )
 
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', {
-          name: 'Chấp nhận & bắt đầu',
-        }),
-      ).not.toBeInTheDocument(),
-    )
+    await screen.findByRole('button', { name: 'Tạo đề xuất ghép trận' })
 
     expect(queueMock).toHaveBeenCalledOnce()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -671,7 +541,7 @@ describe('Matchmaking recommendation', () => {
     await generate(user)
 
     await user.click(
-      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
     )
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -680,7 +550,7 @@ describe('Matchmaking recommendation', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Thêm vào hàng chờ',
+        name: 'Đưa vào hàng chờ',
       }),
     ).toBeDisabled()
 
@@ -692,7 +562,7 @@ describe('Matchmaking recommendation', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Thêm vào hàng chờ',
+        name: 'Đưa vào hàng chờ',
       }),
     )
 
@@ -714,7 +584,7 @@ describe('Matchmaking recommendation', () => {
     await generate(user)
 
     await user.click(
-      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
     )
 
     await screen.findByRole('button', { name: 'Kiểm tra lại' })
@@ -756,7 +626,7 @@ describe('Matchmaking recommendation', () => {
     await generate(user)
 
     await user.click(
-      screen.getByRole('button', { name: 'Thêm vào hàng chờ' }),
+      screen.getByRole('button', { name: 'Đưa vào hàng chờ' }),
     )
 
     expect(
@@ -773,7 +643,7 @@ describe('Matchmaking recommendation', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Thêm vào hàng chờ',
+        name: 'Đưa vào hàng chờ',
       }),
     ).toBeEnabled()
 

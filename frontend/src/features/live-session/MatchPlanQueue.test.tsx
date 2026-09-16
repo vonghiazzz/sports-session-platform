@@ -16,7 +16,10 @@ import {
   updateMatchPlan,
 } from '../../api/matchPlanApi'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
-import { composeLiveSessionModel } from './liveSessionModel'
+import {
+  composeLiveSessionModel,
+  type ParticipantView,
+} from './liveSessionModel'
 import { MatchPlanQueue } from './MatchPlanQueue'
 import { matchPlanStartReason } from './matchPlanReadiness'
 
@@ -85,11 +88,15 @@ function renderQueue({
   plans = [plan('plan-1', `session-court-${courtIndex + 1}`, 1)],
   statuses,
   sessionStatus = 'IN_PROGRESS',
+  transformParticipants = (participants) => participants,
 }: {
   readonly courtIndex?: number
   readonly plans?: readonly MatchPlanResponse[]
   readonly statuses?: readonly ParticipantStatus[]
   readonly sessionStatus?: string
+  readonly transformParticipants?: (
+    participants: readonly ParticipantView[],
+  ) => readonly ParticipantView[]
 } = {}) {
   const input = createLiveSessionInput()
   const participants = statuses
@@ -109,13 +116,13 @@ function renderQueue({
   queryClients.push(queryClient)
   vi.spyOn(queryClient, 'refetchQueries').mockResolvedValue(undefined)
   const court = model.courts[courtIndex]
-  const participantViews = [
+  const participantViews = transformParticipants([
     ...model.waitingParticipants,
     ...model.registeredParticipants,
     ...model.pausedParticipants,
     ...model.playingParticipants,
     ...model.leftParticipants,
-  ]
+  ])
   render(
     <QueryClientProvider client={queryClient}>
       <MatchPlanQueue
@@ -129,6 +136,24 @@ function renderQueue({
     </QueryClientProvider>,
   )
   return { queryClient, court, participants: participantViews }
+}
+
+function deferred<T>() {
+  let resolvePromise: (value: T | PromiseLike<T>) => void = () => {
+    throw new Error('Deferred promise resolver is unavailable')
+  }
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve
+  })
+  return { promise, resolve: resolvePromise }
+}
+
+function pairFirstTwoParticipants(
+  participants: readonly ParticipantView[],
+): readonly ParticipantView[] {
+  return participants.map((participant, index) =>
+    index < 2 ? { ...participant, buddyPairId: 'buddy-pair-1' } : participant,
+  )
 }
 
 async function selectFourPlayers(user: ReturnType<typeof userEvent.setup>) {
@@ -155,7 +180,7 @@ describe('MatchPlan Queue', () => {
 
   it.each([0, 1, 2])('allows planning on Session Court state #%s', (courtIndex) => {
     renderQueue({ courtIndex, plans: [] })
-    expect(screen.getByRole('button', { name: 'Xếp trận tiếp theo' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Xếp vào hàng chờ' })).toBeEnabled()
   })
 
   it('shows only QUEUED plans in queuePosition order on a PLAYING Court', () => {
@@ -181,7 +206,7 @@ describe('MatchPlan Queue', () => {
     expect(screen.getByRole('button', { name: 'Đổi sân' })).toBeEnabled()
   })
 
-  it('offers REGISTERED, WAITING, PLAYING and PAUSED participants but excludes LEFT', async () => {
+  it('offers only WAITING participants not already queued and shows Participant codes', async () => {
     const user = userEvent.setup()
     const input = createLiveSessionInput()
     const leftParticipant = { ...input.participants[4], status: 'LEFT' as const }
@@ -211,26 +236,175 @@ describe('MatchPlan Queue', () => {
         />
       </QueryClientProvider>,
     )
-    await user.click(screen.getByRole('button', { name: 'Xếp trận tiếp theo' }))
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
     const options = within(screen.getByRole('combobox', { name: 'Đội A — Vị trí 1' }))
-    expect(options.getByRole('option', { name: /An Nguyen.*Đang chờ/ })).toBeVisible()
-    expect(options.getByRole('option', { name: /Chi Le.*Chưa điểm danh/ })).toBeVisible()
-    expect(options.getByRole('option', { name: /Dung Pham.*Đang tạm nghỉ/ })).toBeVisible()
+    expect(options.getByRole('option', { name: /#1 An Nguyen.*Đang chờ/ })).toBeVisible()
+    expect(options.queryByRole('option', { name: /Chi Le/ })).not.toBeInTheDocument()
+    expect(options.queryByRole('option', { name: /Dung Pham/ })).not.toBeInTheDocument()
     expect(options.queryByRole('option', { name: /Giang Vo/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps duplicate names distinguishable by Participant code', async () => {
+    const user = userEvent.setup()
+    renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+      transformParticipants: (participants) =>
+        participants.map((participant, index) =>
+          index < 2 ? { ...participant, displayName: 'Nguyen An' } : participant,
+        ),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+    const options = within(
+      screen.getByRole('combobox', { name: 'Đội A — Vị trí 1' }),
+    )
+    expect(options.getByRole('option', { name: /#1 Nguyen An/ })).toBeVisible()
+    expect(options.getByRole('option', { name: /#2 Nguyen An/ })).toBeVisible()
+  })
+
+  it('shows Buddy relationship in the manual Queue selector', async () => {
+    const user = userEvent.setup()
+    renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+      transformParticipants: pairFirstTwoParticipants,
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+    const options = within(
+      screen.getByRole('combobox', { name: 'Đội A — Vị trí 1' }),
+    )
+    expect(
+      options.getByRole('option', {
+        name: /#1 An Nguyen.*Buddy với #2 Bao Tran/,
+      }),
+    ).toBeVisible()
+    expect(
+      options.getByRole('option', {
+        name: /#2 Bao Tran.*Buddy với #1 An Nguyen/,
+      }),
+    ).toBeVisible()
+  })
+
+  it('blocks a Buddy pair split across teams before manual Queue submission', async () => {
+    const user = userEvent.setup()
+    renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+      transformParticipants: pairFirstTwoParticipants,
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Đội A — Vị trí 1' }),
+      'participant-1',
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Đội A — Vị trí 2' }),
+      'participant-3',
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Đội B — Vị trí 1' }),
+      'participant-2',
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Đội B — Vị trí 2' }),
+      'participant-4',
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Buddy #1 An Nguyen và #2 Bao Tran phải ở cùng đội.',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Xếp vào hàng chờ' }),
+    ).toBeDisabled()
+    expect(createMock).not.toHaveBeenCalled()
+  })
+
+  it('submits exact SessionParticipant UUIDs when Buddy members share a team', async () => {
+    const user = userEvent.setup()
+    createMock.mockResolvedValue(plan('created', 'session-court-2', 1))
+    renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+      transformParticipants: pairFirstTwoParticipants,
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+    await selectFourPlayers(user)
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledOnce())
+    expect(createMock).toHaveBeenCalledWith('session-1', 'session-court-2', {
+      participants: assignments.map(({ id: _id, ...assignment }) => assignment),
+    })
+  })
+
+  it('does not offer participants already assigned to another queued MatchPlan', async () => {
+    const user = userEvent.setup()
+    renderQueue({
+      plans: [plan('other-court-plan', 'session-court-1', 1)],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+    const options = within(
+      screen.getByRole('combobox', { name: 'Đội A — Vị trí 1' }),
+    )
+    expect(options.queryByRole('option', { name: /#1 An Nguyen/ })).not.toBeInTheDocument()
+    expect(options.queryByRole('option', { name: /#2 Bao Tran/ })).not.toBeInTheDocument()
   })
 
   it('creates with exactly four unique assignments and retry disabled', async () => {
     const user = userEvent.setup()
     createMock.mockResolvedValue(plan('created', 'session-court-2', 1))
-    const { queryClient } = renderQueue({ plans: [] })
-    await user.click(screen.getByRole('button', { name: 'Xếp trận tiếp theo' }))
+    const { queryClient } = renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+    })
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
     await selectFourPlayers(user)
-    await user.click(screen.getByRole('button', { name: 'Xếp trận' }))
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
     await waitFor(() => expect(createMock).toHaveBeenCalledOnce())
     expect(createMock).toHaveBeenCalledWith('session-1', 'session-court-2', {
       participants: assignments.map(({ id: _id, ...assignment }) => assignment),
     })
     expect(queryClient.getMutationCache().getAll()[0]?.options.retry).toBe(false)
+    expect(
+      vi.mocked(queryClient.refetchQueries).mock.calls.map(
+        ([filters]) => filters?.queryKey,
+      ),
+    ).toEqual([
+      ['sessionMatchPlans', 'session-1'],
+      ['sessionParticipants', 'session-1'],
+    ])
+  })
+
+  it('blocks duplicate manual Queue submission while creation is pending', async () => {
+    const user = userEvent.setup()
+    const request = deferred<MatchPlanResponse>()
+    createMock.mockReturnValue(request.promise)
+    renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+    })
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+    await selectFourPlayers(user)
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
+
+    const pendingButton = screen.getByRole('button', { name: 'Đang lưu…' })
+    expect(pendingButton).toBeDisabled()
+    expect(screen.getByText('Chưa có trận nào được xếp tiếp theo.')).toBeVisible()
+    await user.click(pendingButton)
+    expect(createMock).toHaveBeenCalledOnce()
+
+    request.resolve(plan('created', 'session-court-2', 1))
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Đang lưu…' }),
+      ).not.toBeInTheDocument(),
+    )
   })
 
   it('edits all four assignments through the backend', async () => {
@@ -306,12 +480,16 @@ describe('MatchPlan Queue', () => {
   it('blocks blind Create replay after an unknown response until Check again', async () => {
     const user = userEvent.setup()
     createMock.mockRejectedValue(new TypeError('Failed to fetch'))
-    renderQueue({ plans: [] })
-    await user.click(screen.getByRole('button', { name: 'Xếp trận tiếp theo' }))
+    renderQueue({
+      plans: [],
+      statuses: ['WAITING', 'WAITING', 'WAITING', 'WAITING'],
+    })
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
     await selectFourPlayers(user)
-    await user.click(screen.getByRole('button', { name: 'Xếp trận' }))
+    await user.click(screen.getByRole('button', { name: 'Xếp vào hàng chờ' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Kiểm tra lại' })).toBeVisible())
     expect(createMock).toHaveBeenCalledOnce()
+    expect(screen.getByText('Chưa có trận nào được xếp tiếp theo.')).toBeVisible()
   })
 
   it('derives concise Start-disabled reasons from authoritative runtime state', () => {

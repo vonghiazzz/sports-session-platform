@@ -28,8 +28,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -96,10 +98,12 @@ public class MatchPlanService {
         sessionRuntimeLookup.requireScopedSessionCourtForUpdate(
                 sessionId, sessionCourtId
         );
-        validatePlanningParticipants(
-                sessionId, assignments,
-                source == MatchSource.RECOMMENDATION
-        );
+        List<SessionParticipant> planningParticipants =
+                validatePlanningParticipants(
+                        sessionId, assignments,
+                        source == MatchSource.RECOMMENDATION
+                );
+        validateBuddyTeamConsistency(assignments, planningParticipants);
 
         requireNotQueuedElsewhere(
                 sessionId,
@@ -148,7 +152,11 @@ public class MatchPlanService {
         requireInProgress(sessionRuntimeLookup.requireSessionForUpdate(
                 plan.sessionId()
         ));
-        validatePlanningParticipants(plan.sessionId(), assignments, false);
+        List<SessionParticipant> planningParticipants =
+                validatePlanningParticipants(
+                        plan.sessionId(), assignments, false
+                );
+        validateBuddyTeamConsistency(assignments, planningParticipants);
 
         requireNotQueuedElsewhere(
                 plan.sessionId(),
@@ -320,7 +328,7 @@ public class MatchPlanService {
         );
     }
 
-    private void validatePlanningParticipants(
+    private List<SessionParticipant> validatePlanningParticipants(
             UUID sessionId,
             List<MatchPlanAssignment> assignments,
             boolean requireWaiting
@@ -349,6 +357,36 @@ public class MatchPlanService {
                 throw new MatchPlanConflictException(
                         "Recommended MatchPlan Participant must be WAITING: "
                                 + participant.id()
+                );
+            }
+        }
+        return participants;
+    }
+
+    private void validateBuddyTeamConsistency(
+            List<MatchPlanAssignment> assignments,
+            List<SessionParticipant> participants
+    ) {
+        Map<UUID, TeamSide> teamByParticipantId = new HashMap<>();
+        assignments.forEach(assignment -> teamByParticipantId.put(
+                assignment.sessionParticipantId(), assignment.teamSide()
+        ));
+
+        Map<UUID, TeamSide> teamByBuddyPairId = new HashMap<>();
+        for (SessionParticipant participant : participants) {
+            UUID buddyPairId = participant.buddyPairId();
+            if (buddyPairId == null) {
+                continue;
+            }
+            TeamSide selectedTeam = teamByParticipantId.get(participant.id());
+            TeamSide buddyTeam = teamByBuddyPairId.putIfAbsent(
+                    buddyPairId, selectedTeam
+            );
+            if (buddyTeam != null && buddyTeam != selectedTeam) {
+                throw new MatchPlanConflictException(
+                        "Buddy Pair members selected for a MatchPlan must "
+                                + "be assigned to the same Team: "
+                                + buddyPairId
                 );
             }
         }

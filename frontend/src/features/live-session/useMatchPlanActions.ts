@@ -57,7 +57,7 @@ function knownFailureMessage(error: HttpError, action: MatchPlanAction['type']) 
   if (error.status === 409) {
     return action === 'START'
       ? 'Không thể bắt đầu trận vì trạng thái sân hoặc người chơi đã thay đổi.'
-      : 'Hàng chờ đã thay đổi. Dữ liệu mới nhất đã được tải lại.'
+      : 'Không thể lưu hàng chờ vì Buddy, người chơi hoặc hàng chờ đã thay đổi. Dữ liệu mới nhất đã được tải lại.'
   }
   return 'Không thể hoàn tất thao tác với hàng chờ trận.'
 }
@@ -77,13 +77,17 @@ export function useCreateMatchPlan(
   })
 
   const reconcile = useCallback(async () => {
-    await queryClient.refetchQueries(
-      {
-        queryKey: ['sessionMatchPlans', sessionId],
-        exact: true,
-        type: 'active',
-      },
-      { throwOnError: true },
+    await Promise.all(
+      ['sessionMatchPlans', 'sessionParticipants'].map((queryName) =>
+        queryClient.refetchQueries(
+          {
+            queryKey: [queryName, sessionId],
+            exact: true,
+            type: 'active',
+          },
+          { throwOnError: true },
+        ),
+      ),
     )
   }, [queryClient, sessionId])
 

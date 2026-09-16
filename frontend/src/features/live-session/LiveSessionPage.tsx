@@ -18,10 +18,7 @@ import {
   type ParticipantAction,
   type SessionCourtAction,
 } from './useLiveSessionActions'
-import {
-  useCreateManualMatch,
-  useMatchLifecycleActions,
-} from './useManualMatchActions'
+import { useMatchLifecycleActions } from './useManualMatchActions'
 import {
   useSessionLifecycleActions,
   type SessionLifecycleAction,
@@ -43,7 +40,6 @@ import type {
   SessionParticipantResponse,
 } from '../../api/contracts'
 import { MatchmakingRecommendation } from './MatchmakingRecommendation'
-import { GlobalMatchmakingRecommendation } from './GlobalMatchmakingRecommendation'
 import { MatchPlanQueue } from './MatchPlanQueue'
 import { BuddyPairControls } from './BuddyPairControls'
 import {
@@ -703,259 +699,6 @@ function PeoplePanel({
   )
 }
 
-function participantOptionLabel(participant: ParticipantView): string {
-  return [
-    participant.displayName,
-    participant.skillLabel ?? 'Không có trình độ',
-    participant.waitingDuration === null
-      ? 'không có thời gian chờ'
-      : `đã chờ ${participant.waitingDuration}`,
-  ].join(' · ')
-}
-
-type MatchSlot = 'A1' | 'A2' | 'B1' | 'B2'
-
-const MATCH_SLOTS: readonly {
-  readonly id: MatchSlot
-  readonly label: string
-  readonly teamSide: 'A' | 'B'
-  readonly teamSlot: 1 | 2
-}[] = [
-  { id: 'A1', label: 'Đội A — Vị trí 1', teamSide: 'A', teamSlot: 1 },
-  { id: 'A2', label: 'Đội A — Vị trí 2', teamSide: 'A', teamSlot: 2 },
-  { id: 'B1', label: 'Đội B — Vị trí 1', teamSide: 'B', teamSlot: 1 },
-  { id: 'B2', label: 'Đội B — Vị trí 2', teamSide: 'B', teamSlot: 2 },
-]
-
-const EMPTY_MATCH_SLOTS: Readonly<Record<MatchSlot, string>> = {
-  A1: '',
-  A2: '',
-  B1: '',
-  B2: '',
-}
-
-function CreateManualMatchForm({
-  sessionId,
-  model,
-}: {
-  readonly sessionId: string
-  readonly model: LiveSessionModel
-}) {
-  const actionState = useCreateManualMatch(sessionId)
-  const [sessionCourtId, setSessionCourtId] = useState('')
-  const [participantsBySlot, setParticipantsBySlot] = useState(
-    EMPTY_MATCH_SLOTS,
-  )
-  const availableCourts = model.courts.filter(
-    (court) => court.status === 'AVAILABLE',
-  )
-  const waitingParticipants = model.waitingParticipants
-  const availableCourtIds = new Set(
-    availableCourts.map((court) => court.sessionCourtId),
-  )
-  const waitingParticipantIds = new Set(
-    waitingParticipants.map((participant) => participant.sessionParticipantId),
-  )
-
-  if (model.header.status !== 'IN_PROGRESS') {
-    return (
-      <section className="panel manual-match-creator" aria-labelledby="create-match-heading">
-        <div className="section-title section-title-large">
-          <div>
-            <p className="eyebrow">Vận hành trận đấu</p>
-            <h2 id="create-match-heading">Tạo trận thủ công</h2>
-          </div>
-        </div>
-        <p className="empty-panel">
-          Chỉ có thể tạo trận thủ công khi phiên đang diễn ra.
-        </p>
-      </section>
-    )
-  }
-
-  const selectedParticipants = Object.values(participantsBySlot).filter(
-    (participantId) => participantId !== '',
-  )
-  const selectionIsUnique =
-    new Set(selectedParticipants).size === selectedParticipants.length
-  const hasStaleSelection =
-    (sessionCourtId !== '' && !availableCourtIds.has(sessionCourtId)) ||
-    selectedParticipants.some(
-      (participantId) => !waitingParticipantIds.has(participantId),
-    )
-  const formIsValid =
-    availableCourtIds.has(sessionCourtId) &&
-    selectedParticipants.length === MATCH_SLOTS.length &&
-    selectionIsUnique &&
-    selectedParticipants.every((participantId) =>
-      waitingParticipantIds.has(participantId),
-    )
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!formIsValid || actionState.isPending) {
-      return
-    }
-
-    const succeeded = await actionState.execute({
-      sessionCourtId,
-      participants: MATCH_SLOTS.map((slot) => ({
-        sessionParticipantId: participantsBySlot[slot.id],
-        teamSide: slot.teamSide,
-        teamSlot: slot.teamSlot,
-      })),
-    })
-    if (succeeded) {
-      setSessionCourtId('')
-      setParticipantsBySlot(EMPTY_MATCH_SLOTS)
-    }
-  }
-
-  return (
-    <section className="panel manual-match-creator" aria-labelledby="create-match-heading">
-      <div className="section-title section-title-large">
-        <div>
-          <p className="eyebrow">Vận hành trận đấu</p>
-          <h2 id="create-match-heading">Tạo trận thủ công</h2>
-        </div>
-      </div>
-      <form onSubmit={(event) => void handleSubmit(event)}>
-        <div className="manual-match-fields">
-          <label className="match-field court-field">
-            <span>Sân trong phiên</span>
-            <select
-              value={
-                availableCourtIds.has(sessionCourtId) ? sessionCourtId : ''
-              }
-              disabled={actionState.isPending || availableCourts.length === 0}
-              onChange={(event) => setSessionCourtId(event.target.value)}
-            >
-              <option value="">Chọn sân sẵn sàng</option>
-              {availableCourts.map((court) => (
-                <option key={court.sessionCourtId} value={court.sessionCourtId}>
-                  {court.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="team-fields" aria-label="Phân công Đội A">
-            {MATCH_SLOTS.filter((slot) => slot.teamSide === 'A').map((slot) => (
-              <label className="match-field" key={slot.id}>
-                <span>{slot.label}</span>
-                <select
-                  value={
-                    waitingParticipantIds.has(participantsBySlot[slot.id])
-                      ? participantsBySlot[slot.id]
-                      : ''
-                  }
-                  disabled={actionState.isPending || waitingParticipants.length < 4}
-                  onChange={(event) =>
-                    setParticipantsBySlot((current) => ({
-                      ...current,
-                      [slot.id]: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Chọn người chơi đang chờ</option>
-                  {waitingParticipants.map((participant) => {
-                    const selectedElsewhere = MATCH_SLOTS.some(
-                      (candidateSlot) =>
-                        candidateSlot.id !== slot.id &&
-                        participantsBySlot[candidateSlot.id] ===
-                          participant.sessionParticipantId,
-                    )
-                    return (
-                      <option
-                        key={participant.sessionParticipantId}
-                        value={participant.sessionParticipantId}
-                        disabled={selectedElsewhere}
-                      >
-                        {participantOptionLabel(participant)}
-                      </option>
-                    )
-                  })}
-                </select>
-              </label>
-            ))}
-          </div>
-          <div className="team-fields" aria-label="Phân công Đội B">
-            {MATCH_SLOTS.filter((slot) => slot.teamSide === 'B').map((slot) => (
-              <label className="match-field" key={slot.id}>
-                <span>{slot.label}</span>
-                <select
-                  value={
-                    waitingParticipantIds.has(participantsBySlot[slot.id])
-                      ? participantsBySlot[slot.id]
-                      : ''
-                  }
-                  disabled={actionState.isPending || waitingParticipants.length < 4}
-                  onChange={(event) =>
-                    setParticipantsBySlot((current) => ({
-                      ...current,
-                      [slot.id]: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">Chọn người chơi đang chờ</option>
-                  {waitingParticipants.map((participant) => {
-                    const selectedElsewhere = MATCH_SLOTS.some(
-                      (candidateSlot) =>
-                        candidateSlot.id !== slot.id &&
-                        participantsBySlot[candidateSlot.id] ===
-                          participant.sessionParticipantId,
-                    )
-                    return (
-                      <option
-                        key={participant.sessionParticipantId}
-                        value={participant.sessionParticipantId}
-                        disabled={selectedElsewhere}
-                      >
-                        {participantOptionLabel(participant)}
-                      </option>
-                    )
-                  })}
-                </select>
-              </label>
-            ))}
-          </div>
-        </div>
-        {availableCourts.length === 0 && (
-          <p className="form-note">Không có sân sẵn sàng để chọn.</p>
-        )}
-        {waitingParticipants.length < 4 && (
-          <p className="form-note">
-            Cần ít nhất bốn người chơi đang chờ để tạo trận.
-          </p>
-        )}
-        {hasStaleSelection && (
-          <p className="form-note" role="status">
-            Lựa chọn trước đó không còn hợp lệ. Hãy chọn lại từ các tùy chọn
-            hiện tại trước khi tạo trận.
-          </p>
-        )}
-        <p className="form-note">
-          Việc tạo trận chưa giữ sân hoặc người chơi. Hệ thống sẽ kiểm tra lại
-          trạng thái sẵn sàng khi trận bắt đầu.
-        </p>
-        <div className="create-match-actions">
-          <button
-            className="primary-action-button"
-            type="submit"
-            disabled={!formIsValid || actionState.isPending}
-          >
-            {actionState.isPending ? 'Đang tạo…' : 'Tạo trận'}
-          </button>
-        </div>
-        {actionState.errorMessage && (
-          <p className="action-feedback" role="alert">
-            {actionState.errorMessage}
-          </p>
-        )}
-      </form>
-    </section>
-  )
-}
-
 function CreatedMatchCard({
   match,
   sessionId,
@@ -1371,13 +1114,6 @@ export function LiveSessionScreen({
           venueCourts={state.data.venueCourts}
           sessionCourts={state.data.sessionCourts}
         />
-        {model.header.status === 'IN_PROGRESS' && (
-          <GlobalMatchmakingRecommendation
-            sessionId={state.data.session.id}
-            courts={model.courts}
-            participants={allParticipants}
-          />
-        )}
         {model.courts.length === 0 ? (
           <p className="empty-panel">Chưa có sân nào trong phiên này.</p>
         ) : (
@@ -1396,11 +1132,6 @@ export function LiveSessionScreen({
           </div>
         )}
       </section>
-
-      <CreateManualMatchForm
-        sessionId={state.data.session.id}
-        model={model}
-      />
 
       <div className="operational-grid">
         <PeoplePanel

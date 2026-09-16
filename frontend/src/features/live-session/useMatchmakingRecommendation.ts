@@ -222,13 +222,17 @@ export function useMatchmakingRecommendation(
   }, [queryClient, sessionId])
 
   const reconcileMatchPlans = useCallback(async () => {
-    await queryClient.refetchQueries(
-      {
-        queryKey: ['sessionMatchPlans', sessionId],
-        exact: true,
-        type: 'active',
-      },
-      { throwOnError: true },
+    await Promise.all(
+      ['sessionMatchPlans', 'sessionParticipants'].map((queryName) =>
+        queryClient.refetchQueries(
+          {
+            queryKey: [queryName, sessionId],
+            exact: true,
+            type: 'active',
+          },
+          { throwOnError: true },
+        ),
+      ),
     )
 
     return (
