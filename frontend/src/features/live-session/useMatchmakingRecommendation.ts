@@ -127,7 +127,7 @@ function isQueuedRecommendation(
 
 function generateFailureMessage(error: unknown): string {
   if (!(error instanceof HttpError)) {
-    return 'Mất kết nối khi tạo đề xuất. Bạn có thể chủ động tạo lại; thao tác này chưa giữ sân hoặc người chơi.'
+    return 'Mất kết nối khi tạo đề xuất. Bạn có thể chủ động cập nhật đề xuất; thao tác này chưa giữ sân hoặc người chơi.'
   }
 
   if (error.status === 409) {
@@ -327,7 +327,7 @@ export function useMatchmakingRecommendation(
 
       if (error instanceof HttpError && error.status === 409) {
         setAcceptError(
-          'Đề xuất không thể bắt đầu với trạng thái hiện tại. Bạn có thể tạo đề xuất mới hoặc thêm một đề xuất hợp lệ vào hàng chờ.',
+          'Đề xuất không thể bắt đầu với trạng thái hiện tại. Bạn có thể cập nhật đề xuất hoặc thêm một đề xuất hợp lệ vào hàng chờ.',
         )
       } else if (!(error instanceof HttpError)) {
         setAcceptError(
@@ -337,7 +337,7 @@ export function useMatchmakingRecommendation(
         )
       } else {
         setAcceptError(
-          'Không thể chấp nhận đề xuất. Dữ liệu trực tiếp đã được tải lại; hãy tạo đề xuất mới.',
+          'Không thể chấp nhận đề xuất. Dữ liệu trực tiếp đã được tải lại; hãy cập nhật đề xuất.',
         )
       }
 
@@ -403,7 +403,7 @@ export function useMatchmakingRecommendation(
           queueAttemptExistingPlanIds.current = null
 
           setGenerateError(
-            'Đề xuất không còn hợp lệ để thêm vào hàng chờ. Hãy tạo đề xuất mới.',
+            'Đề xuất không còn hợp lệ để thêm vào hàng chờ. Hãy tạo đề xuất ghép trận từ trạng thái mới.',
           )
           return
         }

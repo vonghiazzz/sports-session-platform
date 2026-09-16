@@ -133,7 +133,9 @@ export function GlobalMatchmakingRecommendation({
               disabled={!action.canRegenerate}
               onClick={() => void action.generate()}
             >
-              {action.isGenerating ? 'Đang tạo lại…' : 'Tạo lại'}
+              {action.isGenerating
+                ? 'Đang cập nhật đề xuất…'
+                : 'Cập nhật đề xuất'}
             </button>
 
             <button
@@ -183,7 +185,9 @@ export function GlobalMatchmakingRecommendation({
       )}
 
       <p className="recommendation-note">
-        Bản xem trước chỉ đọc, không giữ sân hoặc người chơi và không tạo trận.
+        Đề xuất được tính từ trạng thái hiện tại. Nếu dữ liệu chưa thay đổi, kết
+        quả có thể giống trước. Bản xem trước chỉ đọc, không giữ sân hoặc người
+        chơi và không tạo trận.
       </p>
     </section>
   )

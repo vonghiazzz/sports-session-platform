@@ -93,6 +93,14 @@ export function PlayerSessionScreen({
             <PersonIdentity person={model.participant} />
           </h1>
           <p>{model.sessionTitle}</p>
+          <button
+            className="player-session-refresh"
+            type="button"
+            disabled={state.isRefreshing}
+            onClick={() => void state.refresh()}
+          >
+            {state.isRefreshing ? 'Đang làm mới…' : 'Làm mới'}
+          </button>
         </div>
         <dl>
           <div>

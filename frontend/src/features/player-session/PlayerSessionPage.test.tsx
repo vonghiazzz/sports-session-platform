@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MatchPlanResponse } from '../../api/contracts'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
 import type {
@@ -63,6 +64,10 @@ function queuedPlan(): MatchPlanResponse {
 }
 
 describe('PlayerSessionScreen', () => {
+  beforeEach(() => {
+    refresh.mockClear()
+  })
+
   it('renders Participant code, name, and REGISTERED state', () => {
     render(
       <PlayerSessionScreen
@@ -91,6 +96,78 @@ describe('PlayerSessionScreen', () => {
       'WAITING',
     )
     expect(screen.queryByRole('heading', { name: /Trận/ })).not.toBeInTheDocument()
+  })
+
+  it('manually refreshes authoritative data without leaving the Player view', async () => {
+    const user = userEvent.setup()
+    const input = createLiveSessionInput()
+    const rendered = render(
+      <PlayerSessionScreen
+        state={readyState(input)}
+        sessionParticipantId="participant-1"
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Làm mới' }))
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(screen.getByRole('heading', { name: '#1 An Nguyen' })).toBeVisible()
+
+    rendered.rerender(
+      <PlayerSessionScreen
+        state={readyState({
+          ...input,
+          participants: input.participants.map((participant) =>
+            participant.id === 'participant-1'
+              ? {
+                  ...participant,
+                  status: 'PAUSED',
+                  waitingSince: null,
+                  pausedAt: '2026-09-02T10:01:00Z',
+                }
+              : participant,
+          ),
+        })}
+        sessionParticipantId="participant-1"
+      />,
+    )
+    expect(screen.getByText('Tạm nghỉ')).toHaveAttribute(
+      'data-player-state',
+      'PAUSED',
+    )
+  })
+
+  it('shows an explicit disabled pending state for manual Refresh', () => {
+    render(
+      <PlayerSessionScreen
+        state={{
+          ...readyState(createLiveSessionInput()),
+          isRefreshing: true,
+        }}
+        sessionParticipantId="participant-1"
+      />,
+    )
+
+    expect(
+      screen.getByRole('button', { name: 'Đang làm mới…' }),
+    ).toBeDisabled()
+  })
+
+  it('keeps the last successful Player state after a refresh failure', () => {
+    render(
+      <PlayerSessionScreen
+        state={{
+          ...readyState(createLiveSessionInput()),
+          hasBackgroundError: true,
+        }}
+        sessionParticipantId="participant-1"
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: '#1 An Nguyen' })).toBeVisible()
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Đang hiển thị dữ liệu gần nhất',
+    )
+    expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
   })
 
   it('renders QUEUED Court, teammate, and two opponents with codes', () => {
@@ -221,7 +298,7 @@ describe('PlayerSessionScreen', () => {
       expect(screen.getByRole('heading', { name: '#3 Chi Le' })).toBeVisible()
       expect(screen.getByText(status === 'COMPLETED' ? 'Đã kết thúc' : 'Đã hủy'))
         .toBeVisible()
-      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
     },
   )
 })

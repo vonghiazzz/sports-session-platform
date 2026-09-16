@@ -39,9 +39,7 @@ export function MatchmakingRecommendation({
         >
           {action.isGenerating
             ? 'Đang tạo đề xuất…'
-            : action.generateError
-              ? 'Tạo đề xuất mới'
-              : 'Tạo đề xuất'}
+            : 'Tạo đề xuất ghép trận'}
         </button>
       ) : (
         <div className="recommendation-card">
@@ -129,8 +127,8 @@ export function MatchmakingRecommendation({
                 onClick={() => void action.generate()}
               >
                 {action.isGenerating
-                  ? 'Đang tạo đề xuất…'
-                  : 'Tạo đề xuất mới'}
+                  ? 'Đang cập nhật đề xuất…'
+                  : 'Cập nhật đề xuất'}
               </button>
             )}
           </div>
@@ -156,9 +154,9 @@ export function MatchmakingRecommendation({
       )}
 
       <p className="recommendation-note">
-        Ưu tiên người chờ lâu và cân bằng hai đội. Đề xuất chưa giữ sân hoặc
-        người chơi; bạn có thể bắt đầu ngay khi đủ điều kiện hoặc thêm vào hàng
-        chờ để chuẩn bị trước.
+        Đề xuất được tính từ trạng thái hiện tại. Nếu dữ liệu chưa thay đổi, kết
+        quả có thể giống trước. Đề xuất chưa giữ sân hoặc người chơi; bạn có thể
+        bắt đầu ngay khi đủ điều kiện hoặc thêm vào hàng chờ để chuẩn bị trước.
       </p>
 
       <p className="recommendation-fallback">

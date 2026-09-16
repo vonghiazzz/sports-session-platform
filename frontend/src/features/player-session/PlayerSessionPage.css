@@ -90,10 +90,16 @@
 .player-session-refresh {
   border: 1px solid var(--accent-strong);
   border-radius: 0.65rem;
+  margin-top: 0.5rem;
   padding: 0.65rem 0.9rem;
   color: #ffffff;
   background: var(--accent-strong);
   font-weight: 750;
+}
+
+.player-session-refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 @media (max-width: 42rem) {

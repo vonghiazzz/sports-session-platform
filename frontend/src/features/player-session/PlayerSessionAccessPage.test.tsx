@@ -1,6 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import userEvent from '@testing-library/user-event'
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MatchPlanResponse } from '../../api/contracts'
 import { HttpError } from '../../api/http'
@@ -21,6 +27,11 @@ const TOKEN = '550e8400-e29b-41d4-a716-446655440000'
 const SESSION_ID = 'session-1'
 const resolveAccessMock = vi.mocked(resolvePlayerSessionAccess)
 const liveSessionDataMock = vi.mocked(useLiveSessionData)
+const refreshMock = vi.fn(async () => undefined)
+
+function LocationProbe() {
+  return <output data-testid="current-location">{useLocation().pathname}</output>
+}
 
 function queuedPlan(): MatchPlanResponse {
   return {
@@ -58,7 +69,15 @@ function renderRoute(token = TOKEN) {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[`/player-session/${token}`]}>
         <Routes>
-          <Route path="/player-session/:token" element={<PlayerSessionAccessPage />} />
+          <Route
+            path="/player-session/:token"
+            element={
+              <>
+                <PlayerSessionAccessPage />
+                <LocationProbe />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -85,7 +104,7 @@ describe('PlayerSessionAccessPage', () => {
       liveSessionDataMock.mockReturnValue({
         status: 'ready',
         data: queued ? { ...input, matchPlans: [queuedPlan()] } : input,
-        refresh: vi.fn(async () => undefined),
+        refresh: refreshMock,
         isRefreshing: false,
       })
 
@@ -95,7 +114,10 @@ describe('PlayerSessionAccessPage', () => {
       expect(resolveAccessMock).toHaveBeenCalledWith(TOKEN, expect.any(AbortSignal))
       expect(liveSessionDataMock).toHaveBeenCalledWith(SESSION_ID)
       expect(screen.queryByText(TOKEN)).not.toBeInTheDocument()
-      expect(screen.queryByRole('button')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Làm mới' })).toBeEnabled()
+      expect(
+        screen.queryByRole('button', { name: /Điểm danh/ }),
+      ).not.toBeInTheDocument()
     },
   )
 
@@ -109,6 +131,33 @@ describe('PlayerSessionAccessPage', () => {
     ).toBeVisible()
     expect(liveSessionDataMock).not.toHaveBeenCalled()
     expect(screen.queryByText(TOKEN)).not.toBeInTheDocument()
+  })
+
+  it('keeps the token route while manually refreshing read-only data', async () => {
+    const user = userEvent.setup()
+    resolveAccessMock.mockResolvedValue({
+      sessionId: SESSION_ID,
+      sessionParticipantId: 'participant-1',
+    })
+    liveSessionDataMock.mockReturnValue({
+      status: 'ready',
+      data: createLiveSessionInput(),
+      refresh: refreshMock,
+      isRefreshing: false,
+    })
+
+    renderRoute()
+    await screen.findByText('Đang chờ')
+    await user.click(screen.getByRole('button', { name: 'Làm mới' }))
+
+    expect(refreshMock).toHaveBeenCalledOnce()
+    expect(resolveAccessMock).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('current-location')).toHaveTextContent(
+      `/player-session/${TOKEN}`,
+    )
+    expect(
+      screen.queryByRole('button', { name: /Điểm danh/ }),
+    ).not.toBeInTheDocument()
   })
 
   it('uses the existing generic error behavior for a malformed token', async () => {

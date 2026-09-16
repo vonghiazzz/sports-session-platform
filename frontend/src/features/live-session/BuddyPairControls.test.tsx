@@ -38,6 +38,7 @@ function participant(
     waitingSince: '2026-09-14T05:00:00Z',
     waitingDuration: '10 phút',
     dataUnavailable: false,
+    completedMatchCount: 0,
     plannedMatchCount: 0,
     planningLabel: null,
   }

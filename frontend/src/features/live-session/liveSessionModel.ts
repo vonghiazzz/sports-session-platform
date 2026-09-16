@@ -30,6 +30,7 @@ export interface ParticipantView {
   readonly waitingSince: string | null
   readonly waitingDuration: string | null
   readonly dataUnavailable: boolean
+  readonly completedMatchCount: number
   readonly plannedMatchCount: number
   readonly planningLabel: string | null
 }
@@ -188,6 +189,23 @@ export function composeLiveSessionModel({
 }: LiveSessionModelInput): LiveSessionModel {
   const warnings = new Set<string>()
   const playerById = new Map(players.map((player) => [player.id, player]))
+  const completedMatchIdsByParticipantId = new Map<string, Set<string>>()
+  for (const match of matches) {
+    if (match.sessionId !== session.id || match.status !== 'COMPLETED') {
+      continue
+    }
+    for (const assignment of match.participants) {
+      const completedMatchIds =
+        completedMatchIdsByParticipantId.get(
+          assignment.sessionParticipantId,
+        ) ?? new Set<string>()
+      completedMatchIds.add(match.id)
+      completedMatchIdsByParticipantId.set(
+        assignment.sessionParticipantId,
+        completedMatchIds,
+      )
+    }
+  }
 
   const activePlans = matchPlans.filter((plan) => plan.status === 'QUEUED')
   const courtNameBySessionCourtId = new Map(
@@ -254,6 +272,8 @@ export function composeLiveSessionModel({
       waitingSince: participant.waitingSince,
       waitingDuration,
       dataUnavailable: player === undefined,
+      completedMatchCount:
+        completedMatchIdsByParticipantId.get(participant.id)?.size ?? 0,
       plannedMatchCount: plannedMatches.length,
       planningLabel,
     }

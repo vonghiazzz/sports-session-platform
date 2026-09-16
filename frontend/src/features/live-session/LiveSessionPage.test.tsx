@@ -188,6 +188,12 @@ describe('LiveSessionScreen', () => {
     expect(people.getByRole('region', { name: 'Đã đăng ký: 1 người' })).toBeVisible()
     expect(people.getByRole('region', { name: 'Tạm nghỉ: 1 người' })).toBeVisible()
     expect(people.getByRole('region', { name: 'Đã rời: 0 người' })).toBeVisible()
+    expect(people.getAllByText('Trận đã hoàn tất: 0')).toHaveLength(8)
+    expect(
+      people.getByText(
+        'Số trận đã hoàn tất được tính trong phiên hiện tại và là một trong các tiêu chí ghép trận công bằng.',
+      ),
+    ).toBeVisible()
     expect(people.getAllByText('An Nguyen')).toHaveLength(1)
     expect(people.getByText('#1').closest('strong')).toHaveTextContent(
       '#1 An Nguyen',
@@ -202,6 +208,36 @@ describe('LiveSessionScreen', () => {
         name: /^QR người chơi cho /,
       }),
     ).toHaveLength(8)
+  })
+
+  it('renders completed-session Match counts from authoritative Match data', () => {
+    const currentState = readyState()
+    if (currentState.status !== 'ready') {
+      throw new Error('Expected ready fixture data')
+    }
+    renderScreen({
+      ...currentState,
+      data: {
+        ...currentState.data,
+        matches: currentState.data.matches.map((match) =>
+          match.status === 'CREATED'
+            ? {
+                ...match,
+                status: 'COMPLETED',
+                startedAt: '2026-09-02T09:40:00Z',
+                completedAt: '2026-09-02T09:50:00Z',
+              }
+            : match,
+        ),
+      },
+    })
+
+    const participantOne = screen.getByText('#1').closest('li')
+    const participantFive = screen.getByText('#5').closest('li')
+    expect(participantOne).not.toBeNull()
+    expect(participantFive).not.toBeNull()
+    expect(within(participantOne!).getByText('Trận đã hoàn tất: 1')).toBeVisible()
+    expect(within(participantFive!).getByText('Trận đã hoàn tất: 0')).toBeVisible()
   })
 
   it('distinguishes duplicate Player names with Session-local Participant codes', () => {
@@ -344,6 +380,7 @@ describe('LiveSessionScreen', () => {
     expect(people.getByRole('region', { name: 'Đã đăng ký: 4 người' })).toBeVisible()
     expect(people.getByRole('region', { name: 'Tạm nghỉ: 3 người' })).toBeVisible()
     expect(people.getByRole('region', { name: 'Đã rời: 2 người' })).toBeVisible()
+    expect(people.getAllByText('Trận đã hoàn tất: 0')).toHaveLength(25)
   })
 
   it('uses the single manual Refresh control for read refresh', async () => {
@@ -503,7 +540,7 @@ describe('LiveSessionScreen', () => {
 
     expect(
       playing.getByRole('button', {
-        name: 'Tạo đề xuất',
+        name: 'Tạo đề xuất ghép trận',
       }),
     ).toBeEnabled()
 
@@ -517,7 +554,7 @@ describe('LiveSessionScreen', () => {
 
     expect(
       available.getByRole('button', {
-        name: 'Tạo đề xuất',
+        name: 'Tạo đề xuất ghép trận',
       }),
     ).toBeEnabled()
 
@@ -532,7 +569,7 @@ describe('LiveSessionScreen', () => {
 
     expect(
       unavailable.getByRole('button', {
-        name: 'Tạo đề xuất',
+        name: 'Tạo đề xuất ghép trận',
       }),
     ).toBeEnabled()
   })
@@ -576,7 +613,9 @@ describe('LiveSessionScreen', () => {
 
       expect(screen.queryByRole('button', { name: 'Tạo trận' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Bắt đầu trận' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Tạo đề xuất' })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Tạo đề xuất ghép trận' }),
+      ).not.toBeInTheDocument()
       expect(
         screen.getAllByRole('button', {
           name: /^Sao chép liên kết người chơi cho /,

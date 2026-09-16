@@ -5,7 +5,7 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `38eefcfdb4b547f449fd5582e20fee1be9114d9d` |
+| HEAD | `b923e98f5e19c0eb33011dc17b5a41ac38684644` |
 | Ngày audit | 2026-09-16 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
@@ -166,6 +166,8 @@ Luồng discovery/resume, gồm recovery cho Session chưa bắt đầu:
 Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYING`, `PAUSED`, `LEFT`; khi phù hợp còn hiển thị Court, teammate và opponents.
 
 - Player View là read-only.
+- Player View tiếp tục polling và có nút `Làm mới` để chủ động refetch dữ liệu
+  authoritative mà không reload trình duyệt.
 - Host thực hiện check-in.
 - Player self check-in: **NOT IMPLEMENTED**, không phải current requirement.
 - QR auto check-in: **NOT IMPLEMENTED**, không phải current requirement.
@@ -177,6 +179,9 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | --- | --- | --- | --- | --- |
 | Create Player | DONE | DONE | DONE | Có quản lý danh sách/detail và SkillLevel |
 | Global Player Code V1 | DONE | DONE | DONE | Global display/search code; UUID vẫn canonical |
+| Session-local completed Match count visibility | N/A | DONE | DONE | People rows hiển thị count từ authoritative Match collection |
+| Player Session View manual refresh | N/A | DONE | DONE | Bổ sung refetch chủ động, giữ polling/read-only |
+| Recommendation refresh wording clarification | N/A | DONE | DONE | Recompute dùng “Cập nhật đề xuất”, không hứa phương án khác |
 | Create Venue | DONE | DONE | DONE | Có trong Session Setup |
 | Create Court | DONE | DONE | DONE | Tạo physical Court trong Setup hoặc Control Room |
 | Create Session | DONE | DONE | DONE | Setup UI không cần Swagger |
@@ -220,6 +225,9 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] Rating uncertainty explanation / history presentation
 - [x] Session → Home navigation
 - [x] Global Player Code V1 cho duplicate-name selection
+- [x] Session-local completed Match count visibility
+- [x] Player Session View manual refresh
+- [x] Recommendation refresh wording clarification
 
 ## 10. Matchmaking Current State
 
@@ -239,6 +247,11 @@ Thứ tự chọn đã xác thực:
 10. Player UUID và partition key làm deterministic tie-break.
 
 Recommendation là preview, không tự chiếm resource. Accept/Queue tái tạo và so sánh authoritative evidence; thay đổi participant, Court, Buddy, algorithm version hoặc composition khiến evidence cũ bị từ chối như stale. Host có thể accept-and-start hoặc đưa recommendation vào MatchPlan Queue.
+
+People rows hiển thị số Match `COMPLETED` trong Session theo
+`SessionParticipant UUID`, cùng semantics với fairness reader của backend.
+Recommendation là deterministic với cùng authoritative state; UI dùng “Cập
+nhật đề xuất” và giải thích kết quả có thể không đổi.
 
 ## 11. Rating Current State
 
@@ -299,7 +312,7 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 - Backend: JUnit/Spring integration tests với Testcontainers PostgreSQL 18.4; có Flyway schema/invariant coverage và pure-domain tests.
 - Frontend: Vitest, Testing Library, jsdom; có API contract, model/hook và component interaction coverage; checkpoint còn kiểm tra lint, TypeScript/Vite build và `git diff --check`.
 - Full backend sau Global Player Code V1: **635 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
-- Full frontend sau Global Player Code V1: **374 tests PASS**; lint và production build PASS.
+- Full frontend sau Fairness Visibility + Player Refresh + Recommendation Clarity: **382 tests PASS**; lint và production build PASS.
 - Các số trên là evidence đã ghi nhận, không phải kết quả chạy lại trong lần cập nhật tài liệu này.
 
 ## 16. Current Work
@@ -309,11 +322,8 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 ## 17. Next Recommended Work
 
 1. **Tiếp tục MVP Manual Browser Acceptance Test**
-2. **Đánh giá fairness visibility trong Host UI**
-3. **Đánh giá Player View manual refresh**
-4. **Rà soát Matchmaking wording**
-5. **Đơn giản hóa Match placement nếu manual acceptance xác nhận cần thiết**
-6. **MVP Checkpoint / Tag / Release Preparation**
+2. **Host Match Placement Simplification**
+3. **MVP Checkpoint / Tag / Release Preparation**
 
 ## 18. Deferred / Not Now
 
@@ -362,14 +372,16 @@ Các item sau đã được source/test/UI xác nhận **DONE** và không còn 
 - PLANNED Session Recovery Start V1 tại Session page.
 - Runtime Create Physical Court V1 với partial-failure recovery.
 - Global Player Code V1 với duplicate-name-safe selectors.
+- Session-local completed Match count visibility.
+- Player Session View manual refresh.
+- Recommendation refresh wording clarification.
 
 Không chuyển các item này trở lại `Current Work` nếu chưa có regression hoặc requirement mới được source chứng minh.
 
 ## 21. Known Gaps / Caveats
 
 - Manual browser acceptance là bước verification, không phải missing feature.
-- Fairness visibility, Player View manual refresh, Matchmaking wording và Match
-  placement simplification vẫn cần được đánh giá bằng manual acceptance.
+- Host Match Placement Simplification là hạng mục manual acceptance lớn còn lại.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
 
 ## 22. How To Use This Document

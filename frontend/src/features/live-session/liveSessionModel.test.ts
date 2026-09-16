@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLiveSessionInput } from '../../test/liveSessionFixtures'
-import type { ParticipantStatus } from '../../api/contracts'
+import type { MatchResponse, ParticipantStatus } from '../../api/contracts'
 import {
   composeLiveSessionModel,
   formatWaitingDuration,
@@ -25,6 +25,152 @@ describe('composeLiveSessionModel', () => {
       skillLevel: 'WEAK_PLUS',
       skillLabel: 'Yếu+',
     })
+  })
+
+  it('counts distinct COMPLETED Session Matches by SessionParticipant UUID only', () => {
+    const input = createLiveSessionInput()
+    const created = input.matches.find((match) => match.status === 'CREATED')
+    const playing = input.matches.find((match) => match.status === 'PLAYING')
+    expect(created).toBeDefined()
+    expect(playing).toBeDefined()
+    if (created === undefined || playing === undefined) {
+      throw new Error('Expected CREATED and PLAYING Match fixtures')
+    }
+
+    const completedOne: MatchResponse = {
+      ...created,
+      id: 'match-completed-1',
+      status: 'COMPLETED',
+      startedAt: '2026-09-02T09:40:00Z',
+      completedAt: '2026-09-02T09:50:00Z',
+    }
+    const completedTwo: MatchResponse = {
+      ...playing,
+      id: 'match-completed-2',
+      status: 'COMPLETED',
+      participants: playing.participants.map((assignment, index) =>
+        index === 0
+          ? { ...assignment, sessionParticipantId: 'participant-1' }
+          : assignment,
+      ),
+      completedAt: '2026-09-02T09:55:00Z',
+    }
+    const cancelled: MatchResponse = {
+      ...created,
+      id: 'match-cancelled',
+      status: 'CANCELLED',
+      cancelledAt: '2026-09-02T09:55:00Z',
+    }
+    const otherSession: MatchResponse = {
+      ...completedOne,
+      id: 'match-other-session',
+      sessionId: 'session-2',
+    }
+    const queuedPlan = {
+      id: 'plan-queued',
+      sessionId: input.session.id,
+      sessionCourtId: 'session-court-2',
+      source: 'MANUAL' as const,
+      status: 'QUEUED' as const,
+      queuePosition: 1,
+      startedMatchId: null,
+      participants: [
+        {
+          id: 'plan-participant-1',
+          sessionParticipantId: 'participant-1',
+          teamSide: 'A' as const,
+          teamSlot: 1,
+        },
+      ],
+      createdAt: '2026-09-02T09:56:00Z',
+      startedAt: null,
+      cancelledAt: null,
+      updatedAt: '2026-09-02T09:56:00Z',
+      version: 0,
+    }
+    const model = composeLiveSessionModel({
+      ...input,
+      players: input.players.map((player) =>
+        player.id === 'player-1' || player.id === 'player-2'
+          ? { ...player, displayName: 'Trùng Tên' }
+          : player,
+      ),
+      matches: [
+        created,
+        playing,
+        cancelled,
+        completedOne,
+        completedOne,
+        completedTwo,
+        otherSession,
+      ],
+      matchPlans: [queuedPlan],
+    })
+    const allParticipants = [
+      ...model.waitingParticipants,
+      ...model.playingParticipants,
+      ...model.registeredParticipants,
+      ...model.pausedParticipants,
+      ...model.leftParticipants,
+    ]
+    const countFor = (sessionParticipantId: string) =>
+      allParticipants.find(
+        (participant) =>
+          participant.sessionParticipantId === sessionParticipantId,
+      )?.completedMatchCount
+
+    expect(countFor('participant-1')).toBe(2)
+    expect(countFor('participant-2')).toBe(1)
+    expect(countFor('participant-3')).toBe(1)
+    expect(countFor('participant-8')).toBe(0)
+  })
+
+  it('updates the count from authoritative Match data and starts runtime additions at zero', () => {
+    const input = createLiveSessionInput()
+    const created = input.matches.find((match) => match.status === 'CREATED')
+    expect(created).toBeDefined()
+    if (created === undefined) {
+      throw new Error('Expected CREATED Match fixture')
+    }
+    const addedPlayer = {
+      ...input.players[0],
+      id: 'player-9',
+      playerCode: 'P000009',
+      displayName: 'Người mới',
+    }
+    const addedParticipant = {
+      ...input.participants[0],
+      id: 'participant-9',
+      playerId: addedPlayer.id,
+      participantCode: 9,
+    }
+    const before = composeLiveSessionModel({
+      ...input,
+      players: [...input.players, addedPlayer],
+      participants: [...input.participants, addedParticipant],
+    })
+    const after = composeLiveSessionModel({
+      ...input,
+      players: [...input.players, addedPlayer],
+      participants: [...input.participants, addedParticipant],
+      matches: [
+        ...input.matches.filter((match) => match.id !== created.id),
+        {
+          ...created,
+          status: 'COMPLETED',
+          startedAt: '2026-09-02T09:40:00Z',
+          completedAt: '2026-09-02T09:50:00Z',
+        },
+      ],
+    })
+    const waitingCount = (model: typeof before, id: string) =>
+      model.waitingParticipants.find(
+        (participant) => participant.sessionParticipantId === id,
+      )?.completedMatchCount
+
+    expect(waitingCount(before, 'participant-1')).toBe(0)
+    expect(waitingCount(after, 'participant-1')).toBe(1)
+    expect(waitingCount(after, 'participant-9')).toBe(0)
   })
 
   it('enriches a Session Court with its physical name and runtime status', () => {

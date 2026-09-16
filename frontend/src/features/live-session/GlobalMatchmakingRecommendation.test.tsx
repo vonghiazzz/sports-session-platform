@@ -59,6 +59,7 @@ const participants: readonly ParticipantView[] = Array.from(
     waitingSince: '2026-09-02T09:30:00Z',
     waitingDuration: `${30 - index} phút`,
     dataUnavailable: false,
+    completedMatchCount: 0,
     plannedMatchCount: 0,
     planningLabel: null,
   }),
@@ -246,7 +247,46 @@ describe('Global Matchmaking recommendation', () => {
     ).toEqual([false])
 
     request.resolve(globalPreview([recommendation('court-1', 1)]))
-    await screen.findByRole('button', { name: 'Tạo lại' })
+    await screen.findByRole('button', { name: 'Cập nhật đề xuất' })
+    expect(screen.queryByRole('button', { name: 'Tạo lại' })).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Nếu dữ liệu chưa thay đổi, kết quả có thể giống trước/),
+    ).toBeVisible()
+  })
+
+  it('updates from the same deterministic generator and accepts an unchanged result', async () => {
+    const user = userEvent.setup()
+    const unchangedPreview = globalPreview([recommendation('court-1', 1)])
+    const updateRequest = deferred<GlobalMatchmakingGenerationResponse>()
+    generateMock
+      .mockResolvedValueOnce(unchangedPreview)
+      .mockReturnValueOnce(updateRequest.promise)
+    renderGlobal()
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Tạo đề xuất cho các sân sẵn sàng',
+      }),
+    )
+    await screen.findByRole('article', {
+      name: 'Đề xuất toàn phiên cho Sân Một',
+    })
+
+    await user.click(
+      screen.getByRole('button', { name: 'Cập nhật đề xuất' }),
+    )
+    expect(
+      screen.getByRole('button', { name: 'Đang cập nhật đề xuất…' }),
+    ).toBeDisabled()
+
+    updateRequest.resolve(unchangedPreview)
+    await screen.findByRole('button', { name: 'Cập nhật đề xuất' })
+    expect(
+      screen.getByRole('article', {
+        name: 'Đề xuất toàn phiên cho Sân Một',
+      }),
+    ).toBeVisible()
+    expect(generateMock).toHaveBeenCalledTimes(2)
   })
 
   it('renders recommended Courts in backend order with names and player evidence', async () => {
@@ -434,7 +474,9 @@ describe('Global Matchmaking recommendation', () => {
       name: 'Đang thêm vào hàng chờ…',
     })
     expect(pendingButton).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Tạo lại' })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Cập nhật đề xuất' }),
+    ).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Bỏ đề xuất' })).toBeDisabled()
     await user.click(pendingButton)
     expect(queueMock).toHaveBeenCalledOnce()
@@ -476,7 +518,9 @@ describe('Global Matchmaking recommendation', () => {
       screen.queryByRole('button', { name: 'Thêm tất cả vào hàng chờ' }),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Tạo lại' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Cập nhật đề xuất' }),
+    )
     expect(
       await screen.findByRole('article', {
         name: 'Đề xuất toàn phiên cho Sân Hai',
@@ -543,7 +587,9 @@ describe('Global Matchmaking recommendation', () => {
       await screen.findByText(/Chưa xác định được yêu cầu đã được ghi nhận/),
     ).toBeVisible()
     expect(screen.getByRole('button', { name: 'Kiểm tra lại' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Tạo lại' })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Cập nhật đề xuất' }),
+    ).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Bỏ đề xuất' })).toBeDisabled()
 
     queryClient.setQueryData(
@@ -638,7 +684,9 @@ describe('Global Matchmaking recommendation', () => {
       }),
     ).toBeVisible()
 
-    await user.click(screen.getByRole('button', { name: 'Tạo lại' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Cập nhật đề xuất' }),
+    )
     expect(
       await screen.findByRole('article', {
         name: 'Đề xuất toàn phiên cho Sân Hai',
@@ -650,7 +698,9 @@ describe('Global Matchmaking recommendation', () => {
       }),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Tạo lại' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Cập nhật đề xuất' }),
+    )
     await waitFor(() => expect(screen.getByRole('alert')).toBeVisible())
     expect(
       screen.getByRole('article', {

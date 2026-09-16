@@ -56,15 +56,15 @@ function generateFailureMessage(error: unknown): string {
 
 function knownQueueFailureMessage(error: HttpError): string {
   if (error.status === 409) {
-    return 'Đề xuất đã thay đổi theo trạng thái mới của phiên. Hãy tạo lại trước khi thêm vào hàng chờ.'
+    return 'Đề xuất đã thay đổi theo trạng thái mới của phiên. Hãy cập nhật đề xuất trước khi thêm vào hàng chờ.'
   }
   if (error.status === 404) {
     return 'Phiên hoặc tài nguyên liên quan không còn khả dụng. Hãy làm mới dữ liệu.'
   }
   if (error.status === 400) {
-    return 'Bằng chứng đề xuất không còn hợp lệ. Hãy tạo lại trước khi thêm vào hàng chờ.'
+    return 'Bằng chứng đề xuất không còn hợp lệ. Hãy cập nhật đề xuất trước khi thêm vào hàng chờ.'
   }
-  return 'Không thể thêm đề xuất vào hàng chờ. Hãy tạo lại trước khi thử tiếp.'
+  return 'Không thể thêm đề xuất vào hàng chờ. Hãy cập nhật đề xuất trước khi thử tiếp.'
 }
 
 const UNKNOWN_OUTCOME_MESSAGE =

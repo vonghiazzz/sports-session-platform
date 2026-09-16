@@ -457,6 +457,9 @@ function ParticipantRow({
         <span>{participant.skillLabel ?? '—'}</span>
       </div>
       <div className="participant-operation">
+        <span className="participant-completed-match-count">
+          {`Trận đã hoàn tất: ${participant.completedMatchCount}`}
+        </span>
         {showWaiting && (
           <span
             className={
@@ -669,6 +672,10 @@ function PeoplePanel({
           onChange={(event) => setSearch(event.target.value)}
         />
       </label>
+      <p className="people-fairness-note">
+        Số trận đã hoàn tất được tính trong phiên hiện tại và là một trong các
+        tiêu chí ghép trận công bằng.
+      </p>
       {hasSearch && matchingCount === 0 ? (
         <p className="people-search-empty">Không tìm thấy người chơi trong phiên.</p>
       ) : (

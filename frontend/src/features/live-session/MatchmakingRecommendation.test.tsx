@@ -54,6 +54,7 @@ const participants: readonly ParticipantView[] = [
   waitingSince: '2026-09-02T09:30:00Z',
   waitingDuration,
   dataUnavailable: false,
+  completedMatchCount: 0,
   plannedMatchCount: 0,
   planningLabel: null,
 })) as readonly ParticipantView[]
@@ -210,7 +211,7 @@ function renderRecommendation(courtOverride: CourtView = court) {
 
 async function generate(user: ReturnType<typeof userEvent.setup>) {
   generateMock.mockResolvedValue(recommendation)
-  await user.click(screen.getByRole('button', { name: 'Tạo đề xuất' }))
+  await user.click(screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' }))
   await screen.findByRole('button', { name: 'Chấp nhận & bắt đầu' })
 }
 
@@ -295,7 +296,7 @@ describe('Matchmaking recommendation', () => {
     generateMock.mockReturnValue(request.promise)
     const { queryClient } = renderRecommendation()
 
-    const button = screen.getByRole('button', { name: 'Tạo đề xuất' })
+    const button = screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' })
     await user.click(button)
     await user.click(screen.getByRole('button', { name: 'Đang tạo đề xuất…' }))
     expect(generateMock).toHaveBeenCalledOnce()
@@ -323,7 +324,9 @@ describe('Matchmaking recommendation', () => {
 
     await user.click(screen.getByRole('button', { name: 'Bỏ đề xuất' }))
 
-    expect(screen.getByRole('button', { name: 'Tạo đề xuất' })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' }),
+    ).toBeEnabled()
     expect(screen.getByText(/tạo trận thủ công bên dưới/i)).toBeVisible()
     expect(acceptMock).not.toHaveBeenCalled()
   })
@@ -343,7 +346,9 @@ describe('Matchmaking recommendation', () => {
     })
     renderRecommendation()
 
-    await user.click(screen.getByRole('button', { name: 'Tạo đề xuất' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' }),
+    )
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Chưa đủ bốn người chơi',
@@ -351,7 +356,9 @@ describe('Matchmaking recommendation', () => {
     expect(
       screen.queryByRole('button', { name: 'Chấp nhận & bắt đầu' }),
     ).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Tạo đề xuất mới' })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: 'Tạo đề xuất ghép trận' }),
+    ).toBeEnabled()
   })
 
   it('submits exact evidence once and reconciles all four runtime queries', async () => {
@@ -433,7 +440,7 @@ describe('Matchmaking recommendation', () => {
     expect(
       screen.getByRole('button', { name: 'Chấp nhận & bắt đầu' }),
     ).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Tạo đề xuất mới' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Cập nhật đề xuất' })).toBeEnabled()
     expect(screen.getByText(/tạo trận thủ công bên dưới/i)).toBeVisible()
     expect(acceptMock).toHaveBeenCalledOnce()
   })
@@ -609,7 +616,7 @@ describe('Matchmaking recommendation', () => {
 
     expect(
       screen.getByRole('button', {
-        name: 'Tạo đề xuất mới',
+        name: 'Tạo đề xuất ghép trận',
       }),
     ).toBeEnabled()
   })
