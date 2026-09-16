@@ -110,6 +110,7 @@ export interface PlayerRatingResponse {
 
 export interface PlayerResponse {
   readonly id: UUID
+  readonly playerCode: string
   readonly displayName: string
   readonly sportProfiles: readonly PlayerSportProfileResponse[]
   readonly createdAt: ISOInstant

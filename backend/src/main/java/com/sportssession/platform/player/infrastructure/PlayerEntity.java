@@ -5,6 +5,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Generated;
+import org.hibernate.generator.EventType;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,6 +17,10 @@ public class PlayerEntity {
 
     @Id
     private UUID id;
+
+    @Generated(event = EventType.INSERT)
+    @Column(name = "player_code", nullable = false, insertable = false, updatable = false)
+    private long playerCode;
 
     @Column(name = "display_name", nullable = false, length = 120)
     private String displayName;
@@ -41,7 +47,7 @@ public class PlayerEntity {
     }
 
     public Player toDomain() {
-        return new Player(id, displayName, createdAt, updatedAt);
+        return new Player(id, playerCode, displayName, createdAt, updatedAt);
     }
 
     public UUID getId() {
@@ -52,6 +58,10 @@ public class PlayerEntity {
         return displayName;
     }
 
+    public long getPlayerCode() {
+        return playerCode;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -60,4 +70,3 @@ public class PlayerEntity {
         return updatedAt;
     }
 }
-

@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record PlayerResponse(
         UUID id,
+        String playerCode,
         String displayName,
         List<PlayerSportProfileResponse> sportProfiles,
         Instant createdAt,
@@ -16,6 +17,7 @@ public record PlayerResponse(
     static PlayerResponse from(PlayerResult result) {
         return new PlayerResponse(
                 result.player().id(),
+                result.player().formattedPlayerCode(),
                 result.player().displayName(),
                 result.sportProfiles().stream()
                         .map(PlayerSportProfileResponse::from)
@@ -24,4 +26,3 @@ public record PlayerResponse(
                 result.player().updatedAt());
     }
 }
-

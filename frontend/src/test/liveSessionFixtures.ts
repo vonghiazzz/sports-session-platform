@@ -24,6 +24,7 @@ const initialRatingBySkillLevel: Readonly<Record<SkillLevel, number>> = {
 function player(id: string, displayName: string, skillLevel: SkillLevel): PlayerResponse {
   return {
     id,
+    playerCode: `P${id.replace('player-', '').padStart(6, '0')}`,
     displayName,
     sportProfiles: [
       {

@@ -49,11 +49,12 @@ public class PlayerService {
     @Transactional
     public PlayerResult createPlayer(CreatePlayerCommand command) {
         Instant now = Instant.now();
-        Player player = Player.create(command.displayName(), now);
+        Player newPlayer = Player.create(command.displayName(), now);
         PlayerSportProfile profile = PlayerSportProfile.create(
-                player.id(), command.sport(), command.skillLevel(), now);
+                newPlayer.id(), command.sport(), command.skillLevel(), now);
 
-        playerRepository.save(PlayerEntity.from(player));
+        Player player = playerRepository.saveAndFlush(PlayerEntity.from(newPlayer))
+                .toDomain();
         try {
             profileRepository.saveAndFlush(PlayerSportProfileEntity.from(profile));
         } catch (DataIntegrityViolationException exception) {
@@ -82,11 +83,20 @@ public class PlayerService {
     @Transactional(readOnly = true)
     public List<PlayerResult> searchPlayers(String name) {
         String normalizedName = name == null ? null : name.strip();
-        List<PlayerEntity> entities = normalizedName == null || normalizedName.isEmpty()
-                ? playerRepository.findAllByOrderByCreatedAtAscIdAsc()
-                : playerRepository
-                        .findByDisplayNameContainingIgnoreCaseOrderByCreatedAtAscIdAsc(
-                                normalizedName);
+        List<PlayerEntity> entities;
+        if (normalizedName == null || normalizedName.isEmpty()) {
+            entities = playerRepository.findAllByOrderByCreatedAtAscIdAsc();
+        } else {
+            Long playerCode = parsePlayerCode(normalizedName);
+            entities = playerCode == null
+                    ? playerRepository
+                            .findByDisplayNameContainingIgnoreCaseOrderByCreatedAtAscIdAsc(
+                                    normalizedName)
+                    : playerRepository
+                            .findByPlayerCodeOrDisplayNameContainingIgnoreCaseOrderByCreatedAtAscIdAsc(
+                                    playerCode,
+                                    normalizedName);
+        }
 
         if (entities.isEmpty()) {
             return List.of();
@@ -234,5 +244,21 @@ public class PlayerService {
             current = current.getCause();
         }
         return false;
+    }
+
+    private static Long parsePlayerCode(String search) {
+        String digits = search.length() > 1
+                && (search.charAt(0) == 'P' || search.charAt(0) == 'p')
+                ? search.substring(1)
+                : search;
+        if (digits.isEmpty() || !digits.chars().allMatch(Character::isDigit)) {
+            return null;
+        }
+        try {
+            long value = Long.parseLong(digits);
+            return value > 0 ? value : null;
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 }

@@ -60,6 +60,7 @@ const courts: readonly CourtResponse[] = [
 const players: readonly PlayerResponse[] = [
   {
     id: 'player-1',
+    playerCode: 'P000001',
     displayName: 'Nguyễn An',
     sportProfiles: [
       {
@@ -82,6 +83,7 @@ const players: readonly PlayerResponse[] = [
   },
   {
     id: 'player-2',
+    playerCode: 'P000002',
     displayName: 'Trần Bình',
     sportProfiles: [
       {
@@ -104,10 +106,10 @@ const players: readonly PlayerResponse[] = [
   },
 ]
 
-function arrangeHooks() {
+function arrangeHooks(availablePlayers: readonly PlayerResponse[] = players) {
   vi.mocked(useSessionSetupData).mockImplementation((venueId) => ({
     venues,
-    players,
+    players: availablePlayers,
     courts: venueId === 'venue-1' ? courts : [],
     venuesLoading: false,
     playersLoading: false,
@@ -172,7 +174,7 @@ describe('SessionSetupPage', () => {
     expect(screen.getByText('Yếu')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Tìm người chơi'), 'an')
 
-    expect(screen.getByText('Nguyễn An')).toBeInTheDocument()
+    expect(screen.getByText('P000001 · Nguyễn An')).toBeInTheDocument()
     expect(screen.queryByText('Trần Bình')).not.toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: /Nguyễn An/ }))
     expect(screen.getByText('Đã chọn 1 người chơi.')).toBeInTheDocument()
@@ -256,5 +258,39 @@ describe('SessionSetupPage', () => {
       courtIds: ['court-1'],
       playerIds: ['player-1'],
     })
+  })
+
+  it('distinguishes duplicate names and allocates the selected Player UUID', async () => {
+    arrangeHooks([
+      players[0],
+      { ...players[1], displayName: players[0].displayName },
+    ])
+    const { user } = renderPage()
+
+    expect(
+      screen.getByRole('checkbox', { name: /P000001 · Nguyễn An/ }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('checkbox', { name: /P000002 · Nguyễn An/ }),
+    ).toBeVisible()
+    await user.type(screen.getByLabelText('Tìm người chơi'), '000002')
+    expect(
+      screen.queryByRole('checkbox', { name: /P000001 · Nguyễn An/ }),
+    ).not.toBeInTheDocument()
+    await user.click(
+      screen.getByRole('checkbox', { name: /P000002 · Nguyễn An/ }),
+    )
+
+    await user.type(screen.getByLabelText('Tiêu đề phiên'), 'Phiên mã Player')
+    await user.type(screen.getByLabelText('Ngày'), '2026-09-05')
+    await user.type(screen.getByLabelText('Giờ bắt đầu'), '18:00')
+    await user.type(screen.getByLabelText('Giờ kết thúc'), '20:00')
+    await user.selectOptions(screen.getByLabelText('Chọn địa điểm'), 'venue-1')
+    await user.click(screen.getByRole('checkbox', { name: 'Sân 1' }))
+    await user.click(screen.getByRole('button', { name: 'Tạo và bắt đầu phiên' }))
+
+    expect(executeMock).toHaveBeenCalledWith(expect.objectContaining({
+      playerIds: ['player-2'],
+    }))
   })
 })

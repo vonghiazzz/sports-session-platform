@@ -33,6 +33,13 @@
   color: #9de2d1;
 }
 
+.player-management-header .player-code {
+  margin-top: 0.7rem;
+  color: #ffffff;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
 .player-management-header nav {
   display: flex;
   flex: 0 0 auto;

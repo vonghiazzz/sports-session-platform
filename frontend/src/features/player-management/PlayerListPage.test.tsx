@@ -16,6 +16,7 @@ vi.mock('../../api/playerApi', () => ({
 
 const initialPlayer: PlayerResponse = {
   id: 'player-1',
+  playerCode: 'P000001',
   displayName: 'Nguyễn An',
   sportProfiles: [{
     id: 'profile-1',
@@ -38,6 +39,7 @@ const initialPlayer: PlayerResponse = {
 const persistedPlayer: PlayerResponse = {
   ...initialPlayer,
   id: 'player-2',
+  playerCode: 'P000002',
   displayName: 'Trần Bình',
   sportProfiles: [{
     ...initialPlayer.sportProfiles[0],
@@ -87,9 +89,11 @@ describe('PlayerListPage', () => {
     expect(screen.getByText('Đang tải người chơi...')).toBeInTheDocument()
   })
 
-  it('renders names, Vietnamese Skill labels, Rating, and rated matches', async () => {
+  it('renders Player codes, names, Vietnamese Skill labels, Rating, and rated matches', async () => {
     renderPage()
-    expect(await screen.findByText('Nguyễn An')).toBeInTheDocument()
+    expect(await screen.findByText('P000001')).toBeInTheDocument()
+    expect(screen.getByText('P000002')).toBeInTheDocument()
+    expect(screen.getByText('Nguyễn An')).toBeInTheDocument()
     expect(screen.getByText('Trình: TB+')).toBeInTheDocument()
     expect(screen.getByText('31,0')).toBeInTheDocument()
     expect(screen.getByText('Chưa có trận được tính điểm xếp hạng')).toBeInTheDocument()
@@ -116,6 +120,33 @@ describe('PlayerListPage', () => {
     expect(getPlayers).toHaveBeenCalledTimes(1)
     await user.click(screen.getByRole('button', { name: 'Tìm kiếm' }))
     expect(getPlayers).toHaveBeenLastCalledWith('Nguyễn An', expect.any(AbortSignal))
+  })
+
+  it('submits a global Player code through the existing search flow', async () => {
+    const { user } = renderPage()
+    await screen.findByText('P000001')
+    await user.type(screen.getByLabelText('Tên người chơi'), '  p000001  ')
+    await user.click(screen.getByRole('button', { name: 'Tìm kiếm' }))
+
+    expect(getPlayers).toHaveBeenLastCalledWith(
+      'p000001',
+      expect.any(AbortSignal),
+    )
+  })
+
+  it('distinguishes duplicate names while detail navigation remains UUID-based', async () => {
+    vi.mocked(getPlayers).mockResolvedValue([
+      initialPlayer,
+      { ...persistedPlayer, displayName: initialPlayer.displayName },
+    ])
+    renderPage()
+
+    expect(await screen.findAllByText('Nguyễn An')).toHaveLength(2)
+    expect(screen.getByText('P000001')).toBeInTheDocument()
+    expect(screen.getByText('P000002')).toBeInTheDocument()
+    const links = screen.getAllByRole('link', { name: 'Xem chi tiết' })
+    expect(links[0]).toHaveAttribute('href', '/players/player-1')
+    expect(links[1]).toHaveAttribute('href', '/players/player-2')
   })
 
   it('shows the base empty state', async () => {

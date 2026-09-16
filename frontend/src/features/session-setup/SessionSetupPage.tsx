@@ -1,5 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  matchesPlayerIdentitySearch,
+  playerIdentityLabel,
+} from '../../lib/playerIdentity'
 import type { SkillLevel } from '../../api/contracts'
 import {
   matchFormatLabel,
@@ -60,17 +64,12 @@ export function SessionSetupPage() {
   const badmintonPlayers = data.players.filter((player) =>
     player.sportProfiles.some((profile) => profile.sport === 'BADMINTON'),
   )
-  const normalizedSearch = playerSearch.trim().toLocaleLowerCase('vi-VN')
   const visiblePlayers = useMemo(
     () =>
       badmintonPlayers.filter(
-        (player) =>
-          normalizedSearch.length === 0 ||
-          player.displayName
-            .toLocaleLowerCase('vi-VN')
-            .includes(normalizedSearch),
+        (player) => matchesPlayerIdentitySearch(player, playerSearch),
       ),
-    [badmintonPlayers, normalizedSearch],
+    [badmintonPlayers, playerSearch],
   )
   const selectedCourts = eligibleCourts.filter((court) =>
     selectedCourtIds.includes(court.id),
@@ -432,7 +431,7 @@ export function SessionSetupPage() {
                       )
                     }
                   />
-                  <span>{player.displayName}</span>
+                  <span>{playerIdentityLabel(player)}</span>
                   <small>{profile ? skillLevelLabel(profile.skillLevel) : '—'}</small>
                 </label>
               )
@@ -528,7 +527,7 @@ export function SessionSetupPage() {
           <div>
             <dt>Người chơi ({selectedPlayers.length})</dt>
             <dd>
-              {selectedPlayers.map((player) => player.displayName).join(', ') || '—'}
+              {selectedPlayers.map(playerIdentityLabel).join(', ') || '—'}
             </dd>
           </div>
         </dl>

@@ -10,6 +10,10 @@ import type {
 } from '../../api/contracts'
 import { skillLevelLabel } from '../../lib/presentation'
 import {
+  matchesPlayerIdentitySearch,
+  playerIdentityLabel,
+} from '../../lib/playerIdentity'
+import {
   useLiveAddCourt,
   useLiveAddPlayer,
 } from './useLiveSessionAdditions'
@@ -46,15 +50,11 @@ export function LiveAddPlayer({
     () => new Set(participants.map((participant) => participant.playerId)),
     [participants],
   )
-  const normalizedSearch = search.trim().toLocaleLowerCase('vi-VN')
   const eligiblePlayers = players.filter(
     (player) =>
       !participantPlayerIds.has(player.id) &&
       player.sportProfiles.some((profile) => profile.sport === 'BADMINTON') &&
-      (normalizedSearch.length === 0 ||
-        player.displayName
-          .toLocaleLowerCase('vi-VN')
-          .includes(normalizedSearch)),
+      matchesPlayerIdentitySearch(player, search),
   )
 
   if (sessionStatus !== 'IN_PROGRESS') {
@@ -132,7 +132,7 @@ export function LiveAddPlayer({
                     disabled={action.isPending || action.hasUnknownAddOutcome}
                     onChange={() => setSelectedPlayerId(player.id)}
                   />
-                  <span>{player.displayName}</span>
+                  <span>{playerIdentityLabel(player)}</span>
                   <small>{profile ? skillLevelLabel(profile.skillLevel) : '—'}</small>
                 </label>
               )

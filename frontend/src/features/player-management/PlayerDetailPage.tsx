@@ -92,6 +92,7 @@ export function PlayerDetailPage() {
       <header className="player-management-header">
         <div>
           <p className="eyebrow">Hồ sơ người chơi</p>
+          <p className="player-code">{player.playerCode}</p>
           <h1>{player.displayName}</h1>
           <p>
             Trình độ do người tổ chức quản lý; điểm xếp hạng thay đổi độc lập

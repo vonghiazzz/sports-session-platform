@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,6 +33,11 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,6 +63,9 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
 
     @Autowired
     private PlayerRepository playerRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private PlayerSportProfileRepository profileRepository;
@@ -92,6 +101,8 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.matchesPattern(
                         ".*/api/players/[0-9a-f-]{36}")))
+                .andExpect(jsonPath("$.playerCode", org.hamcrest.Matchers.matchesPattern(
+                        "P[0-9]{6,}")))
                 .andExpect(jsonPath("$.displayName").value("Player A"))
                 .andExpect(jsonPath("$.sportProfiles[0].sport").value("BADMINTON"))
                 .andExpect(jsonPath("$.sportProfiles[0].skillLevel")
@@ -157,6 +168,8 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
         mockMvc.perform(get("/api/players/{playerId}", playerId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(playerId.toString()))
+                .andExpect(jsonPath("$.playerCode", org.hamcrest.Matchers.matchesPattern(
+                        "P[0-9]{6,}")))
                 .andExpect(jsonPath("$.displayName").value("Player B"))
                 .andExpect(jsonPath("$.sportProfiles.length()").value(1))
                 .andExpect(jsonPath("$.sportProfiles[0].rating.ratingValue")
@@ -184,6 +197,8 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
         mockMvc.perform(get("/api/players"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].playerCode").isString())
+                .andExpect(jsonPath("$[1].playerCode").isString())
                 .andExpect(jsonPath("$[0].sportProfiles[0].rating.ratingBasis")
                         .value("INITIAL_PRIOR"))
                 .andExpect(jsonPath("$[1].sportProfiles[0].rating.ratingBasis")
@@ -245,6 +260,8 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
     void skillUpdatePreservesMatureRatingAndMatchmakingReadsBothDimensions()
             throws Exception {
         UUID playerId = createPlayer("Rated Player");
+        long playerCode = playerRepository.findById(playerId).orElseThrow()
+                .getPlayerCode();
         Instant initializedAt = Instant.parse("2026-09-11T01:00:00Z");
         PlayerRatingEntity rating = PlayerRatingEntity.initialize(
                 playerId,
@@ -267,6 +284,8 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
 
         updateSkillLevel(playerId, "INTERMEDIATE_PLUS")
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerCode")
+                        .value("P%06d".formatted(playerCode)))
                 .andExpect(jsonPath("$.sportProfiles[0].skillLevel")
                         .value("INTERMEDIATE_PLUS"))
                 .andExpect(jsonPath("$.sportProfiles[0].rating.ratingValue")
@@ -362,11 +381,116 @@ class PlayerApiIntegrationTest extends PostgreSqlIntegrationTest {
 
     @Test
     void duplicateDisplayNamesAreAllowed() throws Exception {
-        createPlayer("Same Name");
-        createPlayer("Same Name");
+        UUID firstPlayerId = createPlayer("Same Name");
+        UUID secondPlayerId = createPlayer("Same Name");
 
         assertThat(playerRepository.count()).isEqualTo(2);
         assertThat(profileRepository.count()).isEqualTo(2);
+        assertThat(List.of(
+                playerRepository.findById(firstPlayerId).orElseThrow()
+                        .getPlayerCode(),
+                playerRepository.findById(secondPlayerId).orElseThrow()
+                        .getPlayerCode()
+        )).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void playerCodeSearchAcceptsFormattedLowercaseAndNumericForms()
+            throws Exception {
+        UUID playerId = createPlayer("Searchable Player");
+        long playerCode = playerRepository.findById(playerId).orElseThrow()
+                .getPlayerCode();
+        String formattedCode = "P%06d".formatted(playerCode);
+
+        for (String search : List.of(
+                formattedCode,
+                formattedCode.toLowerCase(),
+                formattedCode.substring(1)
+        )) {
+            mockMvc.perform(get("/api/players").queryParam("name", search))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].id").value(playerId.toString()))
+                    .andExpect(jsonPath("$[0].playerCode")
+                            .value(formattedCode));
+        }
+    }
+
+    @Test
+    void clientSuppliedPlayerCodeCannotOverrideSystemGeneratedCode()
+            throws Exception {
+        mockMvc.perform(post("/api/players")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "System Code Owner",
+                                  "playerCode": "P999999",
+                                  "sport": "BADMINTON",
+                                  "skillLevel": "INTERMEDIATE"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.playerCode")
+                        .value(org.hamcrest.Matchers.not("P999999")));
+    }
+
+    @Test
+    void concurrentPlayerCreationsReceiveDistinctGlobalCodes()
+            throws Exception {
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<UUID> first = executor.submit(() ->
+                    createPlayerAfterGate("Concurrent Name", ready, start));
+            Future<UUID> second = executor.submit(() ->
+                    createPlayerAfterGate("Concurrent Name", ready, start));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+
+            List<Long> codes = List.of(
+                    playerRepository.findById(
+                            first.get(15, TimeUnit.SECONDS)
+                    ).orElseThrow().getPlayerCode(),
+                    playerRepository.findById(
+                            second.get(15, TimeUnit.SECONDS)
+                    ).orElseThrow().getPlayerCode()
+            );
+            assertThat(codes)
+                    .allMatch(code -> code > 0)
+                    .doesNotHaveDuplicates();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void playerCodesRemainValidWhenTheDatabaseSequenceHasAGap()
+            throws Exception {
+        long unusedCode = jdbcTemplate.queryForObject(
+                "SELECT nextval('players_player_code_seq')",
+                Long.class
+        );
+
+        UUID playerId = createPlayer("Player After Gap");
+        long assignedCode = playerRepository.findById(playerId).orElseThrow()
+                .getPlayerCode();
+
+        assertThat(assignedCode).isGreaterThan(unusedCode);
+        assertThat(playerRepository.findAll())
+                .noneMatch(player -> player.getPlayerCode() == unusedCode);
+    }
+
+    private UUID createPlayerAfterGate(
+            String displayName,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws Exception {
+        ready.countDown();
+        if (!start.await(5, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("start gate timeout");
+        }
+        return createPlayer(displayName);
     }
 
     private UUID createPlayer(String displayName) throws Exception {

@@ -35,6 +35,7 @@ vi.mock('../../api/sessionSetupApi', () => ({
 
 const createdPlayer: PlayerResponse = {
   id: 'player-new',
+  playerCode: 'P000099',
   displayName: 'Người chơi mới',
   sportProfiles: [
     {

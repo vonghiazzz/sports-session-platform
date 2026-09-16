@@ -26,6 +26,7 @@ vi.mock('../../api/playerApi', () => ({
 
 const initialPlayer: PlayerResponse = {
   id: 'player-1',
+  playerCode: 'P000001',
   displayName: 'Nguyễn An',
   sportProfiles: [{
     id: 'profile-1',
@@ -276,6 +277,7 @@ describe('PlayerDetailPage', () => {
   it('renders Player identity, Skill, initial Rating, uncertainty, and basis', async () => {
     renderPage()
     expect(await screen.findByRole('heading', { name: 'Nguyễn An' })).toBeInTheDocument()
+    expect(screen.getByText('P000001')).toBeInTheDocument()
     expect(screen.getByText('Cầu lông')).toBeInTheDocument()
     const currentSkill = screen.getByText('Trình hiện tại').parentElement
     expect(currentSkill).not.toBeNull()

@@ -5,12 +5,12 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `d732ee57df1795205d5551640fce6bb582532827` |
-| Ngày audit | 2026-09-15 |
+| HEAD | `38eefcfdb4b547f449fd5582e20fee1be9114d9d` |
+| Ngày audit | 2026-09-16 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
 | Database | PostgreSQL 18.4; Hibernate `ddl-auto=validate` |
-| Migration head | V8 — Participant Personal Access Token |
+| Migration head | V9 — Global Player Code |
 
 Đây là living document canonical về trạng thái sản phẩm. Khi tài liệu và source khác nhau, ưu tiên `CODE → TEST → CONFIG → MIGRATION → CURRENT UI → docs/comments/assumptions` và cập nhật lại tài liệu.
 
@@ -39,7 +39,7 @@ Cung cấp một luồng vận hành phiên cầu lông đôi hoàn chỉnh: Hos
 ### Database
 
 - PostgreSQL là nguồn dữ liệu bền vững; JPA mapping được kiểm tra với `ddl-auto=validate`.
-- Flyway quản lý schema. V1–V8 đã áp dụng và bất biến.
+- Flyway quản lý schema. V1–V9 đã áp dụng và bất biến.
 - UUID là khóa định danh chính của các aggregate/runtime record; enum domain được lưu dưới dạng giá trị chuỗi theo schema hiện tại.
 
 ### Runtime Data Flow
@@ -99,7 +99,9 @@ MatchPlan là kế hoạch/hàng đợi theo Session Court, hỗ trợ tạo, s�
 
 ### Player / Rating
 
-- Player là identity lâu dài; sports profile hiện có `BADMINTON` và `SkillLevel`.
+- Player là identity lâu dài; UUID vẫn là canonical identity, còn `playerCode`
+  là mã global immutable do hệ thống sinh để Host hiển thị và tìm kiếm.
+- Sports profile hiện có `BADMINTON` và `SkillLevel`.
 - `SkillLevel` prior ban đầu: `WEAK=15`, `WEAK_PLUS=19`, `INTERMEDIATE_MINUS=23`, `INTERMEDIATE=27`, `INTERMEDIATE_PLUS=31`, `GOOD=35`; uncertainty ban đầu là `25/3`.
 - Rating hiện tại được persist theo Player/Sport/MatchFormat; rating history được ghi thành event theo kết quả Match.
 
@@ -107,7 +109,17 @@ MatchPlan là kế hoạch/hàng đợi theo Session Court, hỗ trợ tạo, s�
 
 ### Player ID
 
-Identity của Player xuyên suốt hệ thống.
+UUID là canonical identity của Player xuyên suốt hệ thống. API mutation,
+navigation và persistence relationship tiếp tục dùng UUID.
+
+### playerCode
+
+Mã global, immutable và human-readable của Player, ví dụ `P000123`:
+
+- PostgreSQL lưu số sequence dạng `BIGINT`; API/UI format `P%06d`;
+- globally unique, system-generated và không do client cung cấp;
+- chỉ dùng cho display/search, không thay thế UUID làm relational/business identity;
+- độc lập với `participantCode` cục bộ của từng Session.
 
 ### SessionParticipant UUID
 
@@ -138,6 +150,9 @@ Luồng tạo mới qua UI:
 
 `Home → Create New Session → create/select Venue → create/select Courts → create/select Players → create Session → allocate Courts → add Participants → Start Session → Control Room → Check-In Desk / People Check-In → REGISTERED → WAITING → Buddy / People operations → Runtime Add Court bằng cách chọn existing Court hoặc tạo physical Court rồi allocate → Manual Match hoặc Matchmaking → Accept & Start hoặc MatchPlan Queue → Start Match → Complete / Cancel Match → Complete / Cancel Session`
 
+Player trùng `displayName` được phân biệt trước khi cấp phát vào Session bằng
+`playerCode · displayName`; mọi lựa chọn/mutation vẫn gửi Player UUID.
+
 Luồng discovery/resume, gồm recovery cho Session chưa bắt đầu:
 
 `Home → discover PLANNED Session → open Session bằng Session UUID → Start → IN_PROGRESS → Control Room`
@@ -161,6 +176,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | Capability | Backend | Frontend | Overall | Notes |
 | --- | --- | --- | --- | --- |
 | Create Player | DONE | DONE | DONE | Có quản lý danh sách/detail và SkillLevel |
+| Global Player Code V1 | DONE | DONE | DONE | Global display/search code; UUID vẫn canonical |
 | Create Venue | DONE | DONE | DONE | Có trong Session Setup |
 | Create Court | DONE | DONE | DONE | Tạo physical Court trong Setup hoặc Control Room |
 | Create Session | DONE | DONE | DONE | Setup UI không cần Swagger |
@@ -203,6 +219,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 - [x] Vietnamese terminology polish
 - [x] Rating uncertainty explanation / history presentation
 - [x] Session → Home navigation
+- [x] Global Player Code V1 cho duplicate-name selection
 
 ## 10. Matchmaking Current State
 
@@ -236,7 +253,7 @@ Recommendation là preview, không tự chiếm resource. Accept/Queue tái tạ
 
 | Nhóm | API hiện có |
 | --- | --- |
-| Player | Create, list/search, get detail, update SkillLevel, read Rating history |
+| Player | Create, list/search theo name/code, get detail, update SkillLevel, read Rating history |
 | Venue/Court | Create/list/get Venue; create/list Court theo Venue; get Court |
 | Session | Create/list/get; start/complete/cancel; add/list Participants; check-in/pause/resume/leave; add/list/enable/disable Session Courts |
 | Buddy/Personal access | Create/remove Buddy Pair; get participant personal access; resolve personal token |
@@ -273,30 +290,30 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 | V6 | Session Buddy Pair |
 | V7 | Session Participant Code |
 | V8 | Participant Personal Access Token |
+| V9 | Global Player Code |
 
-**V1–V8 IMMUTABLE.** Mọi thay đổi schema tương lai phải dùng migration version mới; không sửa migration đã áp dụng.
+**V1–V9 IMMUTABLE.** Mọi thay đổi schema tương lai phải dùng migration version mới; không sửa migration đã áp dụng.
 
 ## 15. Testing / Verification
 
 - Backend: JUnit/Spring integration tests với Testcontainers PostgreSQL 18.4; có Flyway schema/invariant coverage và pure-domain tests.
 - Frontend: Vitest, Testing Library, jsdom; có API contract, model/hook và component interaction coverage; checkpoint còn kiểm tra lint, TypeScript/Vite build và `git diff --check`.
-- Full backend sau Session Discovery / Resume V1: **630 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
-- Full frontend sau Runtime Create Physical Court V1: **360 tests PASS**; lint và production build PASS.
+- Full backend sau Global Player Code V1: **635 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
+- Full frontend sau Global Player Code V1: **374 tests PASS**; lint và production build PASS.
 - Các số trên là evidence đã ghi nhận, không phải kết quả chạy lại trong lần cập nhật tài liệu này.
 
 ## 16. Current Work
 
-**Current Work: Stable human-readable Player identity — DESIGN REQUIRED**
-
-Manual acceptance vẫn đang mở vì các Player trùng tên chưa thể được phân biệt
-an toàn trước khi thêm vào Session. Không dùng UUID hoặc `participantCode` làm
-mã hiển thị toàn hệ thống.
+**Current Work: None — continue MVP manual acceptance**
 
 ## 17. Next Recommended Work
 
-1. **Thiết kế và triển khai stable global `playerCode`**
-2. **Tiếp tục MVP Manual Browser Acceptance Test**
-3. **MVP Checkpoint / Tag / Release Preparation**
+1. **Tiếp tục MVP Manual Browser Acceptance Test**
+2. **Đánh giá fairness visibility trong Host UI**
+3. **Đánh giá Player View manual refresh**
+4. **Rà soát Matchmaking wording**
+5. **Đơn giản hóa Match placement nếu manual acceptance xác nhận cần thiết**
+6. **MVP Checkpoint / Tag / Release Preparation**
 
 ## 18. Deferred / Not Now
 
@@ -314,9 +331,10 @@ mã hiển thị toàn hệ thống.
 - Backend business state là authoritative; không optimistic business-state transition.
 - Production mutation dùng `retry: false`.
 - `SessionParticipant UUID` là identity thật cho business operation.
+- Player UUID là canonical identity; `playerCode` chỉ dùng display/search.
 - `participantCode` chỉ dùng hiển thị/search, không làm khóa nghiệp vụ.
 - `personalAccessToken` chỉ là locator cho Player View, không phải participant identity.
-- V1–V8 đã áp dụng là immutable.
+- V1–V9 đã áp dụng là immutable.
 - Live status thuộc `SessionCourt`, không thuộc physical `Court`.
 - Buddy Pair không được tách khi pair eligible/được chọn.
 - Buddy change không viết lại hồi tố Match/MatchPlan hiện có.
@@ -343,14 +361,15 @@ Các item sau đã được source/test/UI xác nhận **DONE** và không còn 
 - Session Discovery / Resume V1 với deterministic backend ordering.
 - PLANNED Session Recovery Start V1 tại Session page.
 - Runtime Create Physical Court V1 với partial-failure recovery.
+- Global Player Code V1 với duplicate-name-safe selectors.
 
 Không chuyển các item này trở lại `Current Work` nếu chưa có regression hoặc requirement mới được source chứng minh.
 
 ## 21. Known Gaps / Caveats
 
-- Stable human-readable Player identity: **DESIGN REQUIRED**; API hiện chỉ có
-  UUID và `displayName`, trong khi duplicate display name được phép.
 - Manual browser acceptance là bước verification, không phải missing feature.
+- Fairness visibility, Player View manual refresh, Matchmaking wording và Match
+  placement simplification vẫn cần được đánh giá bằng manual acceptance.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
 
 ## 22. How To Use This Document

@@ -20,7 +20,7 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesRuntimeTablesThroughPersonalAccessTokenFoundation() {
+    void flywayCreatesRuntimeTablesThroughGlobalPlayerCodeFoundation() {
         String serverVersion = jdbcTemplate.queryForObject(
                 "SHOW server_version", String.class);
         assertThat(serverVersion).startsWith("18.4");
@@ -111,6 +111,39 @@ class FlywaySchemaIntegrationTest extends PostgreSqlIntegrationTest {
                 WHERE version = '8' AND success = true
                 """, Integer.class);
         assertThat(personalAccessTokenMigrationCount).isEqualTo(1);
+
+        Integer playerCodeMigrationCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM flyway_schema_history
+                WHERE version = '9' AND success = true
+                """, Integer.class);
+        assertThat(playerCodeMigrationCount).isEqualTo(1);
+
+        assertThat(playerCodeColumnCount("public")).isEqualTo(1);
+
+        List<String> playerCodeConstraints = jdbcTemplate.queryForList("""
+                SELECT constraint_name
+                FROM information_schema.table_constraints
+                WHERE table_schema = 'public'
+                  AND table_name = 'players'
+                  AND constraint_name IN (
+                    'ck_players_player_code_positive',
+                    'uk_players_player_code'
+                  )
+                ORDER BY constraint_name
+                """, String.class);
+        assertThat(playerCodeConstraints).containsExactly(
+                "ck_players_player_code_positive",
+                "uk_players_player_code"
+        );
+
+        Integer playerCodeSequenceCount = jdbcTemplate.queryForObject("""
+                SELECT count(*)
+                FROM pg_sequences
+                WHERE schemaname = 'public'
+                  AND sequencename = 'players_player_code_seq'
+                """, Integer.class);
+        assertThat(playerCodeSequenceCount).isEqualTo(1);
 
         Integer participantCodeColumnCount = jdbcTemplate.queryForObject("""
                 SELECT count(*)
@@ -442,7 +475,7 @@ void participantCodeMigrationBackfillsExistingParticipantsDeterministically() {
 }
 
 @Test
-void personalAccessTokenMigrationBackfillsExistingParticipantsGloballyUniquely() {
+    void personalAccessTokenMigrationBackfillsExistingParticipantsGloballyUniquely() {
     String schemaName =
             "personal_access_token_backfill_"
                     + UUID.randomUUID().toString().replace("-", "");
@@ -529,6 +562,86 @@ void personalAccessTokenMigrationBackfillsExistingParticipantsGloballyUniquely()
     }
 }
 
+    @Test
+    void playerCodeMigrationBackfillsByCreationTimeThenIdAndAdvancesSequence() {
+        String schemaName = "player_code_backfill_"
+                + UUID.randomUUID().toString().replace("-", "");
+        UUID lowerId = UUID.fromString(
+                "00000000-0000-0000-0000-000000000001");
+        UUID higherId = UUID.fromString(
+                "00000000-0000-0000-0000-000000000002");
+        UUID laterId = UUID.fromString(
+                "00000000-0000-0000-0000-000000000003");
+        Instant sameCreatedAt = Instant.parse("2026-01-01T08:00:00Z");
+        Instant laterCreatedAt = sameCreatedAt.plusSeconds(1);
+
+        try {
+            Flyway.configure()
+                    .dataSource(
+                            POSTGRESQL.getJdbcUrl(),
+                            POSTGRESQL.getUsername(),
+                            POSTGRESQL.getPassword()
+                    )
+                    .locations("classpath:db/migration")
+                    .schemas(schemaName)
+                    .defaultSchema(schemaName)
+                    .target("8")
+                    .load()
+                    .migrate();
+
+            assertThat(playerCodeColumnCount(schemaName)).isZero();
+
+            insertLegacyPlayer(
+                    schemaName, higherId, "Higher UUID", sameCreatedAt
+            );
+            insertLegacyPlayer(
+                    schemaName, lowerId, "Lower UUID", sameCreatedAt
+            );
+            insertLegacyPlayer(
+                    schemaName, laterId, "Later Player", laterCreatedAt
+            );
+
+            Flyway.configure()
+                    .dataSource(
+                            POSTGRESQL.getJdbcUrl(),
+                            POSTGRESQL.getUsername(),
+                            POSTGRESQL.getPassword()
+                    )
+                    .locations("classpath:db/migration")
+                    .schemas(schemaName)
+                    .defaultSchema(schemaName)
+                    .target("9")
+                    .load()
+                    .migrate();
+
+            assertThat(playerCodeColumnCount(schemaName)).isEqualTo(1);
+            assertThat(playerCode(schemaName, lowerId)).isEqualTo(1L);
+            assertThat(playerCode(schemaName, higherId)).isEqualTo(2L);
+            assertThat(playerCode(schemaName, laterId)).isEqualTo(3L);
+
+            List<Long> codes = jdbcTemplate.queryForList(
+                    "SELECT player_code FROM %s.players ORDER BY player_code"
+                            .formatted(schemaName),
+                    Long.class
+            );
+            assertThat(codes)
+                    .containsExactly(1L, 2L, 3L)
+                    .doesNotContainNull()
+                    .doesNotHaveDuplicates();
+
+            Long nextCode = jdbcTemplate.queryForObject(
+                    "SELECT nextval('%s.players_player_code_seq')"
+                            .formatted(schemaName),
+                    Long.class
+            );
+            assertThat(nextCode).isEqualTo(4L);
+        } finally {
+            jdbcTemplate.execute(
+                    "DROP SCHEMA IF EXISTS " + schemaName + " CASCADE"
+            );
+        }
+    }
+
 private int participantCodeColumnCount(String schemaName) {
     Integer count = jdbcTemplate.queryForObject(
             """
@@ -545,7 +658,7 @@ private int participantCodeColumnCount(String schemaName) {
     return count == null ? 0 : count;
 }
 
-private int personalAccessTokenColumnCount(String schemaName) {
+    private int personalAccessTokenColumnCount(String schemaName) {
     Integer count = jdbcTemplate.queryForObject(
             """
             SELECT count(*)
@@ -560,8 +673,36 @@ private int personalAccessTokenColumnCount(String schemaName) {
             schemaName
     );
 
-    return count == null ? 0 : count;
-}
+        return count == null ? 0 : count;
+    }
+
+    private int playerCodeColumnCount(String schemaName) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT count(*)
+                FROM information_schema.columns
+                WHERE table_schema = ?
+                  AND table_name = 'players'
+                  AND column_name = 'player_code'
+                  AND data_type = 'bigint'
+                  AND is_nullable = 'NO'
+                """,
+                Integer.class,
+                schemaName
+        );
+
+        return count == null ? 0 : count;
+    }
+
+    private long playerCode(String schemaName, UUID playerId) {
+        Long playerCode = jdbcTemplate.queryForObject(
+                "SELECT player_code FROM %s.players WHERE id = ?"
+                        .formatted(schemaName),
+                Long.class,
+                playerId
+        );
+        return playerCode;
+    }
 
 private int participantCode(
         String schemaName,

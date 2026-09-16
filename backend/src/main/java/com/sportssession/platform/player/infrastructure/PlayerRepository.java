@@ -10,5 +10,9 @@ public interface PlayerRepository extends JpaRepository<PlayerEntity, UUID> {
     List<PlayerEntity> findAllByOrderByCreatedAtAscIdAsc();
 
     List<PlayerEntity> findByDisplayNameContainingIgnoreCaseOrderByCreatedAtAscIdAsc(String name);
-}
 
+    List<PlayerEntity> findByPlayerCodeOrDisplayNameContainingIgnoreCaseOrderByCreatedAtAscIdAsc(
+            long playerCode,
+            String name
+    );
+}

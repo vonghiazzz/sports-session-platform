@@ -44,9 +44,14 @@ function courtActionState(
   }
 }
 
-function player(id: string, displayName: string): PlayerResponse {
+function player(
+  id: string,
+  displayName: string,
+  playerCode = id === 'existing' ? 'P000001' : 'P000002',
+): PlayerResponse {
   return {
     id,
+    playerCode,
     displayName,
     sportProfiles: [
       {
@@ -178,7 +183,7 @@ describe('LiveAddPlayer', () => {
     await user.type(screen.getByLabelText('Tìm người chơi'), 'mới')
 
     expect(screen.queryByText('Người đã tham gia')).not.toBeInTheDocument()
-    expect(screen.getByText('Nguyễn Mới')).toBeVisible()
+    expect(screen.getByText('P000002 · Nguyễn Mới')).toBeVisible()
     expect(screen.getByText('TB+')).toBeVisible()
   })
 
@@ -197,6 +202,45 @@ describe('LiveAddPlayer', () => {
     await user.click(screen.getByRole('button', { name: 'Thêm vào phiên' }))
 
     expect(addExistingPlayer).toHaveBeenCalledWith(players[1])
+  })
+
+  it('distinguishes duplicate names, searches by code, and adds by Player UUID', async () => {
+    const user = userEvent.setup()
+    const duplicatePlayers = [
+      player('first', 'Nguyễn An', 'P000123'),
+      player('second', 'Nguyễn An', 'P000247'),
+    ]
+    render(
+      <LiveAddPlayer
+        sessionId="session-1"
+        sessionStatus="IN_PROGRESS"
+        players={duplicatePlayers}
+        participants={[]}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: '+ Thêm người chơi' }))
+    await user.type(screen.getByLabelText('Tìm người chơi'), 'nguyễn an')
+
+    expect(
+      screen.getByRole('radio', { name: /P000123 · Nguyễn An/ }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('radio', { name: /P000247 · Nguyễn An/ }),
+    ).toBeVisible()
+
+    await user.clear(screen.getByLabelText('Tìm người chơi'))
+    await user.type(screen.getByLabelText('Tìm người chơi'), '000247')
+    expect(
+      screen.queryByRole('radio', { name: /P000123 · Nguyễn An/ }),
+    ).not.toBeInTheDocument()
+    await user.click(
+      screen.getByRole('radio', { name: /P000247 · Nguyễn An/ }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Thêm vào phiên' }))
+
+    expect(addExistingPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'second', playerCode: 'P000247' }),
+    )
   })
 
   it('creates a Player with BADMINTON and the selected backend Skill enum', async () => {

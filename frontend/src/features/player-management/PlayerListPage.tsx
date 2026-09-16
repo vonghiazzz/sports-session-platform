@@ -91,7 +91,10 @@ export function PlayerListPage() {
                   const profile = badmintonProfile(player.sportProfiles)
                   return (
                     <tr key={player.id}>
-                      <td><strong>{player.displayName}</strong></td>
+                      <td>
+                        <strong>{player.playerCode}</strong>
+                        <small>{player.displayName}</small>
+                      </td>
                       <td>
                         {profile === undefined ? (
                           'Chưa có hồ sơ Cầu lông'
