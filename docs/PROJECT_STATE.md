@@ -5,12 +5,14 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `cc499acaf6838675101782bbf268f723960b2554` |
+| HEAD | `9cd87278640cd3de8e23c41dab1dfe3d0ea3aa48` |
 | Ngày audit | 2026-09-16 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
 | Database | PostgreSQL 18.4; Hibernate `ddl-auto=validate` |
 | Migration head | V9 — Global Player Code |
+| Deployment target | Backend: Render; Frontend: Vercel; Database: Supabase PostgreSQL |
+| Deployment state | `READY TO DEPLOY` — cloud resources are not deployed yet |
 
 Đây là living document canonical về trạng thái sản phẩm. Khi tài liệu và source khác nhau, ưu tiên `CODE → TEST → CONFIG → MIGRATION → CURRENT UI → docs/comments/assumptions` và cập nhật lại tài liệu.
 
@@ -41,6 +43,14 @@ Cung cấp một luồng vận hành phiên cầu lông đôi hoàn chỉnh: Hos
 - PostgreSQL là nguồn dữ liệu bền vững; JPA mapping được kiểm tra với `ddl-auto=validate`.
 - Flyway quản lý schema. V1–V9 đã áp dụng và bất biến.
 - UUID là khóa định danh chính của các aggregate/runtime record; enum domain được lưu dưới dạng giá trị chuỗi theo schema hiện tại.
+
+### Deployment
+
+- Backend được đóng gói bằng multi-stage Docker image Java 25 và dự kiến chạy trên Render Web Service từ branch `main`.
+- Frontend Vite SPA dự kiến chạy trên Vercel từ branch `main`; API base URL được cấu hình công khai qua `VITE_API_BASE_URL`.
+- Production database dự kiến là Supabase PostgreSQL qua Session Pooler, SSL bắt buộc; chỉ backend nhận JDBC credentials.
+- Flyway tiếp tục là schema owner và áp dụng V1–V9 trên database trống; Hibernate chỉ validate schema.
+- Hướng dẫn dashboard, biến môi trường, thứ tự triển khai và smoke test nằm tại [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ### Runtime Data Flow
 
@@ -220,6 +230,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | MatchPlan Queue | DONE | DONE | DONE | Per-court queue và điều phối plan |
 | Host Match Placement Simplification | N/A | DONE | DONE | Hai entry point chính hội tụ vào MatchPlan Queue |
 | Manual MatchPlan Buddy Consistency | DONE | DONE | DONE | Server reject split Buddy; editor hiển thị Buddy và chặn submit sai team |
+| Deployment Readiness | DONE | DONE | READY TO DEPLOY | Render Docker + Supabase config + Vercel SPA/env config; chưa deploy cloud |
 | Complete/Cancel Match | DONE | DONE | DONE | Manual và recommendation Match |
 | Personal Link | DONE | DONE | DONE | Opaque token được cấp theo participant |
 | QR | DONE | DONE | DONE | QR mở personal read-only page |
@@ -333,19 +344,21 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 
 - Backend: JUnit/Spring integration tests với Testcontainers PostgreSQL 18.4; có Flyway schema/invariant coverage và pure-domain tests.
 - Frontend: Vitest, Testing Library, jsdom; có API contract, model/hook và component interaction coverage; checkpoint còn kiểm tra lint, TypeScript/Vite build và `git diff --check`.
-- Focused backend sau Manual MatchPlan Buddy Consistency: **22 tests PASS**, PostgreSQL 18.4.
-- Full backend sau Manual MatchPlan Buddy Consistency: **641 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4.
-- Focused frontend sau Manual MatchPlan Buddy Consistency: **20 tests PASS**.
-- Full frontend sau Manual MatchPlan Buddy Consistency: **377 tests PASS**; lint và production build PASS.
+- Focused backend deployment configuration: **3 tests PASS**.
+- Full backend deployment-readiness checkpoint: **644 tests PASS**, 0 failures/errors/skips, PostgreSQL 18.4; Maven BUILD SUCCESS.
+- Focused frontend API-base configuration: **12 tests PASS**.
+- Full frontend deployment-readiness checkpoint: **381 tests PASS**; lint và production build PASS.
+- Backend multi-stage Docker image build: **PASS** với Java 25 builder/runtime images.
 
 ## 16. Current Work
 
-**Current Work: None — continue MVP manual acceptance**
+**Current Work: Deployment — Render + Vercel + Supabase**
 
 ## 17. Next Recommended Work
 
-1. **Tiếp tục MVP Manual Browser Acceptance Test**
-2. **MVP Checkpoint / Tag / Release Preparation**
+1. **Review và checkpoint deployment-readiness changes trên feature branch**
+2. **Merge đã duyệt vào `main`, cấu hình Supabase → Render → Vercel → CORS**
+3. **Chạy production smoke test theo `docs/DEPLOYMENT.md`**
 
 ## 18. Deferred / Not Now
 
@@ -408,6 +421,7 @@ Không chuyển các item này trở lại `Current Work` nếu chưa có regres
 - Manual browser acceptance là bước verification, không phải missing feature.
 - Host Match Placement Simplification đã hoàn tất; tiếp tục manual browser acceptance trước release checkpoint.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
+- Deployment configuration đã sẵn sàng trong repository nhưng Supabase, Render và Vercel chưa được tạo/kết nối hoặc smoke-test production trong task này.
 
 ## 22. How To Use This Document
 
