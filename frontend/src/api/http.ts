@@ -1,4 +1,5 @@
 import type { ApiError } from './contracts'
+import { apiUrl } from './apiConfig'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -51,7 +52,7 @@ async function requestJson<T>(
   body?: unknown,
 ): Promise<T> {
   const hasBody = body !== undefined
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers: {
       Accept: 'application/json',
@@ -78,7 +79,7 @@ async function requestWithoutResponse(
   method: 'DELETE',
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers: { Accept: 'application/json' },
     signal,
