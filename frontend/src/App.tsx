@@ -1,0 +1,62 @@
+import { Link, Route, Routes } from 'react-router-dom'
+import './App.css'
+import { LiveSessionPage } from './features/live-session/LiveSessionPage'
+import { HostCheckInPage } from './features/check-in/HostCheckInPage'
+import { PlayerDetailPage } from './features/player-management/PlayerDetailPage'
+import { PlayerListPage } from './features/player-management/PlayerListPage'
+import { PlayerSessionAccessPage } from './features/player-session/PlayerSessionAccessPage'
+import { PlayerSessionPage } from './features/player-session/PlayerSessionPage'
+import { SessionDiscoveryList } from './features/session-discovery/SessionDiscoveryList'
+import { SessionSetupPage } from './features/session-setup/SessionSetupPage'
+
+export function HomePage() {
+  return (
+    <main className="route-message home-page">
+      <header>
+        <p className="eyebrow">Nền tảng Phiên thể thao</p>
+        <h1>Vận hành phiên chơi</h1>
+        <p>Tạo phiên mới hoặc mở lại một phiên đã có.</p>
+        <div className="home-actions">
+          <Link className="home-primary-link" to="/sessions/new">
+            Tạo phiên mới
+          </Link>
+          <Link to="/players">Quản lý người chơi</Link>
+        </div>
+      </header>
+
+      <SessionDiscoveryList />
+    </main>
+  )
+}
+
+function NotFoundPage() {
+  return (
+    <main className="route-message">
+      <p className="eyebrow">Nền tảng Phiên thể thao</p>
+      <h1>Không tìm thấy trang</h1>
+      <p>Trang bạn yêu cầu không tồn tại.</p>
+      <Link to="/">Về trang chủ</Link>
+    </main>
+  )
+}
+
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/sessions/new" element={<SessionSetupPage />} />
+      <Route path="/player-session/:token" element={<PlayerSessionAccessPage />} />
+      <Route
+        path="/sessions/:sessionId/player/:sessionParticipantId"
+        element={<PlayerSessionPage />}
+      />
+      <Route path="/sessions/:sessionId/check-in" element={<HostCheckInPage />} />
+      <Route path="/sessions/:sessionId" element={<LiveSessionPage />} />
+      <Route path="/players" element={<PlayerListPage />} />
+      <Route path="/players/:playerId" element={<PlayerDetailPage />} />
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
+  )
+}
+
+export default App

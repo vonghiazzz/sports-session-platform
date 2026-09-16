@@ -9,3 +9,8 @@ spring:
     enabled: true
     clean-disabled: true
     validate-migration-naming: true
+
+rating:
+  reconciliation:
+    enabled: false
+    fixed-delay-ms: 5000

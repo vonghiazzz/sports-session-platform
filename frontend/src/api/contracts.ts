@@ -1,0 +1,396 @@
+export type UUID = string
+export type ISOInstant = string
+
+export type SportCode = 'BADMINTON'
+export type MatchFormat = 'DOUBLES'
+export type SessionStatus = 'PLANNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+export type ParticipantStatus =
+  | 'REGISTERED'
+  | 'WAITING'
+  | 'PLAYING'
+  | 'PAUSED'
+  | 'LEFT'
+export type SessionCourtStatus = 'AVAILABLE' | 'PLAYING' | 'UNAVAILABLE'
+export type SkillLevel =
+  | 'WEAK'
+  | 'WEAK_PLUS'
+  | 'INTERMEDIATE_MINUS'
+  | 'INTERMEDIATE'
+  | 'INTERMEDIATE_PLUS'
+  | 'GOOD'
+export type MatchStatus = 'CREATED' | 'PLAYING' | 'COMPLETED' | 'CANCELLED'
+export type MatchSource = 'MANUAL' | 'RECOMMENDATION' | 'MODIFIED_RECOMMENDATION'
+export type TeamSide = 'A' | 'B'
+export type MatchPlanStatus = 'QUEUED' | 'STARTED' | 'CANCELLED'
+export type PlayerRatingBasis = 'INITIAL_PRIOR' | 'PERSISTED'
+
+export interface SessionResponse {
+  readonly id: UUID
+  readonly venueId: UUID
+  readonly title: string
+  readonly sport: SportCode
+  readonly matchFormat: MatchFormat
+  readonly plannedStartAt: ISOInstant
+  readonly plannedEndAt: ISOInstant
+  readonly status: SessionStatus
+  readonly startedAt: ISOInstant | null
+  readonly completedAt: ISOInstant | null
+  readonly cancelledAt: ISOInstant | null
+  readonly version: number
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export interface VenueResponse {
+  readonly id: UUID
+  readonly name: string
+  readonly locationText: string | null
+  readonly active: boolean
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export interface SessionParticipantResponse {
+  readonly id: UUID
+  readonly sessionId: UUID
+  readonly playerId: UUID
+  readonly participantCode: number
+  readonly buddyPairId: UUID | null
+  readonly status: ParticipantStatus
+  readonly joinedAt: ISOInstant
+  readonly checkedInAt: ISOInstant | null
+  readonly waitingSince: ISOInstant | null
+  readonly pausedAt: ISOInstant | null
+  readonly totalPausedSeconds: number
+  readonly leftAt: ISOInstant | null
+  readonly version: number
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export interface PlayerSessionAccessResponse {
+  readonly sessionId: UUID
+  readonly sessionParticipantId: UUID
+}
+
+export interface SessionParticipantPersonalAccessResponse {
+  readonly sessionId: UUID
+  readonly sessionParticipantId: UUID
+  readonly personalAccessToken: UUID
+}
+
+export interface CreateBuddyPairRequest {
+  readonly firstSessionParticipantId: UUID
+  readonly secondSessionParticipantId: UUID
+}
+
+export interface BuddyPairResponse {
+  readonly buddyPairId: UUID
+  readonly sessionId: UUID
+  readonly firstSessionParticipantId: UUID
+  readonly secondSessionParticipantId: UUID
+}
+
+export interface PlayerSportProfileResponse {
+  readonly id: UUID
+  readonly sport: SportCode
+  readonly skillLevel: SkillLevel
+  readonly rating: PlayerRatingResponse
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export interface PlayerRatingResponse {
+  readonly ratingValue: number
+  readonly uncertainty: number
+  readonly ratedMatches: number
+  readonly ratingBasis: PlayerRatingBasis
+  readonly ratingAlgorithmVersion: string | null
+}
+
+export interface PlayerResponse {
+  readonly id: UUID
+  readonly playerCode: string
+  readonly displayName: string
+  readonly sportProfiles: readonly PlayerSportProfileResponse[]
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export type PlayerRatingHistoryOutcome = 'WIN' | 'LOSS'
+
+export interface PlayerRatingHistoryEventResponse {
+  readonly matchId: UUID
+  readonly matchCompletedAt: ISOInstant
+  readonly outcome: PlayerRatingHistoryOutcome
+  readonly beforeRatingValue: number
+  readonly beforeUncertainty: number
+  readonly afterRatingValue: number
+  readonly afterUncertainty: number
+  readonly resultVersion: number
+  readonly algorithmVersion: string
+  readonly createdAt: ISOInstant
+}
+
+export interface PlayerRatingHistoryResponse {
+  readonly playerId: UUID
+  readonly sport: SportCode
+  readonly matchFormat: MatchFormat
+  readonly events: readonly PlayerRatingHistoryEventResponse[]
+}
+
+export interface SessionCourtResponse {
+  readonly id: UUID
+  readonly sessionId: UUID
+  readonly courtId: UUID
+  readonly status: SessionCourtStatus
+  readonly addedAt: ISOInstant
+  readonly version: number
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export interface CourtResponse {
+  readonly id: UUID
+  readonly venueId: UUID
+  readonly name: string
+  readonly sport: SportCode
+  readonly active: boolean
+  readonly createdAt: ISOInstant
+  readonly updatedAt: ISOInstant
+}
+
+export interface MatchParticipantResponse {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface MatchParticipantRequest {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface CreateManualMatchRequest {
+  readonly sessionCourtId: UUID
+  readonly participants: readonly MatchParticipantRequest[]
+}
+
+export interface CompleteMatchRequest {
+  readonly winnerTeam: TeamSide
+  readonly teamAScore: number | null
+  readonly teamBScore: number | null
+}
+
+export interface MatchResponse {
+  readonly id: UUID
+  readonly sessionId: UUID
+  readonly sessionCourtId: UUID
+  readonly status: MatchStatus
+  readonly source: MatchSource
+  readonly winnerTeam: TeamSide | null
+  readonly teamAScore: number | null
+  readonly teamBScore: number | null
+  readonly resultVersion: number
+  readonly participants: readonly MatchParticipantResponse[]
+  readonly createdAt: ISOInstant
+  readonly startedAt: ISOInstant | null
+  readonly completedAt: ISOInstant | null
+  readonly cancelledAt: ISOInstant | null
+  readonly updatedAt: ISOInstant
+  readonly version: number
+}
+
+export interface MatchPlanParticipantResponse {
+  readonly id: UUID
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface MatchPlanParticipantRequest {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface MatchPlanResponse {
+  readonly id: UUID
+  readonly sessionId: UUID
+  readonly sessionCourtId: UUID
+  readonly source: MatchSource
+  readonly status: MatchPlanStatus
+  readonly queuePosition: number | null
+  readonly startedMatchId: UUID | null
+  readonly participants: readonly MatchPlanParticipantResponse[]
+  readonly createdAt: ISOInstant
+  readonly startedAt: ISOInstant | null
+  readonly cancelledAt: ISOInstant | null
+  readonly updatedAt: ISOInstant
+  readonly version: number
+}
+
+export interface SaveMatchPlanRequest {
+  readonly participants: readonly MatchPlanParticipantRequest[]
+}
+
+export interface MoveMatchPlanRequest {
+  readonly targetSessionCourtId: UUID
+}
+
+export interface ReorderMatchPlanRequest {
+  readonly targetPosition: number
+}
+
+export interface StartedMatchPlanResponse {
+  readonly matchPlan: MatchPlanResponse
+  readonly match: MatchResponse
+}
+
+export type MatchmakingGenerationOutcome = 'RECOMMENDED' | 'UNAVAILABLE'
+export type MatchmakingUnavailableReason = 'INSUFFICIENT_ELIGIBLE_PLAYERS'
+export type MatchmakingRatingBasis = 'PERSISTED' | 'INITIAL_PRIOR'
+
+export interface MatchmakingPlayerResponse {
+  readonly sessionParticipantId: UUID
+  readonly playerId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+  readonly waitingSince: ISOInstant
+  readonly waitingSeconds: number
+  readonly sessionMatchesPlayed: number
+  readonly ratingValue: number
+  readonly uncertainty: number
+  readonly ratedMatches: number
+  readonly ratingBasis: MatchmakingRatingBasis
+}
+
+export interface MatchmakingTeamResponse {
+  readonly slot1: MatchmakingPlayerResponse
+  readonly slot2: MatchmakingPlayerResponse
+}
+
+interface MatchmakingGenerationBase {
+  readonly algorithmVersion: string
+  readonly evaluationTime: ISOInstant
+  readonly sessionId: UUID
+  readonly sessionCourtId: UUID
+  readonly sportCode: SportCode
+  readonly matchFormat: MatchFormat
+  readonly eligiblePlayerCount: number
+}
+
+export interface MatchRecommendationResponse
+  extends MatchmakingGenerationBase {
+  readonly outcome: 'RECOMMENDED'
+  readonly teamA: MatchmakingTeamResponse
+  readonly teamB: MatchmakingTeamResponse
+  readonly teamARatingTotal: number
+  readonly teamBRatingTotal: number
+  readonly ratingDifference: number
+  readonly oldestWaitingSince: ISOInstant
+}
+
+export interface MatchmakingUnavailableResponse
+  extends MatchmakingGenerationBase {
+  readonly outcome: 'UNAVAILABLE'
+  readonly reason: MatchmakingUnavailableReason
+}
+
+export type MatchmakingGenerationResponse =
+  | MatchRecommendationResponse
+  | MatchmakingUnavailableResponse
+
+export type GlobalMatchmakingUnavailableReason =
+  | 'NO_ELIGIBLE_COURTS'
+  | 'INSUFFICIENT_ELIGIBLE_PLAYERS'
+
+export interface GlobalMatchmakingGenerationResponse {
+  readonly outcome: MatchmakingGenerationOutcome
+  readonly orchestrationVersion: string
+  readonly selectionAlgorithmVersion: string
+  readonly evaluationTime: ISOInstant
+  readonly sessionId: UUID
+  readonly initialEligiblePlayerCount: number
+  readonly courtResults: readonly MatchmakingGenerationResponse[]
+  readonly reason: GlobalMatchmakingUnavailableReason | null
+}
+
+export interface GlobalMatchmakingQueueRecommendationRequest {
+  readonly sessionCourtId: UUID
+  readonly assignments: readonly AcceptMatchmakingAssignmentRequest[]
+}
+
+export interface GlobalMatchmakingQueueRequest {
+  readonly orchestrationVersion: string
+  readonly selectionAlgorithmVersion: string
+  readonly targetCourtIds: readonly UUID[]
+  readonly recommendations: readonly GlobalMatchmakingQueueRecommendationRequest[]
+}
+
+export interface GlobalMatchmakingQueueResponse {
+  readonly sessionId: UUID
+  readonly orchestrationVersion: string
+  readonly selectionAlgorithmVersion: string
+  readonly createdPlans: readonly MatchPlanResponse[]
+}
+
+export interface AcceptMatchmakingAssignmentRequest {
+  readonly sessionParticipantId: UUID
+  readonly teamSide: TeamSide
+  readonly teamSlot: number
+}
+
+export interface AcceptMatchmakingRecommendationRequest {
+  readonly algorithmVersion: string
+  readonly assignments: readonly AcceptMatchmakingAssignmentRequest[]
+}
+
+export interface ApiError {
+  readonly timestamp: ISOInstant
+  readonly status: number
+  readonly error: string
+  readonly message: string
+  readonly path: string
+  readonly fieldErrors: Readonly<Record<string, string>>
+}
+
+export interface CreateVenueRequest {
+  readonly name: string
+  readonly locationText: string | null
+  readonly active: boolean
+}
+
+export interface CreateCourtRequest {
+  readonly name: string
+  readonly sport: SportCode
+  readonly active: boolean
+}
+
+export interface CreatePlayerRequest {
+  readonly displayName: string
+  readonly sport: SportCode
+  readonly skillLevel: SkillLevel
+}
+
+export interface UpdatePlayerSkillLevelRequest {
+  readonly skillLevel: SkillLevel
+}
+
+export interface CreateSessionRequest {
+  readonly venueId: UUID
+  readonly title: string
+  readonly sport: SportCode
+  readonly matchFormat: MatchFormat
+  readonly plannedStartAt: ISOInstant
+  readonly plannedEndAt: ISOInstant
+}
+
+export interface AddSessionCourtRequest {
+  readonly courtId: UUID
+}
+
+export interface AddSessionParticipantRequest {
+  readonly playerId: UUID
+}

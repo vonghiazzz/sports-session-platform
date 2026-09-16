@@ -1,0 +1,62 @@
+package com.sportssession.platform.session.infrastructure;
+
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface SessionParticipantRepository
+        extends JpaRepository<SessionParticipantEntity, UUID> {
+
+    boolean existsBySessionIdAndPlayerId(UUID sessionId, UUID playerId);
+
+    @Query("""
+            select max(participant.participantCode)
+            from SessionParticipantEntity participant
+            where participant.sessionId = :sessionId
+            """)
+    Optional<Integer> findMaxParticipantCodeBySessionId(
+            @Param("sessionId") UUID sessionId
+    );
+
+    Optional<SessionParticipantEntity> findByIdAndSessionId(UUID id, UUID sessionId);
+
+    Optional<SessionParticipantEntity> findByPersonalAccessToken(
+            UUID personalAccessToken
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select participant
+            from SessionParticipantEntity participant
+            where participant.id in :participantIds
+            order by participant.id
+            """)
+    List<SessionParticipantEntity> findAllByIdForUpdateOrderById(
+            @Param("participantIds") List<UUID> participantIds
+    );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select participant
+            from SessionParticipantEntity participant
+            where participant.sessionId = :sessionId
+              and participant.buddyPairId = :buddyPairId
+            order by participant.id
+            """)
+    List<SessionParticipantEntity> findBuddyPairMembersForUpdate(
+            @Param("sessionId") UUID sessionId,
+            @Param("buddyPairId") UUID buddyPairId
+    );
+
+    List<SessionParticipantEntity> findAllBySessionIdOrderByJoinedAtAscIdAsc(UUID sessionId);
+
+    List<SessionParticipantEntity> findAllBySessionIdOrderByPlayerIdAscIdAsc(
+            UUID sessionId
+    );
+}

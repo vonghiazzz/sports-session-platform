@@ -66,6 +66,18 @@ public class PlayerSportProfileEntity {
                 profile.updatedAt());
     }
 
+    public void applyProfile(PlayerSportProfile profile) {
+        if (!id.equals(profile.id())
+                || !playerId.equals(profile.playerId())
+                || sportCode != profile.sportCode()) {
+            throw new IllegalArgumentException(
+                    "Profile identity must not change"
+            );
+        }
+        this.skillLevel = profile.skillLevel();
+        this.updatedAt = profile.updatedAt();
+    }
+
     public PlayerSportProfile toDomain() {
         return new PlayerSportProfile(
                 id, playerId, sportCode, skillLevel, createdAt, updatedAt);

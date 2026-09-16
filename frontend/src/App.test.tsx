@@ -1,0 +1,95 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import { describe, expect, it, vi } from 'vitest'
+import App from './App'
+
+vi.mock('./features/player-management/PlayerListPage', () => ({
+  PlayerListPage: () => <h1>Danh sách quản lý người chơi</h1>,
+}))
+
+vi.mock('./features/player-management/PlayerDetailPage', () => ({
+  PlayerDetailPage: () => <h1>Chi tiết quản lý người chơi</h1>,
+}))
+
+vi.mock('./features/player-session/PlayerSessionPage', () => ({
+  PlayerSessionPage: () => <h1>Trạng thái người chơi trong phiên</h1>,
+}))
+
+vi.mock('./features/player-session/PlayerSessionAccessPage', () => ({
+  PlayerSessionAccessPage: () => <h1>Trạng thái người chơi qua liên kết</h1>,
+}))
+
+vi.mock('./features/check-in/HostCheckInPage', () => ({
+  HostCheckInPage: () => <h1>Bàn điểm danh phiên</h1>,
+}))
+
+vi.mock('./features/session-discovery/SessionDiscoveryList', () => ({
+  SessionDiscoveryList: () => <section aria-label="Phiên gần đây" />,
+}))
+
+describe('Player management routing', () => {
+  it('keeps Create Session and renders Session discovery on Home', () => {
+    render(<App />, { wrapper: MemoryRouter })
+    expect(screen.getByRole('link', { name: 'Tạo phiên mới' })).toHaveAttribute(
+      'href',
+      '/sessions/new',
+    )
+    expect(screen.getByRole('region', { name: 'Phiên gần đây' })).toBeVisible()
+  })
+
+  it('provides an obvious Home navigation path to /players', async () => {
+    const user = userEvent.setup()
+    render(<App />, { wrapper: MemoryRouter })
+    const link = screen.getByRole('link', { name: 'Quản lý người chơi' })
+    expect(link).toHaveAttribute('href', '/players')
+    await user.click(link)
+    expect(screen.getByRole('heading', { name: 'Danh sách quản lý người chơi' }))
+      .toBeInTheDocument()
+  })
+
+  it('registers the Player detail route without changing Session routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/players/player-1']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('heading', { name: 'Chi tiết quản lý người chơi' }))
+      .toBeInTheDocument()
+  })
+
+  it('registers the Session Participant UUID route for the read-only Player view', () => {
+    render(
+      <MemoryRouter initialEntries={['/sessions/session-1/player/participant-12']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('heading', {
+        name: 'Trạng thái người chơi trong phiên',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('registers the opaque token route as the preferred Player view route', () => {
+    render(
+      <MemoryRouter initialEntries={['/player-session/opaque-token']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(
+      screen.getByRole('heading', {
+        name: 'Trạng thái người chơi qua liên kết',
+      }),
+    ).toBeInTheDocument()
+  })
+
+  it('registers the Host Check-In Desk route without changing Player routes', () => {
+    render(
+      <MemoryRouter initialEntries={['/sessions/session-1/check-in']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('heading', { name: 'Bàn điểm danh phiên' })).toBeVisible()
+  })
+})

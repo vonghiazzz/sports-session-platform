@@ -32,4 +32,25 @@ public record PlayerSportProfile(
         return new PlayerSportProfile(
                 UUID.randomUUID(), playerId, sportCode, skillLevel, now, now);
     }
+
+    public PlayerSportProfile changeSkillLevel(
+            SkillLevel newSkillLevel,
+            Instant now
+    ) {
+        Objects.requireNonNull(newSkillLevel, "skillLevel is required");
+        Objects.requireNonNull(now, "now is required");
+        if (now.isBefore(createdAt)) {
+            throw new IllegalArgumentException(
+                    "updatedAt must not be before createdAt"
+            );
+        }
+        return new PlayerSportProfile(
+                id,
+                playerId,
+                sportCode,
+                newSkillLevel,
+                createdAt,
+                now
+        );
+    }
 }

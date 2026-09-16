@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PlayerSportProfileRepository
@@ -14,6 +15,14 @@ public interface PlayerSportProfileRepository
 
     List<PlayerSportProfileEntity> findAllByPlayerIdInOrderByCreatedAtAsc(
             Collection<UUID> playerIds);
+
+    List<PlayerSportProfileEntity> findAllByPlayerIdInAndSportCode(
+            Collection<UUID> playerIds,
+            SportCode sportCode);
+
+    Optional<PlayerSportProfileEntity> findByPlayerIdAndSportCode(
+            UUID playerId,
+            SportCode sportCode);
 
     boolean existsByPlayerIdAndSportCode(UUID playerId, SportCode sportCode);
 }

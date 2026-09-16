@@ -1,0 +1,128 @@
+.check-in-desk {
+  width: min(100% - 2rem, 76rem);
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.check-in-desk-header,
+.check-in-list-heading,
+.check-in-participant-row,
+.check-in-desk-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.check-in-desk-header h1,
+.check-in-list-heading h2 {
+  margin: 0.25rem 0;
+}
+
+.check-in-desk-header p {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.check-in-desk-navigation {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.check-in-desk-navigation a,
+.check-in-desk-link {
+  color: var(--accent-strong);
+  font-weight: 750;
+}
+
+.check-in-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.check-in-summary > div,
+.check-in-participants {
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.check-in-summary > div {
+  padding: 1rem;
+}
+
+.check-in-summary dt {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.check-in-summary dd {
+  margin: 0.25rem 0 0;
+  font-size: 1.7rem;
+  font-weight: 850;
+}
+
+.check-in-participants {
+  padding: 1rem;
+}
+
+.check-in-list-heading > span {
+  color: var(--muted-text);
+  font-weight: 700;
+}
+
+.check-in-participants .people-search {
+  margin-top: 1rem;
+}
+
+.check-in-participant-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-in-participant-row {
+  align-items: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  padding: 0.85rem;
+  background: var(--surface-subtle);
+}
+
+.check-in-participant-details,
+.check-in-participant-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.check-in-participant-details {
+  min-width: 12rem;
+}
+
+.check-in-participant-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .check-in-desk-header,
+  .check-in-participant-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .check-in-desk-navigation,
+  .check-in-participant-actions {
+    justify-content: flex-start;
+  }
+
+  .check-in-summary {
+    grid-template-columns: 1fr;
+  }
+}

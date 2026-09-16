@@ -1,0 +1,162 @@
+package com.sportssession.platform.session.infrastructure;
+
+import com.sportssession.platform.session.domain.ParticipantStatus;
+import com.sportssession.platform.session.domain.SessionParticipant;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "session_participants")
+public class SessionParticipantEntity {
+
+    @Id
+    private UUID id;
+
+    @Column(name = "session_id", nullable = false)
+    private UUID sessionId;
+
+    @Column(name = "player_id", nullable = false)
+    private UUID playerId;
+
+    @Column(name = "participant_code", nullable = false)
+    private int participantCode;
+
+    @Column(name = "personal_access_token", nullable = false, unique = true)
+    private UUID personalAccessToken;
+
+    @Column(name = "buddy_pair_id")
+    private UUID buddyPairId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 32)
+    private ParticipantStatus status;
+
+    @Column(name = "joined_at", nullable = false)
+    private Instant joinedAt;
+
+    @Column(name = "checked_in_at")
+    private Instant checkedInAt;
+
+    @Column(name = "waiting_since")
+    private Instant waitingSince;
+
+    @Column(name = "paused_at")
+    private Instant pausedAt;
+
+    @Column(name = "total_paused_seconds", nullable = false)
+    private long totalPausedSeconds;
+
+    @Column(name = "left_at")
+    private Instant leftAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    protected SessionParticipantEntity() {
+    }
+
+    private SessionParticipantEntity(SessionParticipant participant) {
+        this.id = participant.id();
+        this.sessionId = participant.sessionId();
+        this.playerId = participant.playerId();
+        this.participantCode = participant.participantCode();
+        this.personalAccessToken = participant.personalAccessToken();
+        this.buddyPairId = participant.buddyPairId();
+        this.status = participant.status();
+        this.joinedAt = participant.joinedAt();
+        this.checkedInAt = participant.checkedInAt();
+        this.waitingSince = participant.waitingSince();
+        this.pausedAt = participant.pausedAt();
+        this.totalPausedSeconds = participant.totalPausedSeconds();
+        this.leftAt = participant.leftAt();
+        this.version = participant.version();
+        this.createdAt = participant.createdAt();
+        this.updatedAt = participant.updatedAt();
+    }
+
+    public static SessionParticipantEntity from(SessionParticipant participant) {
+        return new SessionParticipantEntity(participant);
+    }
+
+    public void applyRuntimeState(SessionParticipant participant) {
+        this.buddyPairId = participant.buddyPairId();
+        this.status = participant.status();
+        this.checkedInAt = participant.checkedInAt();
+        this.waitingSince = participant.waitingSince();
+        this.pausedAt = participant.pausedAt();
+        this.totalPausedSeconds = participant.totalPausedSeconds();
+        this.leftAt = participant.leftAt();
+        this.updatedAt = participant.updatedAt();
+    }
+
+    public SessionParticipant toDomain() {
+        return new SessionParticipant(
+                id,
+                sessionId,
+                playerId,
+                participantCode,
+                personalAccessToken,
+                buddyPairId,
+                status,
+                joinedAt,
+                checkedInAt,
+                waitingSince,
+                pausedAt,
+                totalPausedSeconds,
+                leftAt,
+                version,
+                createdAt,
+                updatedAt);
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getSessionId() {
+        return sessionId;
+    }
+
+    public UUID getPlayerId() {
+        return playerId;
+    }
+
+    public int getParticipantCode() {
+        return participantCode;
+    }
+
+    public UUID getPersonalAccessToken() {
+        return personalAccessToken;
+    }
+
+    public ParticipantStatus getStatus() {
+        return status;
+    }
+
+    public UUID getBuddyPairId() {
+        return buddyPairId;
+    }
+
+    public Instant getWaitingSince() {
+        return waitingSince;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+}

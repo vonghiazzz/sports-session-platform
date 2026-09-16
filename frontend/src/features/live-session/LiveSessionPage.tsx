@@ -1,0 +1,1183 @@
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import {
+  composeLiveSessionModel,
+  type CourtView,
+  type LiveSessionModel,
+  type MatchView,
+  type ParticipantView,
+} from './liveSessionModel'
+import './LiveSessionPage.css'
+import {
+  useLiveSessionData,
+  type LiveSessionDataState,
+} from './useLiveSessionData'
+import {
+  useParticipantAction,
+  useSessionCourtAction,
+  type ParticipantAction,
+  type SessionCourtAction,
+} from './useLiveSessionActions'
+import { useMatchLifecycleActions } from './useManualMatchActions'
+import {
+  useSessionLifecycleActions,
+  type SessionLifecycleAction,
+} from './useSessionLifecycleActions'
+import {
+  COURT_ACTION_LABELS,
+  MATCH_ACTION_LABELS,
+  matchFormatLabel,
+  PARTICIPANT_ACTION_LABELS,
+  SESSION_ACTION_LABELS,
+  sportLabel,
+  statusLabel,
+} from '../../lib/presentation'
+import { LiveAddCourt, LiveAddPlayer } from './LiveSessionAdditions'
+import { filterParticipantsByName } from './peopleOperations'
+import type {
+  MatchPlanResponse,
+  PlayerResponse,
+  SessionParticipantResponse,
+} from '../../api/contracts'
+import { MatchmakingRecommendation } from './MatchmakingRecommendation'
+import { MatchPlanQueue } from './MatchPlanQueue'
+import { BuddyPairControls } from './BuddyPairControls'
+import {
+  useBuddyPairActions,
+  type BuddyPairActions,
+} from './useBuddyPairActions'
+import { ParticipantPersonalLinkAction } from './ParticipantPersonalLinkAction'
+
+function isSessionMutable(status: LiveSessionModel['header']['status']) {
+  return status === 'PLANNED' || status === 'IN_PROGRESS'
+}
+
+function availableParticipantActions(
+  participantStatus: ParticipantView['status'],
+  sessionStatus: LiveSessionModel['header']['status'],
+): readonly ParticipantAction[] {
+  if (!isSessionMutable(sessionStatus)) {
+    return []
+  }
+  switch (participantStatus) {
+    case 'REGISTERED':
+      return sessionStatus === 'IN_PROGRESS'
+        ? ['CHECK_IN', 'LEAVE']
+        : ['LEAVE']
+    case 'WAITING':
+      return ['PAUSE', 'LEAVE']
+    case 'PAUSED':
+      return ['RESUME', 'LEAVE']
+    case 'PLAYING':
+    case 'LEFT':
+      return []
+  }
+}
+
+function useNow(intervalMilliseconds = 30_000): Date {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const interval = window.setInterval(
+      () => setNow(new Date()),
+      intervalMilliseconds,
+    )
+    return () => window.clearInterval(interval)
+  }, [intervalMilliseconds])
+
+  return now
+}
+
+function StatusBadge({ status }: { readonly status: string }) {
+  const statusClassName = status
+    .toLowerCase()
+    .replaceAll('_', '-')
+    .replaceAll(' ', '-')
+  return (
+    <span className={`status-badge status-${statusClassName}`}>
+      {statusLabel(status)}
+    </span>
+  )
+}
+
+function TeamList({
+  label,
+  members,
+}: {
+  readonly label: string
+  readonly members: MatchView['teamA']
+}) {
+  return (
+    <div className="team">
+      <h4>{label}</h4>
+      <ul>
+        {members.map((member) => (
+          <li key={member.slotLabel}>
+            <span className="slot-label">{member.slotLabel}</span>
+            <span>{member.displayName}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function MatchTeams({ match }: { readonly match: MatchView }) {
+  return (
+    <div className="match-teams">
+      <TeamList label="Đội A" members={match.teamA} />
+      <span className="versus" aria-label="đối đầu">
+        đấu
+      </span>
+      <TeamList label="Đội B" members={match.teamB} />
+    </div>
+  )
+}
+
+type WinnerSelection = '' | 'A' | 'B'
+
+function completeRequest(
+  winnerTeam: WinnerSelection,
+  teamAScoreInput: string,
+  teamBScoreInput: string,
+) {
+  if (winnerTeam === '') {
+    return { error: 'Hãy chọn đội thắng.', request: null }
+  }
+
+  const teamAScoreBlank = teamAScoreInput === ''
+  const teamBScoreBlank = teamBScoreInput === ''
+  if (teamAScoreBlank && teamBScoreBlank) {
+    return {
+      error: null,
+      request: { winnerTeam, teamAScore: null, teamBScore: null },
+    }
+  }
+  if (teamAScoreBlank || teamBScoreBlank) {
+    return { error: 'Hãy nhập cả hai tỷ số hoặc để trống cả hai.', request: null }
+  }
+
+  const teamAScore = Number(teamAScoreInput)
+  const teamBScore = Number(teamBScoreInput)
+  if (!Number.isInteger(teamAScore) || !Number.isInteger(teamBScore)) {
+    return { error: 'Tỷ số phải là số nguyên.', request: null }
+  }
+  if (teamAScore < 0 || teamBScore < 0) {
+    return { error: 'Tỷ số không được là số âm.', request: null }
+  }
+  if (teamAScore === teamBScore) {
+    return { error: 'Trận đấu không thể kết thúc với tỷ số hòa.', request: null }
+  }
+  if (
+    (winnerTeam === 'A' && teamAScore < teamBScore) ||
+    (winnerTeam === 'B' && teamBScore < teamAScore)
+  ) {
+    return {
+      error: 'Đội thắng phải có tỷ số cao hơn.',
+      request: null,
+    }
+  }
+
+  return {
+    error: null,
+    request: { winnerTeam, teamAScore, teamBScore },
+  }
+}
+
+function PlayingMatchPanel({
+  match,
+  sessionId,
+}: {
+  readonly match: MatchView
+  readonly sessionId: string
+}) {
+  const actionState = useMatchLifecycleActions(sessionId, match.id)
+  const [winnerTeam, setWinnerTeam] = useState<WinnerSelection>('')
+  const [teamAScore, setTeamAScore] = useState('')
+  const [teamBScore, setTeamBScore] = useState('')
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    null,
+  )
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false)
+
+  function handleComplete(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (actionState.isPending || isConfirmingCancel) {
+      return
+    }
+    const result = completeRequest(winnerTeam, teamAScore, teamBScore)
+    setValidationMessage(result.error)
+    if (result.request !== null) {
+      void actionState.execute({ type: 'COMPLETE', request: result.request })
+    }
+  }
+
+  const completeDisabled = actionState.isPending || isConfirmingCancel
+
+  return (
+    <div className="court-match">
+      <MatchTeams match={match} />
+      <dl className="inline-details">
+        <div>
+          <dt>Nguồn</dt>
+          <dd>{match.sourceLabel}</dd>
+        </div>
+        <div>
+          <dt>Bắt đầu</dt>
+          <dd>{match.startedAtLabel ?? '—'}</dd>
+        </div>
+        <div>
+          <dt>Thời gian đã chơi</dt>
+          <dd>{match.elapsedLabel ?? '—'}</dd>
+        </div>
+      </dl>
+      <form className="complete-match-form" noValidate onSubmit={handleComplete}>
+        <div className="result-fields">
+          <label className="match-field winner-field">
+            <span>Đội thắng</span>
+            <select
+              value={winnerTeam}
+              disabled={completeDisabled}
+              onChange={(event) => {
+                setWinnerTeam(event.target.value as WinnerSelection)
+                setValidationMessage(null)
+              }}
+            >
+              <option value="">Chọn đội thắng</option>
+              <option value="A">Đội A</option>
+              <option value="B">Đội B</option>
+            </select>
+          </label>
+          <label className="match-field">
+            <span>Tỷ số Đội A (không bắt buộc)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={teamAScore}
+              disabled={completeDisabled}
+              onChange={(event) => {
+                setTeamAScore(event.target.value)
+                setValidationMessage(null)
+              }}
+            />
+          </label>
+          <label className="match-field">
+            <span>Tỷ số Đội B (không bắt buộc)</span>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              inputMode="numeric"
+              value={teamBScore}
+              disabled={completeDisabled}
+              onChange={(event) => {
+                setTeamBScore(event.target.value)
+                setValidationMessage(null)
+              }}
+            />
+          </label>
+        </div>
+        {validationMessage && (
+          <p className="action-feedback" role="alert">
+            {validationMessage}
+          </p>
+        )}
+        <div className="match-lifecycle-actions">
+          <button
+            className="primary-action-button"
+            type="submit"
+            disabled={completeDisabled}
+          >
+            {actionState.pendingAction === 'COMPLETE'
+              ? MATCH_ACTION_LABELS.COMPLETE.pending
+              : MATCH_ACTION_LABELS.COMPLETE.idle}
+          </button>
+          {!isConfirmingCancel ? (
+            <button
+              className="danger-action-button"
+              type="button"
+              disabled={actionState.isPending}
+              onClick={() => setIsConfirmingCancel(true)}
+            >
+              {MATCH_ACTION_LABELS.CANCEL.idle}
+            </button>
+          ) : (
+            <div className="cancel-confirmation">
+              <p>Hủy trận đang chơi này? Kết quả sẽ không ghi nhận đội thắng.</p>
+              <div className="action-area">
+                <button
+                  className="danger-action-button"
+                  type="button"
+                  disabled={actionState.isPending}
+                  onClick={() => void actionState.execute({ type: 'CANCEL' })}
+                >
+                  {actionState.pendingAction === 'CANCEL'
+                    ? MATCH_ACTION_LABELS.CANCEL.pending
+                    : 'Xác nhận hủy'}
+                </button>
+                <button
+                  className="secondary-action-button"
+                  type="button"
+                  disabled={actionState.isPending}
+                  onClick={() => setIsConfirmingCancel(false)}
+                >
+                  Giữ trận đấu
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {actionState.errorMessage && (
+          <p className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </p>
+        )}
+      </form>
+    </div>
+  )
+}
+
+function CourtCard({
+  court,
+  sessionId,
+  sessionStatus,
+  participants,
+  courts,
+  matchPlans,
+}: {
+  readonly court: CourtView
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly participants: readonly ParticipantView[]
+  readonly courts: readonly CourtView[]
+  readonly matchPlans: readonly MatchPlanResponse[]
+}) {
+  const actionState = useSessionCourtAction(sessionId, court.sessionCourtId)
+  const action: SessionCourtAction | null = isSessionMutable(sessionStatus)
+    ? court.status === 'AVAILABLE'
+      ? 'DISABLE'
+      : court.status === 'UNAVAILABLE'
+        ? 'ENABLE'
+        : null
+    : null
+
+  return (
+    <article className="court-card">
+      <header>
+        <h3>{court.name}</h3>
+        <StatusBadge status={court.status} />
+      </header>
+
+      {court.status === 'AVAILABLE' && (
+        <p className="court-note">Sẵn sàng thi đấu.</p>
+      )}
+      {court.status === 'UNAVAILABLE' && (
+        <p className="court-note">Tạm khóa trong phiên này.</p>
+      )}
+      {court.status === 'PLAYING' && court.activeMatch === null && (
+        <p className="data-warning">Không có dữ liệu trận đấu trực tiếp.</p>
+      )}
+      {court.activeMatch && (
+        <PlayingMatchPanel match={court.activeMatch} sessionId={sessionId} />
+      )}
+      {sessionStatus === 'IN_PROGRESS' && (
+        <MatchmakingRecommendation
+          sessionId={sessionId}
+          court={court}
+          participants={participants}
+        />
+      )}
+      <MatchPlanQueue
+        sessionId={sessionId}
+        sessionStatus={sessionStatus}
+        court={court}
+        courts={courts}
+        participants={participants}
+        matchPlans={matchPlans}
+      />
+      {action && (
+        <div className="action-area court-action-area">
+          <button
+            className="secondary-action-button"
+            type="button"
+            disabled={actionState.isPending}
+            onClick={() => actionState.execute(action)}
+          >
+            {actionState.pendingAction === action
+              ? COURT_ACTION_LABELS[action].pending
+              : COURT_ACTION_LABELS[action].idle}
+          </button>
+        </div>
+      )}
+      {actionState.errorMessage && (
+        <p className="action-feedback" role="alert">
+          {actionState.errorMessage}
+        </p>
+      )}
+    </article>
+  )
+}
+
+function ParticipantRow({
+  participant,
+  allParticipants,
+  sessionId,
+  sessionStatus,
+  showWaiting,
+  buddyPairActions,
+}: {
+  readonly participant: ParticipantView
+  readonly allParticipants: readonly ParticipantView[]
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly showWaiting: boolean
+  readonly buddyPairActions: BuddyPairActions
+}) {
+  const actionState = useParticipantAction(
+    sessionId,
+    participant.sessionParticipantId,
+  )
+  const actions = availableParticipantActions(participant.status, sessionStatus)
+  const checkInUnavailable =
+    participant.status === 'REGISTERED' && sessionStatus !== 'IN_PROGRESS'
+
+  return (
+    <li>
+      <div className="participant-identity">
+        <strong>
+          <span>{`#${participant.participantCode}`}</span>{' '}
+          <span>{participant.displayName}</span>
+        </strong>
+        <span>{participant.skillLabel ?? '—'}</span>
+      </div>
+      <div className="participant-operation">
+        <span className="participant-completed-match-count">
+          {`Trận đã hoàn tất: ${participant.completedMatchCount}`}
+        </span>
+        {showWaiting && (
+          <span
+            className={
+              participant.waitingDuration === null
+                ? 'waiting-time data-warning'
+                : 'waiting-time'
+            }
+          >
+            {participant.waitingDuration === null
+              ? 'Chờ —'
+              : `Chờ ${participant.waitingDuration}`}
+          </span>
+        )}
+        {participant.planningLabel && (
+          <span className="participant-planning-context">
+            {participant.planningLabel}
+          </span>
+        )}
+        <BuddyPairControls
+          key={participant.buddyPairId ?? 'unpaired'}
+          participant={participant}
+          participants={allParticipants}
+          sessionStatus={sessionStatus}
+          actions={buddyPairActions}
+        />
+        <ParticipantPersonalLinkAction
+          sessionId={sessionId}
+          sessionParticipantId={participant.sessionParticipantId}
+          participantLabel={`#${participant.participantCode} ${participant.displayName}`}
+        />
+        {actions.length > 0 && (
+          <div className="action-area participant-actions">
+            {actions.map((action) => (
+              <button
+                className="secondary-action-button"
+                type="button"
+                key={action}
+                disabled={actionState.isPending}
+                onClick={() => actionState.execute(action)}
+              >
+                {actionState.pendingAction === action
+                  ? PARTICIPANT_ACTION_LABELS[action].pending
+                  : PARTICIPANT_ACTION_LABELS[action].idle}
+              </button>
+            ))}
+          </div>
+        )}
+        {checkInUnavailable && (
+          <span className="action-note">
+            Phiên phải đang diễn ra để điểm danh.
+          </span>
+        )}
+        {actionState.errorMessage && (
+          <span className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </span>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function ParticipantList({
+  title,
+  participants,
+  allParticipants,
+  sessionId,
+  sessionStatus,
+  showWaiting = false,
+  emptyMessage,
+  priority = false,
+  subdued = false,
+  buddyPairActions,
+}: {
+  readonly title: string
+  readonly participants: readonly ParticipantView[]
+  readonly allParticipants: readonly ParticipantView[]
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly showWaiting?: boolean
+  readonly emptyMessage: string
+  readonly priority?: boolean
+  readonly subdued?: boolean
+  readonly buddyPairActions: BuddyPairActions
+}) {
+  return (
+    <section
+      className={`participant-group${priority ? ' participant-group-priority' : ''}${subdued ? ' participant-group-subdued' : ''}`}
+      aria-label={`${title}: ${participants.length} người`}
+    >
+      <div className="section-title">
+        <h3>{title}</h3>
+        <span>{participants.length}</span>
+      </div>
+      {participants.length === 0 ? (
+        <p className="empty-state">{emptyMessage}</p>
+      ) : (
+        <ul className="participant-list">
+          {participants.map((participant) => (
+            <ParticipantRow
+              key={participant.sessionParticipantId}
+              participant={participant}
+              allParticipants={allParticipants}
+              sessionId={sessionId}
+              sessionStatus={sessionStatus}
+              showWaiting={showWaiting}
+              buddyPairActions={buddyPairActions}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function PeoplePanel({
+  model,
+  sessionId,
+  players,
+  participants,
+}: {
+  readonly model: LiveSessionModel
+  readonly sessionId: string
+  readonly players: readonly PlayerResponse[]
+  readonly participants: readonly SessionParticipantResponse[]
+}) {
+  const [search, setSearch] = useState('')
+  const buddyPairActions = useBuddyPairActions(sessionId)
+  const allParticipants = useMemo(
+    () => [
+      ...model.waitingParticipants,
+      ...model.playingParticipants,
+      ...model.registeredParticipants,
+      ...model.pausedParticipants,
+      ...model.leftParticipants,
+    ],
+    [model],
+  )
+  const groups = [
+    {
+      title: 'Đang chờ',
+      participants: filterParticipantsByName(model.waitingParticipants, search),
+      showWaiting: true,
+      emptyMessage: 'Không có người chơi đang chờ.',
+      priority: true,
+      subdued: false,
+    },
+    {
+      title: 'Đang chơi',
+      participants: filterParticipantsByName(model.playingParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi đang chơi.',
+      priority: false,
+      subdued: false,
+    },
+    {
+      title: 'Đã đăng ký',
+      participants: filterParticipantsByName(model.registeredParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi chưa điểm danh.',
+      priority: false,
+      subdued: false,
+    },
+    {
+      title: 'Tạm nghỉ',
+      participants: filterParticipantsByName(model.pausedParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi đang tạm nghỉ.',
+      priority: false,
+      subdued: false,
+    },
+    {
+      title: 'Đã rời',
+      participants: filterParticipantsByName(model.leftParticipants, search),
+      showWaiting: false,
+      emptyMessage: 'Không có người chơi đã rời phiên.',
+      priority: false,
+      subdued: true,
+    },
+  ] as const
+  const hasSearch = search.trim().length > 0
+  const matchingCount = groups.reduce(
+    (total, group) => total + group.participants.length,
+    0,
+  )
+
+  return (
+    <section className="panel participant-panel" aria-labelledby="participants-heading">
+      <div className="people-heading">
+        <div className="section-title section-title-large">
+          <div>
+            <p className="eyebrow">Người chơi</p>
+            <h2 id="participants-heading">Người chơi</h2>
+          </div>
+          <span>{model.participantCount} người chơi</span>
+        </div>
+        <LiveAddPlayer
+          sessionId={sessionId}
+          sessionStatus={model.header.status}
+          players={players}
+          participants={participants}
+        />
+      </div>
+      <label className="people-search">
+        <span>Tìm người chơi</span>
+        <input
+          type="search"
+          value={search}
+          placeholder="Nhập tên người chơi trong phiên"
+          onChange={(event) => setSearch(event.target.value)}
+        />
+      </label>
+      <p className="people-fairness-note">
+        Số trận đã hoàn tất được tính trong phiên hiện tại và là một trong các
+        tiêu chí ghép trận công bằng.
+      </p>
+      {hasSearch && matchingCount === 0 ? (
+        <p className="people-search-empty">Không tìm thấy người chơi trong phiên.</p>
+      ) : (
+        <div className="participant-groups">
+          {groups
+            .filter((group) => !hasSearch || group.participants.length > 0)
+            .map((group) => (
+              <ParticipantList
+                key={group.title}
+                title={group.title}
+                participants={group.participants}
+                allParticipants={allParticipants}
+                sessionId={sessionId}
+                sessionStatus={model.header.status}
+                showWaiting={group.showWaiting}
+                emptyMessage={group.emptyMessage}
+                priority={group.priority}
+                subdued={group.subdued}
+                buddyPairActions={buddyPairActions}
+              />
+            ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function CreatedMatchCard({
+  match,
+  sessionId,
+  sessionStatus,
+}: {
+  readonly match: MatchView
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+}) {
+  const actionState = useMatchLifecycleActions(sessionId, match.id)
+  const [isConfirmingCancel, setIsConfirmingCancel] = useState(false)
+  const canStart = sessionStatus === 'IN_PROGRESS'
+
+  return (
+    <article className="created-match-card">
+      <header>
+        <div>
+          <h3>{match.courtName}</h3>
+          <p>Đã tạo — chưa bắt đầu</p>
+        </div>
+        <span className="source-label">{match.sourceLabel}</span>
+      </header>
+      <MatchTeams match={match} />
+      <p className="created-time">Tạo lúc {match.createdAtLabel}</p>
+      <div className="action-area created-match-actions">
+        {canStart && (
+          <button
+            className="primary-action-button"
+            type="button"
+            disabled={actionState.isPending || isConfirmingCancel}
+            onClick={() => void actionState.execute({ type: 'START' })}
+          >
+            {actionState.pendingAction === 'START'
+              ? MATCH_ACTION_LABELS.START.pending
+              : MATCH_ACTION_LABELS.START.idle}
+          </button>
+        )}
+        {!isConfirmingCancel && (
+          <button
+            className="danger-action-button"
+            type="button"
+            disabled={actionState.isPending}
+            onClick={() => setIsConfirmingCancel(true)}
+          >
+            {MATCH_ACTION_LABELS.CANCEL.idle}
+          </button>
+        )}
+      </div>
+      {!canStart && (
+        <p className="action-note">
+          Trận này chỉ có thể bắt đầu khi phiên đang diễn ra.
+        </p>
+      )}
+      {isConfirmingCancel && (
+        <div className="cancel-confirmation">
+          <p>Hủy trận đã tạo này?</p>
+          <div className="action-area">
+            <button
+              className="danger-action-button"
+              type="button"
+              disabled={actionState.isPending}
+              onClick={() => void actionState.execute({ type: 'CANCEL' })}
+            >
+              {actionState.pendingAction === 'CANCEL'
+                ? MATCH_ACTION_LABELS.CANCEL.pending
+                : 'Xác nhận hủy'}
+            </button>
+            <button
+              className="secondary-action-button"
+              type="button"
+              disabled={actionState.isPending}
+              onClick={() => setIsConfirmingCancel(false)}
+            >
+              Giữ trận đấu
+            </button>
+          </div>
+        </div>
+      )}
+      {actionState.errorMessage && (
+        <p className="action-feedback" role="alert">
+          {actionState.errorMessage}
+        </p>
+      )}
+    </article>
+  )
+}
+
+function SessionHeader({
+  model,
+  sessionId,
+  hasPlayingMatch,
+  onRefresh,
+  isRefreshing,
+}: {
+  readonly model: LiveSessionModel
+  readonly sessionId: string
+  readonly hasPlayingMatch: boolean
+  readonly onRefresh: () => Promise<void>
+  readonly isRefreshing: boolean
+}) {
+  return (
+    <header className="session-header">
+      <div>
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>{model.header.title}</h1>
+        <p className="venue-line">
+          {model.header.venueName}
+          {model.header.venueLocation
+            ? ` · ${model.header.venueLocation}`
+            : ''}
+        </p>
+      </div>
+      <div className="session-header-actions">
+        <Link className="session-home-link" to="/">
+          ← Danh sách phiên
+        </Link>
+        <a className="check-in-desk-link" href={`/sessions/${sessionId}/check-in`}>
+          Mở bàn điểm danh
+        </a>
+        <button
+          className="refresh-button"
+          type="button"
+          disabled={isRefreshing}
+          onClick={() => void onRefresh()}
+        >
+          {isRefreshing ? 'Đang làm mới…' : 'Làm mới'}
+        </button>
+      </div>
+      <dl className="session-facts">
+        <div>
+          <dt>Trạng thái</dt>
+          <dd>
+            <StatusBadge status={model.header.status} />
+          </dd>
+        </div>
+        <div>
+          <dt>Môn thể thao</dt>
+          <dd>{sportLabel(model.header.sport)}</dd>
+        </div>
+        <div>
+          <dt>Thể thức</dt>
+          <dd>{matchFormatLabel(model.header.matchFormat)}</dd>
+        </div>
+        <div>
+          <dt>Dự kiến</dt>
+          <dd>
+            {model.header.plannedStartAtLabel} – {model.header.plannedEndAtLabel}
+          </dd>
+        </div>
+        <div>
+          <dt>Bắt đầu</dt>
+          <dd>{model.header.startedAtLabel ?? 'Chưa bắt đầu'}</dd>
+        </div>
+      </dl>
+      <SessionLifecycleControls
+        sessionId={sessionId}
+        sessionStatus={model.header.status}
+        hasPlayingMatch={hasPlayingMatch}
+      />
+    </header>
+  )
+}
+
+function SessionLifecycleControls({
+  sessionId,
+  sessionStatus,
+  hasPlayingMatch,
+}: {
+  readonly sessionId: string
+  readonly sessionStatus: LiveSessionModel['header']['status']
+  readonly hasPlayingMatch: boolean
+}) {
+  const actionState = useSessionLifecycleActions(sessionId)
+  const [confirmation, setConfirmation] =
+    useState<SessionLifecycleAction | null>(null)
+
+  if (sessionStatus === 'COMPLETED' || sessionStatus === 'CANCELLED') {
+    return null
+  }
+
+  const startIsAvailable = sessionStatus === 'PLANNED'
+  const completeIsAvailable = sessionStatus === 'IN_PROGRESS'
+  const activeConfirmation =
+    (confirmation === 'START' && !startIsAvailable) ||
+    (confirmation === 'COMPLETE' &&
+      (!completeIsAvailable || hasPlayingMatch))
+      ? null
+      : confirmation
+  const controlsLocked = actionState.isPending || activeConfirmation !== null
+  const confirmationMessage =
+    activeConfirmation === 'START'
+      ? 'Bắt đầu phiên này?'
+      : activeConfirmation === 'COMPLETE'
+      ? 'Kết thúc phiên này? Thao tác cuối cùng này không thể hoàn tác.'
+      : hasPlayingMatch
+        ? 'Hủy phiên này? Phiên sẽ bị hủy nhưng trận đang chơi không tự kết thúc. Sau đó, bạn vẫn phải kết thúc hoặc hủy trận để giải phóng sân và người chơi.'
+        : 'Hủy phiên này? Thao tác cuối cùng này không thể hoàn tác.'
+
+  function executeConfirmedAction() {
+    if (activeConfirmation === null) {
+      return
+    }
+    const action = activeConfirmation
+    setConfirmation(null)
+    actionState.execute(action)
+  }
+
+  return (
+    <section
+      className="session-lifecycle-controls"
+      aria-labelledby="session-lifecycle-heading"
+    >
+      <div>
+        <p className="eyebrow">Vận hành phiên chơi</p>
+        <h2 id="session-lifecycle-heading">
+          {startIsAvailable ? 'Bắt đầu phiên' : 'Kết thúc phiên'}
+        </h2>
+      </div>
+      <div className="session-lifecycle-operation">
+        <div className="action-area session-lifecycle-actions">
+          {startIsAvailable && (
+            <button
+              className="primary-action-button"
+              type="button"
+              disabled={controlsLocked}
+              onClick={() => setConfirmation('START')}
+            >
+              {actionState.pendingAction === 'START'
+                ? SESSION_ACTION_LABELS.START.pending
+                : SESSION_ACTION_LABELS.START.idle}
+            </button>
+          )}
+          {completeIsAvailable && (
+            <button
+              className="primary-action-button"
+              type="button"
+              disabled={controlsLocked || hasPlayingMatch}
+              onClick={() => setConfirmation('COMPLETE')}
+            >
+              {actionState.pendingAction === 'COMPLETE'
+                ? SESSION_ACTION_LABELS.COMPLETE.pending
+                : SESSION_ACTION_LABELS.COMPLETE.idle}
+            </button>
+          )}
+          <button
+            className="danger-action-button"
+            type="button"
+            disabled={controlsLocked}
+            onClick={() => setConfirmation('CANCEL')}
+          >
+            {actionState.pendingAction === 'CANCEL'
+              ? SESSION_ACTION_LABELS.CANCEL.pending
+              : SESSION_ACTION_LABELS.CANCEL.idle}
+          </button>
+        </div>
+        {completeIsAvailable && hasPlayingMatch && (
+          <p className="session-lifecycle-note" role="status">
+            Không thể kết thúc phiên khi đang có trận thi đấu. Hãy kết thúc
+            hoặc hủy trận đang chơi trước.
+          </p>
+        )}
+        {activeConfirmation !== null && (
+          <div className="session-lifecycle-confirmation">
+            <p>{confirmationMessage}</p>
+            <div className="action-area">
+              <button
+                className={
+                  activeConfirmation === 'CANCEL'
+                    ? 'danger-action-button'
+                    : 'primary-action-button'
+                }
+                type="button"
+                disabled={actionState.isPending}
+                onClick={executeConfirmedAction}
+              >
+                {actionState.pendingAction === 'START'
+                  ? SESSION_ACTION_LABELS.START.pending
+                  : actionState.pendingAction === 'COMPLETE'
+                    ? SESSION_ACTION_LABELS.COMPLETE.pending
+                    : actionState.pendingAction === 'CANCEL'
+                      ? SESSION_ACTION_LABELS.CANCEL.pending
+                      : activeConfirmation === 'START'
+                        ? 'Xác nhận bắt đầu'
+                        : activeConfirmation === 'COMPLETE'
+                          ? 'Xác nhận kết thúc'
+                          : 'Xác nhận hủy'}
+              </button>
+              <button
+                className="secondary-action-button"
+                type="button"
+                disabled={actionState.isPending}
+                onClick={() => setConfirmation(null)}
+              >
+                Giữ phiên
+              </button>
+            </div>
+          </div>
+        )}
+        {actionState.errorMessage && (
+          <p className="action-feedback" role="alert">
+            {actionState.errorMessage}
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+export function LiveSessionScreen({
+  state,
+  now,
+}: {
+  readonly state: LiveSessionDataState
+  readonly now: Date
+}) {
+  const model = useMemo(
+    () =>
+      state.status === 'ready'
+        ? composeLiveSessionModel({ ...state.data, now })
+        : null,
+    [now, state],
+  )
+
+  if (state.status === 'loading') {
+    return (
+      <main className="route-state" aria-live="polite">
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>Đang tải phiên…</h1>
+        <p>Đang tải sân, người chơi và trận đấu.</p>
+      </main>
+    )
+  }
+
+  if (state.status === 'not-found') {
+    return (
+      <main className="route-state">
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>Không tìm thấy phiên</h1>
+        <p>Phiên bạn yêu cầu không khả dụng.</p>
+      </main>
+    )
+  }
+
+  if (state.status === 'error' || model === null) {
+    return (
+      <main className="route-state" role="alert">
+        <p className="eyebrow">Phòng điều hành phiên trực tiếp</p>
+        <h1>Không thể tải dữ liệu phiên trực tiếp.</h1>
+        <p>Một hoặc nhiều dữ liệu bắt buộc không tải được. Hãy thử lại.</p>
+        <button
+          className="refresh-button"
+          type="button"
+          disabled={state.isRefreshing}
+          onClick={() => void state.refresh()}
+        >
+          {state.isRefreshing ? 'Đang thử lại…' : 'Thử lại'}
+        </button>
+      </main>
+    )
+  }
+
+  const allParticipants = [
+    ...model.waitingParticipants,
+    ...model.registeredParticipants,
+    ...model.pausedParticipants,
+    ...model.playingParticipants,
+    ...model.leftParticipants,
+  ]
+
+  return (
+    <main className="control-room">
+      <SessionHeader
+        model={model}
+        sessionId={state.data.session.id}
+        hasPlayingMatch={state.data.matches.some(
+          (match) => match.status === 'PLAYING',
+        )}
+        onRefresh={state.refresh}
+        isRefreshing={state.isRefreshing}
+      />
+
+      {model.warnings.length > 0 && (
+        <aside className="consistency-warning" aria-live="polite">
+          <strong>Dữ liệu trực tiếp có thể chưa đồng bộ. Hãy làm mới.</strong>
+          <ul>
+            {model.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
+
+      {state.hasBackgroundError && (
+        <aside className="background-refresh-warning" role="status">
+          Dữ liệu gần nhất vẫn được giữ lại. Một lần đồng bộ nền chưa thành công;
+          bạn có thể dùng “Làm mới”.
+        </aside>
+      )}
+
+      <section className="court-board" aria-labelledby="court-board-heading">
+        <div className="section-title section-title-large">
+          <div>
+            <p className="eyebrow">Khu vực thi đấu</p>
+            <h2 id="court-board-heading">Bảng sân</h2>
+          </div>
+          <span>{model.courts.length} sân</span>
+        </div>
+        <LiveAddCourt
+          sessionId={state.data.session.id}
+          sessionStatus={model.header.status}
+          venueId={state.data.session.venueId}
+          sport={state.data.session.sport}
+          venueCourts={state.data.venueCourts}
+          sessionCourts={state.data.sessionCourts}
+        />
+        {model.courts.length === 0 ? (
+          <p className="empty-panel">Chưa có sân nào trong phiên này.</p>
+        ) : (
+          <div className="court-grid">
+            {model.courts.map((court) => (
+              <CourtCard
+                key={court.sessionCourtId}
+                court={court}
+                sessionId={state.data.session.id}
+                sessionStatus={model.header.status}
+                participants={allParticipants}
+                courts={model.courts}
+                matchPlans={state.data.matchPlans}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="operational-grid">
+        <PeoplePanel
+          model={model}
+          sessionId={state.data.session.id}
+          players={state.data.players}
+          participants={state.data.participants}
+        />
+
+        <section className="panel created-matches" aria-labelledby="created-matches-heading">
+          <div className="section-title section-title-large">
+            <div>
+              <p className="eyebrow">Hàng chờ bền vững</p>
+              <h2 id="created-matches-heading">Trận chờ bắt đầu</h2>
+            </div>
+            <span>{model.createdMatches.length}</span>
+          </div>
+          {model.createdMatches.length === 0 ? (
+            <p className="empty-panel">Không có trận nào đang chờ bắt đầu.</p>
+          ) : (
+            <div className="created-match-list">
+              {model.createdMatches.map((match) => (
+                <CreatedMatchCard
+                  key={match.id}
+                  match={match}
+                  sessionId={state.data.session.id}
+                  sessionStatus={model.header.status}
+                />
+              ))}
+            </div>
+          )}
+          {model.resolvedMatchCount > 0 && (
+            <p className="resolved-count">
+              {model.resolvedMatchCount} trận đã kết thúc hoặc bị hủy
+            </p>
+          )}
+        </section>
+      </div>
+    </main>
+  )
+}
+
+export function LiveSessionPage() {
+  const { sessionId = '' } = useParams()
+  const state = useLiveSessionData(sessionId)
+  const now = useNow()
+
+  return <LiveSessionScreen state={state} now={now} />
+}

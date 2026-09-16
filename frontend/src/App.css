@@ -1,0 +1,42 @@
+.route-message {
+  width: min(100% - 2rem, 56rem);
+  margin: 0 auto;
+  padding: 5rem 0;
+}
+
+.route-message h1 {
+  margin: 0.35rem 0 0.75rem;
+  font-size: clamp(2rem, 6vw, 3.5rem);
+}
+
+.route-message p {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.route-message a {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.route-message .home-primary-link {
+  border-radius: 0.7rem;
+  padding: 0.75rem 1rem;
+  color: #ffffff;
+  background: var(--accent-strong);
+  text-decoration: none;
+}
+
+.home-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.home-page {
+  width: min(100% - 2rem, 72rem);
+}
