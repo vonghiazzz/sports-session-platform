@@ -5,8 +5,8 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `9cd87278640cd3de8e23c41dab1dfe3d0ea3aa48` |
-| Ngày audit | 2026-09-16 |
+| HEAD | `ee8e692d447befbc94395d360d1b4a6357409372` |
+| Ngày audit | 2026-09-21 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
 | Database | PostgreSQL 18.4; Hibernate `ddl-auto=validate` |
@@ -231,6 +231,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | Host Match Placement Simplification | N/A | DONE | DONE | Hai entry point chính hội tụ vào MatchPlan Queue |
 | Manual MatchPlan Buddy Consistency | DONE | DONE | DONE | Server reject split Buddy; editor hiển thị Buddy và chặn submit sai team |
 | Deployment Readiness | DONE | DONE | READY TO DEPLOY | Render Docker + Supabase config + Vercel SPA/env config; chưa deploy cloud |
+| EOP IAM Integration Architecture | NOT IMPLEMENTED | NOT IMPLEMENTED | AUDITED / DESIGNED | Contract, tenancy, role/scope và roadmap tại `docs/IAM_INTEGRATION_ARCHITECTURE.md` |
 | Complete/Cancel Match | DONE | DONE | DONE | Manual và recommendation Match |
 | Personal Link | DONE | DONE | DONE | Opaque token được cấp theo participant |
 | QR | DONE | DONE | DONE | QR mở personal read-only page |
@@ -352,13 +353,13 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 
 ## 16. Current Work
 
-**Current Work: Deployment — Render + Vercel + Supabase**
+**Current Work: EOP IAM Integration Architecture — AUDITED / DESIGNED**
 
 ## 17. Next Recommended Work
 
-1. **Review và checkpoint deployment-readiness changes trên feature branch**
-2. **Merge đã duyệt vào `main`, cấu hình Supabase → Render → Vercel → CORS**
-3. **Chạy production smoke test theo `docs/DEPLOYMENT.md`**
+1. **External IAM Resource Server Runtime Validation Contract**
+2. **Sau khi contract được duyệt: provision `SPORTS_WEB` và Sports authorization catalog**
+3. **Chưa thêm Spring Security/login/tenancy vào Sports trước khi Slice 1 hoàn tất**
 
 ## 18. Deferred / Not Now
 
@@ -422,6 +423,7 @@ Không chuyển các item này trở lại `Current Work` nếu chưa có regres
 - Host Match Placement Simplification đã hoàn tất; tiếp tục manual browser acceptance trước release checkpoint.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
 - Deployment configuration đã sẵn sàng trong repository nhưng Supabase, Render và Vercel chưa được tạo/kết nối hoặc smoke-test production trong task này.
+- EOP IAM integration mới ở trạng thái `AUDITED / DESIGNED`; external runtime validation/context contract và delegated Host administration còn thiếu, vì vậy Authentication chưa `DONE`.
 
 ## 22. How To Use This Document
 
