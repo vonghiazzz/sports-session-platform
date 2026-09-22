@@ -5,14 +5,14 @@
 | Thuộc tính | Giá trị |
 | --- | --- |
 | Branch | `feature/host-live-session-ui-v1` |
-| HEAD | `ee8e692d447befbc94395d360d1b4a6357409372` |
-| Ngày audit | 2026-09-21 |
+| HEAD tại checkpoint audit | `230394006c663eb3e879ebeaf065206fffbb0e23` |
+| Ngày audit | 2026-09-22 |
 | Backend | Java 25, Spring Boot 3.5.16, Maven, JPA, Bean Validation, Flyway 12.8.1 |
 | Frontend | React 19, TypeScript 6, Vite 8, React Router 7, TanStack Query 5 |
 | Database | PostgreSQL 18.4; Hibernate `ddl-auto=validate` |
 | Migration head | V9 — Global Player Code |
 | Deployment target | Backend: Render; Frontend: Vercel; Database: Supabase PostgreSQL |
-| Deployment state | `READY TO DEPLOY` — cloud resources are not deployed yet |
+| Deployment state | `PARTIALLY VERIFIED` — Render backend health 200; frontend production URL và Supabase chưa được xác minh độc lập |
 
 Đây là living document canonical về trạng thái sản phẩm. Khi tài liệu và source khác nhau, ưu tiên `CODE → TEST → CONFIG → MIGRATION → CURRENT UI → docs/comments/assumptions` và cập nhật lại tài liệu.
 
@@ -46,11 +46,12 @@ Cung cấp một luồng vận hành phiên cầu lông đôi hoàn chỉnh: Hos
 
 ### Deployment
 
-- Backend được đóng gói bằng multi-stage Docker image Java 25 và dự kiến chạy trên Render Web Service từ branch `main`.
-- Frontend Vite SPA dự kiến chạy trên Vercel từ branch `main`; API base URL được cấu hình công khai qua `VITE_API_BASE_URL`.
-- Production database dự kiến là Supabase PostgreSQL qua Session Pooler, SSL bắt buộc; chỉ backend nhận JDBC credentials.
+- Backend đã được xác minh phản hồi `200 {"status":"UP"}` tại `https://sports-session-platform-api.onrender.com/api/health` ngày 2026-09-22; free-tier cold start có thể làm phản hồi đầu tiên chậm.
+- Frontend Vite SPA được cấu hình để chạy trên Vercel từ branch `main`, nhưng repository không chứa URL production chính xác nên deployment frontend chưa được xác minh trong checkpoint này. API base URL tiếp tục được cấu hình công khai qua `VITE_API_BASE_URL`.
+- Production database target là Supabase PostgreSQL qua Session Pooler, SSL bắt buộc; chỉ backend nhận JDBC credentials. Health response hiện tại không tự chứng minh nhà cung cấp/kết nối database nên Supabase chưa được xác minh độc lập.
 - Flyway tiếp tục là schema owner và áp dụng V1–V9 trên database trống; Hibernate chỉ validate schema.
 - Hướng dẫn dashboard, biến môi trường, thứ tự triển khai và smoke test nằm tại [`docs/DEPLOYMENT.md`](DEPLOYMENT.md).
+- Checklist cho Host chạy một phiên cầu lông đôi production nằm tại [`docs/UAT_CHECKLIST.md`](UAT_CHECKLIST.md).
 
 ### Runtime Data Flow
 
@@ -230,7 +231,7 @@ Player View hiển thị runtime state `REGISTERED`, `WAITING`, `QUEUED`, `PLAYI
 | MatchPlan Queue | DONE | DONE | DONE | Per-court queue và điều phối plan |
 | Host Match Placement Simplification | N/A | DONE | DONE | Hai entry point chính hội tụ vào MatchPlan Queue |
 | Manual MatchPlan Buddy Consistency | DONE | DONE | DONE | Server reject split Buddy; editor hiển thị Buddy và chặn submit sai team |
-| Deployment Readiness | DONE | DONE | READY TO DEPLOY | Render Docker + Supabase config + Vercel SPA/env config; chưa deploy cloud |
+| Deployment Readiness | DONE | DONE | PARTIALLY VERIFIED | Render backend health 200; URL Vercel và Supabase chưa được xác minh độc lập |
 | EOP IAM Integration Architecture | NOT IMPLEMENTED | NOT IMPLEMENTED | AUDITED / DESIGNED | Contract, tenancy, role/scope và roadmap tại `docs/IAM_INTEGRATION_ARCHITECTURE.md` |
 | Complete/Cancel Match | DONE | DONE | DONE | Manual và recommendation Match |
 | Personal Link | DONE | DONE | DONE | Opaque token được cấp theo participant |
@@ -353,13 +354,16 @@ Các component/hook chính được tổ chức trong `session-setup`, `live-ses
 
 ## 16. Current Work
 
-**Current Work: EOP IAM Integration Architecture — AUDITED / DESIGNED**
+**Current Work: Production UAT Readiness — checklist prepared; awaiting verified frontend URL and Host execution**
+
+IAM integration remains paused during this UAT readiness slice. Current product
+scope remains `BADMINTON` + `DOUBLES` only.
 
 ## 17. Next Recommended Work
 
-1. **External IAM Resource Server Runtime Validation Contract**
-2. **Sau khi contract được duyệt: provision `SPORTS_WEB` và Sports authorization catalog**
-3. **Chưa thêm Spring Security/login/tenancy vào Sports trước khi Slice 1 hoàn tất**
+1. **Xác nhận frontend production URL và CORS với Render backend**
+2. **Host chạy một phiên theo `docs/UAT_CHECKLIST.md` và ghi nhận P0–P3**
+3. **Giữ IAM integration ở trạng thái paused cho đến khi UAT readiness hoàn tất**
 
 ## 18. Deferred / Not Now
 
@@ -422,8 +426,8 @@ Không chuyển các item này trở lại `Current Work` nếu chưa có regres
 - Manual browser acceptance là bước verification, không phải missing feature.
 - Host Match Placement Simplification đã hoàn tất; tiếp tục manual browser acceptance trước release checkpoint.
 - Player self check-in và QR auto check-in không được triển khai và không phải current requirement.
-- Deployment configuration đã sẵn sàng trong repository nhưng Supabase, Render và Vercel chưa được tạo/kết nối hoặc smoke-test production trong task này.
-- EOP IAM integration mới ở trạng thái `AUDITED / DESIGNED`; external runtime validation/context contract và delegated Host administration còn thiếu, vì vậy Authentication chưa `DONE`.
+- Render backend đã phản hồi health 200 ngày 2026-09-22. Repository không chứng minh URL Vercel production và health response không xác minh Supabase độc lập; hai phần này vẫn cần kiểm tra trước Host UAT.
+- EOP IAM integration vẫn paused và không thuộc Production UAT Readiness slice này; Authentication chưa `DONE`.
 
 ## 22. How To Use This Document
 
